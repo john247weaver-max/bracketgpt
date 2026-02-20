@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BracketGPT — March Madness Bracket Advisor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg1:#0a0e17;--bg2:#1a1a2e;--surface:#0f1724;--muted:#9aa4b2;--accent:#ff7a18}
+    html,body{height:100%;margin:0;font-family:Outfit,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,var(--bg1),var(--bg2));color:#e6eef8;display:flex;align-items:center;justify-content:center}
+    .app{width:980px;max-width:96%;height:760px;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.6);display:flex;flex-direction:column}
+    header{background:linear-gradient(90deg,rgba(255,255,255,.02),rgba(255,255,255,.01));padding:18px 22px;display:flex;align-items:center;gap:14px}
+    .logo{font-size:28px}
+    .title{font-weight:700;font-size:18px}
+    .tag{font-size:12px;color:var(--muted);letter-spacing:1px}
+    main{display:flex;flex:1}
+    .sidebar{width:300px;border-right:1px solid rgba(255,255,255,.02);background:transparent;padding:18px;box-sizing:border-box}
+    .welcome{margin-bottom:18px}
+    .quick-btns{display:grid;grid-template-columns:1fr;gap:10px}
+    button.quick{background:linear-gradient(90deg,rgba(255,255,255,.02),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.03);padding:10px 12px;border-radius:8px;color:#e9f3ff;cursor:pointer;text-align:left}
+    .chat-wrap{flex:1;display:flex;flex-direction:column}
+    .messages{flex:1;padding:18px;overflow:auto;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
+    .msg{max-width:72%;margin:8px 0;padding:12px 14px;border-radius:10px;line-height:1.35}
+    .bot{background:var(--surface);align-self:flex-start;color:#dbe7ff}
+    .user{background:linear-gradient(90deg,var(--accent),#ff9d45);align-self:flex-end;color:#08101a}
+    .composer{padding:12px;border-top:1px solid rgba(255,255,255,.02);display:flex;gap:8px}
+    .composer input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.03);background:transparent;color:inherit}
+    .composer button{background:var(--accent);border:none;padding:10px 14px;border-radius:10px;color:#051018;cursor:pointer}
+    .brand-line{font-size:12px;color:var(--muted)}
+    .small{font-size:12px;color:var(--muted);margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="app" role="application">
+    <header>
+      <div class="logo">🏀</div>
+      <div>
+        <div class="title">BracketGPT</div>
+        <div class="tag">3-MODEL ENSEMBLE · ESPN 320 OPTIMIZER</div>
+      </div>
+      <div style="margin-left:auto" class="brand-line" id="brandLine"></div>
+    </header>
+    <main>
+      <aside class="sidebar">
+        <div class="welcome">
+          <div style="font-weight:700;font-size:16px">Welcome to BracketGPT</div>
+          <div class="small">Quick prompts to get started</div>
+        </div>
+        <div class="quick-btns">
+          <button class="quick" data-prompt="Biggest upset candidates?">Biggest upset candidates?</button>
+          <button class="quick" data-prompt="Best strategy for my pool?">Best strategy for my pool?</button>
+          <button class="quick" data-prompt="Best 12 vs 5 upset pick?">Best 12 vs 5 upset pick?</button>
+          <button class="quick" data-prompt="Safest Final Four picks?">Safest Final Four picks?</button>
+          <button class="quick" data-prompt="Compare the 1-seeds">Compare the 1-seeds</button>
+          <button class="quick" data-prompt="Build my bracket">Build my bracket</button>
+        </div>
+      </aside>
+      <section class="chat-wrap">
+        <div class="messages" id="messages" aria-live="polite"></div>
+        <form id="composer" class="composer">
+          <input id="messageInput" placeholder="Ask BracketGPT a question..." autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const composer = document.getElementById('composer');
+    const input = document.getElementById('messageInput');
+    const quicks = document.querySelectorAll('.quick');
+
+    let config = {brandName:'BracketGPT',tagline:'3-MODEL ENSEMBLE · ESPN 320 OPTIMIZER',dataLoaded:false,activeSeason:null};
+
+    async function loadConfig(){
+      try{
+        const res = await fetch('/api/config');
+        if(res.ok){
+          const json = await res.json();
+          config = {...config,...json};
+          document.getElementById('brandLine').textContent = config.brandName + (config.activeSeason?(' · '+config.activeSeason):'');
+        }
+      }catch(e){console.warn('Could not load config',e)}
+    }
+
+    function pushMessage(role, text){
+      const el = document.createElement('div');
+      el.className = 'msg '+(role==='user'?'user':'bot');
+      el.textContent = text;
+      messagesEl.appendChild(el);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function sendMessages(messages){
+      pushMessage('user', messages[messages.length-1].content);
+      pushMessage('bot', 'Thinking...');
+      try{
+        const res = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});
+        const json = await res.json();
+        // replace last bot message
+        const botMsgs = document.querySelectorAll('.msg.bot');
+        if(botMsgs.length) botMsgs[botMsgs.length-1].textContent = json.reply || 'No reply';
+      }catch(err){
+        const botMsgs = document.querySelectorAll('.msg.bot');
+        if(botMsgs.length) botMsgs[botMsgs.length-1].textContent = 'Error: '+err.message;
+      }
+    }
+
+    composer.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const text = input.value.trim();
+      if(!text) return;
+      input.value = '';
+      const messages = [{role:'user',content:text}];
+      await sendMessages(messages);
+    });
+
+    quicks.forEach(b=>b.addEventListener('click', ()=>{
+      const p = b.dataset.prompt;
+      input.value = p;
+      input.focus();
+    }));
+
+    // initial load
+    loadConfig();
+  </script>
+</body>
+</html>
