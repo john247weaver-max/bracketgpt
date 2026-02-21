@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BracketGPT · Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0D1117;--surface:#161B22;--card:#1C2128;--elevated:#252C35;
+    --border:rgba(139,148,158,.12);--text:#E6EDF3;--text2:#8B949E;--muted:#484F58;
+    --green:#3FB950;--green-s:rgba(63,185,80,.1);
+    --blue:#58A6FF;--blue-s:rgba(88,166,255,.08);
+    --orange:#F0883E;--red:#F85149;
+    --r:12px;--mono:'JetBrains Mono',monospace;
+  }
+  html,body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+  /* LAYOUT */
+  .admin{max-width:880px;margin:0 auto;padding:20px 16px 60px}
+  .head{display:flex;align-items:center;gap:12px;margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+  .head .ic{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--green),#238636);display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 16px rgba(63,185,80,.12)}
+  .head h1{font-size:20px;font-weight:700;letter-spacing:-.02em}
+  .head p{font-size:12px;color:var(--text2)}
+  .head .tag{margin-left:auto;padding:4px 10px;border-radius:7px;background:var(--blue-s);color:var(--blue);font-size:11px;font-weight:600}
+
+  /* SECTIONS */
+  .sec{background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:20px;margin-bottom:16px}
+  .sec-t{font-size:14px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:7px}
+  .sec-t .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+  .sec-d{font-size:11.5px;color:var(--text2);margin-bottom:14px}
+
+  /* FORM */
+  .f{margin-bottom:14px}
+  .f:last-child{margin-bottom:0}
+  .f label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+  .f input,.f select,.f textarea{
+    width:100%;padding:9px 12px;background:var(--card);border:1px solid var(--border);
+    border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .2s;
+  }
+  .f input:focus,.f select:focus{border-color:rgba(88,166,255,.4);box-shadow:0 0 0 3px rgba(88,166,255,.06)}
+  .f select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238B949E' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+  .f input[type="password"]{font-family:var(--mono);letter-spacing:.1em}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+  /* SLIDERS */
+  .sl{display:flex;align-items:center;gap:10px}
+  .sl input[type="range"]{flex:1;-webkit-appearance:none;height:5px;background:var(--card);border-radius:3px;border:none;padding:0}
+  .sl input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--green);cursor:pointer;border:2px solid var(--bg);box-shadow:0 2px 6px rgba(63,185,80,.25)}
+  .sl .v{min-width:36px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--green)}
+
+  /* TOGGLES */
+  .trow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+  .trow:last-child{border-bottom:none}
+  .trow span{font-size:13px;font-weight:500}
+  .tog{width:40px;height:22px;border-radius:11px;background:var(--muted);position:relative;cursor:pointer;transition:background .2s;border:none}
+  .tog.on{background:var(--green)}
+  .tog::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s}
+  .tog.on::after{transform:translateX(18px)}
+
+  /* BUTTONS */
+  .btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:none;transition:all .15s}
+  .btn-g{background:var(--green);color:#fff;box-shadow:0 2px 10px rgba(63,185,80,.18)}
+  .btn-g:hover{background:#2ea043;transform:translateY(-1px)}
+  .btn-s{background:var(--card);color:var(--text2);border:1px solid var(--border)}
+  .btn-r{background:rgba(248,81,73,.1);color:var(--red)}
+  .btns{display:flex;gap:8px;margin-top:14px}
+
+  /* STATUS */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-top:10px}
+  .stat{padding:9px 12px;border-radius:8px;background:var(--card);border:1px solid var(--border);font-size:12px;font-weight:500}
+  .stat.ok{border-color:rgba(63,185,80,.2);background:rgba(63,185,80,.06)}
+  .stat .d{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:5px;background:var(--muted)}
+  .stat.ok .d{background:var(--green)}
+
+  /* UPLOAD */
+  .upload-area{margin-top:12px}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;border-radius:8px;background:var(--green);color:#fff;font-size:12px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.3);transform:translateY(80px);opacity:0;transition:all .3s;z-index:99}
+  .toast.show{transform:translateY(0);opacity:1}
+
+  /* LOGIN */
+  .login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:28px;width:340px;max-width:90vw;text-align:center}
+  .login-box .ic{width:50px;height:50px;border-radius:14px;background:linear-gradient(135deg,var(--green),#238636);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px}
+  .login-box h2{font-size:17px;margin-bottom:4px}
+  .login-box p{font-size:12px;color:var(--text2);margin-bottom:16px}
+  .login-box input{width:100%;padding:10px 14px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:13px;font-family:inherit;outline:none;margin-bottom:10px;text-align:center}
+  .login-box .btn{width:100%}
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <div class="login-box">
+    <div class="ic">🏀</div>
+    <h2>BracketGPT Admin</h2>
+    <p>Enter your admin password</p>
+    <input type="password" id="loginPw" placeholder="Password" onkeydown="if(event.key==='Enter')auth()">
+    <button class="btn btn-g" onclick="auth()">Sign In</button>
+  </div>
+</div>
+
+<div class="admin" id="panel" style="display:none">
+  <div class="head">
+    <div class="ic">🏀</div>
+    <div><h1>BracketGPT Admin</h1><p>Manage your bracket advisor</p></div>
+    <span class="tag" id="tag">Connecting…</span>
+  </div>
+
+  <!-- LLM -->
+  <div class="sec">
+    <div class="sec-t"><span class="dot"></span>LLM Configuration</div>
+    <div class="sec-d">Choose your AI provider and model.</div>
+    <div class="row">
+      <div class="f"><label>Provider</label><select id="provider"><option value="deepseek">DeepSeek ($)</option><option value="claude">Anthropic Claude ($$)</option><option value="gemini">Google Gemini ($)</option></select></div>
+      <div class="f"><label>Model</label><input id="model" placeholder="deepseek-chat"></div>
+    </div>
+    <div class="f"><label>API Key</label><input type="password" id="apiKey" placeholder="sk-…"></div>
+    <div class="row">
+      <div class="f"><label>Temperature</label><div class="sl"><input type="range" id="temp" min="0" max="1" step=".05" value=".7" oninput="V('tempV',this.value)"><span class="v" id="tempV">0.7</span></div></div>
+      <div class="f"><label>Max Tokens</label><input id="maxTokens" value="1200"></div>
+    </div>
+  </div>
+
+  <!-- WEIGHTS -->
+  <div class="sec">
+    <div class="sec-t"><span class="dot"></span>Model Weights</div>
+    <div class="sec-d">How much each model influences answers.</div>
+    <div class="f"><label>Base Model (balanced)</label><div class="sl"><input type="range" id="wBase" min="0" max="100" value="60" oninput="V('wBaseV',this.value+'%')"><span class="v" id="wBaseV">60%</span></div></div>
+    <div class="f"><label>Upset Model (Cinderella)</label><div class="sl"><input type="range" id="wUpset" min="0" max="100" value="25" oninput="V('wUpsetV',this.value+'%')"><span class="v" id="wUpsetV">25%</span></div></div>
+    <div class="f"><label>Floor Model (chalk)</label><div class="sl"><input type="range" id="wFloor" min="0" max="100" value="15" oninput="V('wFloorV',this.value+'%')"><span class="v" id="wFloorV">15%</span></div></div>
+  </div>
+
+  <!-- FEATURES -->
+  <div class="sec">
+    <div class="sec-t"><span class="dot"></span>Features</div>
+    <div class="sec-d">Toggle what the chatbot includes.</div>
+    <div class="trow"><span>Team Profiles</span><button class="tog on" id="tProf" onclick="this.classList.toggle('on')"></button></div>
+    <div class="trow"><span>Matchup Data</span><button class="tog on" id="tMatch" onclick="this.classList.toggle('on')"></button></div>
+    <div class="trow"><span>Optimizer Data</span><button class="tog on" id="tOpt" onclick="this.classList.toggle('on')"></button></div>
+    <div class="trow"><span>Upset Picks</span><button class="tog on" id="tUpset" onclick="this.classList.toggle('on')"></button></div>
+    <div class="trow"><span>Safety Scores</span><button class="tog on" id="tSafe" onclick="this.classList.toggle('on')"></button></div>
+    <div class="trow"><span>Historical Context</span><button class="tog on" id="tHist" onclick="this.classList.toggle('on')"></button></div>
+  </div>
+
+  <!-- BRANDING -->
+  <div class="sec">
+    <div class="sec-t"><span class="dot"></span>Branding</div>
+    <div class="row3">
+      <div class="f"><label>App Name</label><input id="brandName" value="BracketGPT"></div>
+      <div class="f"><label>Tagline</label><input id="tagline" value="AI Bracket Advisor"></div>
+      <div class="f"><label>Season</label><input id="season" value="2025"></div>
+    </div>
+    <div class="f"><label>Rate Limit (msgs/min)</label><input id="rateLimit" value="30"></div>
+  </div>
+
+  <!-- DATA -->
+  <div class="sec">
+    <div class="sec-t"><span class="dot"></span>Data Management</div>
+    <div class="sec-d">Upload model prediction files.</div>
+    <div class="stat-grid" id="stats">
+      <div class="stat" id="ds-teams"><span class="d"></span>Teams</div>
+      <div class="stat" id="ds-base"><span class="d"></span>Base Model</div>
+      <div class="stat" id="ds-upset"><span class="d"></span>Upset Model</div>
+      <div class="stat" id="ds-floor"><span class="d"></span>Floor Model</div>
+      <div class="stat" id="ds-optimizer"><span class="d"></span>Optimizer</div>
+    </div>
+    <div class="upload-area">
+      <div class="row">
+        <div class="f"><label>Data Type</label><select id="uploadType"><option value="teams">Team Profiles</option><option value="base">Base Model</option><option value="upset">Upset Model</option><option value="floor">Floor Model</option><option value="optimizer">Optimizer</option></select></div>
+        <div class="f"><label>JSON File</label><input type="file" id="fileIn" accept=".json" style="padding:7px"></div>
+      </div>
+      <button class="btn btn-g" onclick="upload()">Upload</button>
+    </div>
+  </div>
+
+  <!-- PASSWORD -->
+  <div class="sec">
+    <div class="sec-t"><span class="dot" style="background:var(--orange)"></span>Security</div>
+    <div class="row">
+      <div class="f"><label>Old Password</label><input type="password" id="oldPw"></div>
+      <div class="f"><label>New Password</label><input type="password" id="newPw"></div>
+    </div>
+    <button class="btn btn-r" onclick="changePw()">Change Password</button>
+  </div>
+
+  <div class="btns"><button class="btn btn-g" onclick="save()" style="flex:1">💾 Save All Settings</button></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.getElementById(s);
+const V=(id,v)=>$(id).textContent=v;
+let pw='';
+
+function toast(m,ms=2500){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),ms)}
+const H=()=>({headers:{'x-admin-password':pw}});
+
+async function auth(){
+  pw=$('loginPw').value;
+  try{
+    const r=await fetch('/admin/config',H());
+    if(r.ok){
+      $('login').style.display='none';
+      $('panel').style.display='block';
+      const c=await r.json();fill(c);
+      $('tag').textContent='Connected';$('tag').style.background='rgba(63,185,80,.1)';$('tag').style.color='#3FB950';
+    }else{toast('Wrong password')}
+  }catch(e){toast('Connection error')}
+}
+
+function fill(c){
+  if(c.provider)$('provider').value=c.provider;
+  if(c.model)$('model').value=c.model;
+  if(c.apiKey)$('apiKey').value=c.apiKey;
+  if(c.temperature!=null){$('temp').value=c.temperature;V('tempV',c.temperature)}
+  if(c.maxTokens)$('maxTokens').value=c.maxTokens;
+  const w=c.weights||{};
+  if(w.baseWeight!=null){$('wBase').value=w.baseWeight*100;V('wBaseV',Math.round(w.baseWeight*100)+'%')}
+  if(w.upsetWeight!=null){$('wUpset').value=w.upsetWeight*100;V('wUpsetV',Math.round(w.upsetWeight*100)+'%')}
+  if(w.floorWeight!=null){$('wFloor').value=w.floorWeight*100;V('wFloorV',Math.round(w.floorWeight*100)+'%')}
+  const f=c.features||{};
+  if(f.showTeamProfiles!=null)$('tProf').classList.toggle('on',f.showTeamProfiles);
+  if(f.showMatchupData!=null)$('tMatch').classList.toggle('on',f.showMatchupData);
+  if(f.showOptimizerData!=null)$('tOpt').classList.toggle('on',f.showOptimizerData);
+  if(f.showUpsetPicks!=null)$('tUpset').classList.toggle('on',f.showUpsetPicks);
+  if(f.showSafetyScores!=null)$('tSafe').classList.toggle('on',f.showSafetyScores);
+  if(f.includeHistoricalContext!=null)$('tHist').classList.toggle('on',f.includeHistoricalContext);
+  if(c.brandName)$('brandName').value=c.brandName;
+  if(c.tagline)$('tagline').value=c.tagline;
+  if(c.activeSeason)$('season').value=c.activeSeason;
+  if(c.messagesPerMinute)$('rateLimit').value=c.messagesPerMinute;
+  const ds=c.dataStatus||{};
+  for(const[k,v]of Object.entries(ds)){const el=$('ds-'+k);if(el)el.classList.toggle('ok',!!v)}
+}
+
+async function save(){
+  const cfg={
+    provider:$('provider').value,model:$('model').value,apiKey:$('apiKey').value,
+    temperature:parseFloat($('temp').value),maxTokens:parseInt($('maxTokens').value),
+    weights:{baseWeight:parseInt($('wBase').value)/100,upsetWeight:parseInt($('wUpset').value)/100,floorWeight:parseInt($('wFloor').value)/100},
+    features:{
+      showTeamProfiles:$('tProf').classList.contains('on'),showMatchupData:$('tMatch').classList.contains('on'),
+      showOptimizerData:$('tOpt').classList.contains('on'),showUpsetPicks:$('tUpset').classList.contains('on'),
+      showSafetyScores:$('tSafe').classList.contains('on'),includeHistoricalContext:$('tHist').classList.contains('on'),
+    },
+    brandName:$('brandName').value,tagline:$('tagline').value,
+    activeSeason:$('season').value,messagesPerMinute:parseInt($('rateLimit').value),
+  };
+  const r=await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json','x-admin-password':pw},body:JSON.stringify(cfg)});
+  toast(r.ok?'Settings saved!':'Save failed');
+}
+
+async function upload(){
+  const type=$('uploadType').value;
+  const file=$('fileIn').files[0];
+  if(!file)return toast('Select a file');
+  const fd=new FormData();fd.append('file',file);fd.append('type',type);
+  const r=await fetch('/admin/upload',{method:'POST',headers:{'x-admin-password':pw},body:fd});
+  const d=await r.json();
+  if(d.success||d.ok){toast(type+' uploaded!');const el=$('ds-'+type);if(el)el.classList.add('ok')}
+  else toast('Upload failed');
+}
+
+async function changePw(){
+  const r=await fetch('/admin/password',{method:'POST',headers:{'Content-Type':'application/json','x-admin-password':pw},body:JSON.stringify({oldPassword:$('oldPw').value,newPassword:$('newPw').value})});
+  if(r.ok){pw=$('newPw').value;toast('Password changed!')}else toast('Failed — check old password');
+}
+</script>
+</body>
+</html>
