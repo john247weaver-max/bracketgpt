@@ -337,8 +337,18 @@ app.get('/admin/config', auth, (req, res) => {
 
 app.post('/admin/config', auth, (req, res) => {
   const body = req.body || {};
-  for (const key of ['provider', 'apiKey', 'model', 'temperature', 'maxTokens', 'brandName', 'tagline', 'activeSeason', 'messagesPerMinute']) {
+  for (const key of ['provider', 'apiKey', 'model', 'brandName', 'tagline', 'activeSeason']) {
     if (body[key] !== undefined) cfg[key] = body[key];
+  }
+  if (body.temperature !== undefined) {
+    const temperature = Number(body.temperature);
+    if (Number.isFinite(temperature)) cfg.temperature = temperature;
+  }
+  if (body.maxTokens !== undefined) {
+    cfg.maxTokens = asPositiveInt(body.maxTokens, cfg.maxTokens, 1, 8192);
+  }
+  if (body.messagesPerMinute !== undefined) {
+    cfg.messagesPerMinute = asPositiveInt(body.messagesPerMinute, cfg.messagesPerMinute, 1, 600);
   }
   if (body.weights) cfg.weights = body.weights;
   if (body.features) cfg.features = body.features;
