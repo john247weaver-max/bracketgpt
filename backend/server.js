@@ -167,8 +167,15 @@ function buildContextFromQuery(queryText) {
   const context = [];
   const lc = String(queryText || '').toLowerCase();
 
-  // Search team profiles
-  const teams = dataStore.team_profiles?.profiles || dataStore.team_profiles || [];
+  // Search team profiles (coerce to array safely)
+  let teams = [];
+  if (Array.isArray(dataStore.team_profiles)) {
+    teams = dataStore.team_profiles;
+  } else if (dataStore.team_profiles && Array.isArray(dataStore.team_profiles.profiles)) {
+    teams = dataStore.team_profiles.profiles;
+  } else if (dataStore.team_profiles && Array.isArray(dataStore.team_profiles.teams)) {
+    teams = dataStore.team_profiles.teams;
+  }
   if (Array.isArray(teams)) {
     for (const t of teams) {
       const name = (t.name || t.school || t.TeamName || '').toLowerCase();
