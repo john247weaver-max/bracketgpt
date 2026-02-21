@@ -1,130 +1,67 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>BracketGPT — March Madness Bracket Advisor</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root{--bg1:#0a0e17;--bg2:#1a1a2e;--surface:#0f1724;--muted:#9aa4b2;--accent:#ff7a18}
-    html,body{height:100%;margin:0;font-family:Outfit,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
-    body{background:linear-gradient(180deg,var(--bg1),var(--bg2));color:#e6eef8;display:flex;align-items:center;justify-content:center}
-    .app{width:980px;max-width:96%;height:760px;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.6);display:flex;flex-direction:column}
-    header{background:linear-gradient(90deg,rgba(255,255,255,.02),rgba(255,255,255,.01));padding:18px 22px;display:flex;align-items:center;gap:14px}
-    .logo{font-size:28px}
-    .title{font-weight:700;font-size:18px}
-    .tag{font-size:12px;color:var(--muted);letter-spacing:1px}
-    main{display:flex;flex:1}
-    .sidebar{width:300px;border-right:1px solid rgba(255,255,255,.02);background:transparent;padding:18px;box-sizing:border-box}
-    .welcome{margin-bottom:18px}
-    .quick-btns{display:grid;grid-template-columns:1fr;gap:10px}
-    button.quick{background:linear-gradient(90deg,rgba(255,255,255,.02),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.03);padding:10px 12px;border-radius:8px;color:#e9f3ff;cursor:pointer;text-align:left}
-    .chat-wrap{flex:1;display:flex;flex-direction:column}
-    .messages{flex:1;padding:18px;overflow:auto;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
-    .msg{max-width:72%;margin:8px 0;padding:12px 14px;border-radius:10px;line-height:1.35}
-    .bot{background:var(--surface);align-self:flex-start;color:#dbe7ff}
-    .user{background:linear-gradient(90deg,var(--accent),#ff9d45);align-self:flex-end;color:#08101a}
-    .composer{padding:12px;border-top:1px solid rgba(255,255,255,.02);display:flex;gap:8px}
-    .composer input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.03);background:transparent;color:inherit}
-    .composer button{background:var(--accent);border:none;padding:10px 14px;border-radius:10px;color:#051018;cursor:pointer}
-    .brand-line{font-size:12px;color:var(--muted)}
-    .small{font-size:12px;color:var(--muted);margin-top:8px}
-  </style>
-</head>
-<body>
-  <div class="app" role="application">
-    <header>
-      <div class="logo">🏀</div>
-      <div>
-        <div class="title">BracketGPT</div>
-        <div class="tag">3-MODEL ENSEMBLE · ESPN 320 OPTIMIZER</div>
-      </div>
-      <div style="margin-left:auto" class="brand-line" id="brandLine"></div>
-    </header>
-    <main>
-      <aside class="sidebar">
-        <div class="welcome">
-          <div style="font-weight:700;font-size:16px">Welcome to BracketGPT</div>
-          <div class="small">Quick prompts to get started</div>
-        </div>
-        <div class="quick-btns">
-          <button class="quick" data-prompt="Biggest upset candidates?">Biggest upset candidates?</button>
-          <button class="quick" data-prompt="Best strategy for my pool?">Best strategy for my pool?</button>
-          <button class="quick" data-prompt="Best 12 vs 5 upset pick?">Best 12 vs 5 upset pick?</button>
-          <button class="quick" data-prompt="Safest Final Four picks?">Safest Final Four picks?</button>
-          <button class="quick" data-prompt="Compare the 1-seeds">Compare the 1-seeds</button>
-          <button class="quick" data-prompt="Build my bracket">Build my bracket</button>
-        </div>
-      </aside>
-      <section class="chat-wrap">
-        <div class="messages" id="messages" aria-live="polite"></div>
-        <form id="composer" class="composer">
-          <input id="messageInput" placeholder="Ask BracketGPT a question..." autocomplete="off" />
-          <button type="submit">Send</button>
-        </form>
-      </section>
-    </main>
-  </div>
-
-  <script>
-    const messagesEl = document.getElementById('messages');
-    const composer = document.getElementById('composer');
-    const input = document.getElementById('messageInput');
-    const quicks = document.querySelectorAll('.quick');
-
-    let config = {brandName:'BracketGPT',tagline:'3-MODEL ENSEMBLE · ESPN 320 OPTIMIZER',dataLoaded:false,activeSeason:null};
-
-    async function loadConfig(){
-      try{
-        const res = await fetch('/api/config');
-        if(res.ok){
-          const json = await res.json();
-          config = {...config,...json};
-          document.getElementById('brandLine').textContent = config.brandName + (config.activeSeason?(' · '+config.activeSeason):'');
-        }
-      }catch(e){console.warn('Could not load config',e)}
-    }
-
-    function pushMessage(role, text){
-      const el = document.createElement('div');
-      el.className = 'msg '+(role==='user'?'user':'bot');
-      el.textContent = text;
-      messagesEl.appendChild(el);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    async function sendMessages(messages){
-      pushMessage('user', messages[messages.length-1].content);
-      pushMessage('bot', 'Thinking...');
-      try{
-        const res = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});
-        const json = await res.json();
-        // replace last bot message
-        const botMsgs = document.querySelectorAll('.msg.bot');
-        if(botMsgs.length) botMsgs[botMsgs.length-1].textContent = json.reply || 'No reply';
-      }catch(err){
-        const botMsgs = document.querySelectorAll('.msg.bot');
-        if(botMsgs.length) botMsgs[botMsgs.length-1].textContent = 'Error: '+err.message;
-      }
-    }
-
-    composer.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const text = input.value.trim();
-      if(!text) return;
-      input.value = '';
-      const messages = [{role:'user',content:text}];
-      await sendMessages(messages);
-    });
-
-    quicks.forEach(b=>b.addEventListener('click', ()=>{
-      const p = b.dataset.prompt;
-      input.value = p;
-      input.focus();
-    }));
-
-    // initial load
-    loadConfig();
-  </script>
-</body>
-</html>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><title>BracketGPT</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0D1117;--surface:#161B22;--card:#1C2128;--elevated:#252C35;--border:rgba(139,148,158,.12);--bf:rgba(56,189,248,.3);--text:#E6EDF3;--text2:#8B949E;--muted:#484F58;--green:#3FB950;--gs:rgba(63,185,80,.12);--blue:#58A6FF;--orange:#F0883E;--red:#F85149;--purple:#BC8CFF;--ubg:#1A3A2A;--r:14px}
+html{height:100%}body{height:100%;overflow:hidden;font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;height:100%;max-width:780px;margin:0 auto}
+.hdr{display:flex;align-items:center;gap:11px;padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:5}
+.hi{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--green),#238636);display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 16px rgba(63,185,80,.12);flex-shrink:0}
+.hdr h1{font-size:15px;font-weight:700;letter-spacing:-.02em;line-height:1}.hdr .sub{font-size:10.5px;font-weight:500;color:var(--text2);margin-top:2px}
+.live{margin-left:auto;padding:3px 9px;border-radius:20px;background:var(--gs);color:var(--green);font-size:10px;font-weight:600;display:flex;align-items:center;gap:5px}
+.live::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s ease infinite}
+.msgs{flex:1 1 0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:16px 14px;display:flex;flex-direction:column}
+.msgs::-webkit-scrollbar{width:4px}.msgs::-webkit-scrollbar-thumb{background:var(--muted);border-radius:2px}
+.spc{flex:1 1 auto;min-height:0}.pad{flex-shrink:0;height:80px}
+.wel{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:20px;text-align:center;animation:fu .5s ease}
+.wel .ico{width:60px;height:60px;border-radius:18px;background:linear-gradient(145deg,var(--green),#238636);display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:16px;box-shadow:0 6px 28px rgba(63,185,80,.16)}
+.wel h2{font-size:21px;font-weight:700;letter-spacing:-.03em;margin-bottom:5px}
+.wel p{font-size:13px;color:var(--text2);max-width:330px;line-height:1.5;margin-bottom:22px}
+.qp{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;max-width:460px}
+.qp button{padding:8px 13px;border-radius:9px;background:var(--card);border:1px solid var(--border);color:var(--text2);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s}
+.qp button:hover{background:var(--elevated);color:var(--text);border-color:var(--bf);transform:translateY(-1px)}
+.m{display:flex;gap:9px;max-width:88%;margin-bottom:12px;animation:mi .3s ease}.m.u{margin-left:auto;flex-direction:row-reverse}
+.m .av{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+.m.b .av{background:linear-gradient(135deg,var(--green),#238636)}.m.u .av{background:var(--elevated)}
+.m .bd{padding:10px 14px;border-radius:var(--r);font-size:13.5px;line-height:1.55;word-wrap:break-word;overflow-wrap:break-word}
+.m.u .bd{background:var(--ubg);border:1px solid rgba(63,185,80,.12);border-bottom-right-radius:4px}
+.m.b .bd{background:var(--card);border:1px solid var(--border);border-bottom-left-radius:4px}
+.m.b .bd p{margin-bottom:8px}.m.b .bd p:last-child{margin-bottom:0}.m.b .bd strong{color:var(--green);font-weight:600}
+.m.b .bd em{color:var(--blue);font-style:normal;font-weight:500}
+.m.b .bd ul,.m.b .bd ol{margin:6px 0 8px 18px;font-size:13px}.m.b .bd li{margin-bottom:3px}
+.badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;vertical-align:middle}
+.badge-lock{background:rgba(63,185,80,.15);color:var(--green)}.badge-confident{background:rgba(88,166,255,.12);color:var(--blue)}.badge-lean{background:rgba(240,136,62,.12);color:var(--orange)}.badge-slight{background:rgba(188,140,255,.12);color:var(--purple)}.badge-tossup{background:rgba(248,81,73,.12);color:var(--red)}
+.typing{display:none;gap:9px;max-width:88%;margin-bottom:12px}.typing.on{display:flex}
+.dots{display:flex;gap:4px;padding:14px;background:var(--card);border-radius:var(--r);border:1px solid var(--border);border-bottom-left-radius:4px}
+.dots span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bl 1.4s infinite both}
+.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+.iw{flex-shrink:0;padding:10px 14px 16px;background:var(--bg);border-top:1px solid var(--border)}
+.ir{display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px 4px 4px 14px;transition:border-color .2s}
+.ir:focus-within{border-color:var(--bf);box-shadow:0 0 0 3px rgba(56,189,248,.05)}
+.ir input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:13.5px;font-family:inherit;padding:8px 0;min-width:0}
+.ir input::placeholder{color:var(--muted)}
+.snd{width:36px;height:36px;border-radius:9px;border:none;cursor:pointer;background:var(--elevated);color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.snd.on{background:var(--green);color:#fff;box-shadow:0 2px 10px rgba(63,185,80,.25)}
+.ht{text-align:center;margin-top:6px;font-size:10px;color:var(--muted)}
+@keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes mi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bl{0%,80%,100%{opacity:.3}40%{opacity:1}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media(max-width:600px){.m{max-width:92%}.hdr{padding:10px 12px}.wel h2{font-size:18px}.iw{padding:8px 10px 12px}.msgs{padding:12px 10px}}
+</style></head><body>
+<div class="app">
+<div class="hdr"><div class="hi">🏀</div><div><h1 id="an">BracketGPT</h1><div class="sub" id="at">AI Bracket Advisor</div></div><span class="live">LIVE</span></div>
+<div class="msgs" id="msgs"><div class="spc"></div>
+<div class="wel" id="wel"><div class="ico">🏀</div><h2>Your bracket starts here.</h2><p>Ask about any matchup, upset picks, or bracket strategy. 20 years of data crunched.</p>
+<div class="qp"><button onclick="go('Who wins Duke vs Houston?')">Duke vs Houston?</button><button onclick="go('Best upset picks?')">Best upset picks?</button><button onclick="go('Which 12-seed has the best shot?')">12-seed dark horse?</button><button onclick="go('Compare the four 1-seeds')">Compare 1-seeds</button><button onclick="go('Build me a contrarian Final Four')">Contrarian Final Four</button><button onclick="go('Big pool strategy?')">Pool strategy</button></div></div>
+<div class="typing" id="typ"><div class="av" style="background:linear-gradient(135deg,var(--green),#238636)">🏀</div><div class="dots"><span></span><span></span><span></span></div></div>
+<div class="pad"></div></div>
+<div class="iw"><div class="ir"><input type="text" id="inp" placeholder="Ask about any matchup…" autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();go()}"><button class="snd" id="btn" onclick="go()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button></div><div class="ht">3-model ensemble · 76% accuracy</div></div></div>
+<script>
+const $=s=>document.getElementById(s),msgs=$('msgs'),inp=$('inp'),btn=$('btn'),typ=$('typ');let hist=[],busy=false;
+(async()=>{try{const r=await fetch('/api/config');if(r.ok){const c=await r.json();if(c.brandName){$('an').textContent=c.brandName;document.title=c.brandName}if(c.tagline)$('at').textContent=c.tagline}}catch(e){}})();
+inp.addEventListener('input',()=>btn.classList.toggle('on',inp.value.trim().length>0));
+function scroll(){msgs.scrollTop=msgs.scrollHeight}
+function add(w,t){const e=$('wel');if(e)e.remove();const d=document.createElement('div');d.className='m '+(w==='u'?'u':'b');d.innerHTML='<div class="av">'+(w==='u'?'👤':'🏀')+'</div><div class="bd">'+(w==='u'?esc(t):fmt(t))+'</div>';msgs.insertBefore(d,typ);scroll();return d}
+function fmt(t){let s=t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/`([^`]+)`/g,'<code style="background:var(--elevated);padding:1px 5px;border-radius:4px;font-size:12px">$1</code>').replace(/\[LOCK\]/gi,'<span class="badge badge-lock">🔒 lock</span>').replace(/\[CONFIDENT\]/gi,'<span class="badge badge-confident">confident</span>').replace(/\[LEAN\]/gi,'<span class="badge badge-lean">lean</span>').replace(/\[SLIGHT\]/gi,'<span class="badge badge-slight">slight</span>').replace(/\[TOSS.?UP\]/gi,'<span class="badge badge-tossup">toss-up</span>');const blocks=s.split(/\n{2,}/);let h='';for(const b of blocks){const tr=b.trim();if(!tr)continue;const lines=tr.split('\n');const il=lines.length>1&&lines.filter(l=>l.trim()).every(l=>/^\s*[-*]\s|^\s*\d+[.)]\s/.test(l));if(il){h+='<ul>'+lines.filter(l=>l.trim()).map(l=>'<li>'+l.replace(/^\s*[-*]\s*/,'').replace(/^\s*\d+[.)]\s*/,'')+'</li>').join('')+'</ul>'}else{h+='<p>'+tr.replace(/\n/g,'<br>')+'</p>'}}return h||'<p>'+s+'</p>'}
+function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
+async function go(text){const msg=text||inp.value.trim();if(!msg||busy)return;inp.value='';btn.classList.remove('on');busy=true;hist.push({role:'user',content:msg});add('u',msg);typ.classList.add('on');scroll();try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist})});const d=await r.json();typ.classList.remove('on');const reply=d.reply||d.error||'Something went wrong.';hist.push({role:'assistant',content:reply});add('b',reply)}catch(e){typ.classList.remove('on');add('b','Lost connection — try again.')}busy=false;inp.focus()}
+</script></body></html>

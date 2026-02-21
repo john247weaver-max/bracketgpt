@@ -3,3 +3,4 @@ backend/config.json
 backend/data/*.json
 backend/data/tmp/
 .env
+.DS_Store
