@@ -12,6 +12,9 @@ const DATA_DIR = path.join(__dirname, 'data');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+// ensure tmp subdir exists for file uploads
+const DATA_TMP = path.join(DATA_DIR, 'tmp');
+if (!fs.existsSync(DATA_TMP)) fs.mkdirSync(DATA_TMP, { recursive: true });
 
 // Default config
 const DEFAULT_CONFIG = {
@@ -86,6 +89,14 @@ function loadDataFiles() {
 
 const dataLoaded = loadDataFiles();
 
+// Global safety: prevent unexpected process exit on uncaught errors
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, p) => {
+  console.error('Unhandled Rejection at:', p, 'reason:', reason);
+});
+
 // Simple rate limiter by IP
 const rateMap = new Map();
 function checkRateLimit(ip) {
@@ -125,40 +136,169 @@ function saveConfig() {
 
 // Build system prompt
 function buildSystemPrompt() {
-  return `You are BracketGPT, a March Madness bracket advisor that uses a 3-model ensemble (base, upset, floor) and an ESPN 10-20-40-80-160-320 scoring framework. Provide recommendations with three strategy lenses: safe, balanced, contrarian. Use available team profiles and optimizer outputs when available.`;
+  const base = dataStore.chatbot_predictions_base || {};
+  const upset = dataStore.chatbot_predictions_upset || {};
+  const floor = dataStore.chatbot_predictions_floor || {};
+  const preds = base.predictions || [];
+
+  let prompt = `You are BracketGPT, an elite March Madness bracket advisor powered by a 3-model stacked ensemble (XGBoost + LightGBM + meta-learner) trained on 20+ years of tournament data with KenPom efficiency ratings.
+
+You provide advice using three strategy lenses:
+- SAFE: High-floor picks that protect your bracket
+- BALANCED: Best expected value picks
+- CONTRARIAN: Differentiation picks for pools
+
+ESPN scoring: 10-20-40-80-160-320 per round.`;
+
+  if (preds.length > 0) {
+    prompt += '\n\nYou have access to ' + preds.length + ' historical predictions from the model.';
+    prompt += '\nModel version: ' + (base.model_version || 'unknown');
+    if (base.model_stats) {
+      prompt += '\nAvg Brier score: ' + (base.model_stats.avg_brier || 'N/A');
+      prompt += '\nEnsemble: ' + (base.model_stats.ensemble || 'XGB+LGB stacked');
+    }
+  }
+
+  return prompt;
 }
 
 // Build context by searching team names in loaded data
 function buildContextFromQuery(queryText) {
   const context = [];
-  const teams = dataStore.team_profiles || [];
   const lc = String(queryText || '').toLowerCase();
-  for (const t of teams) {
-    const name = (t.name || t.school || '').toLowerCase();
-    if (!name) continue;
-    if (lc.includes(name) || lc.includes((t.nickname || '').toLowerCase())) {
-      context.push({ type: 'team_profile', team: t });
+
+  // Search team profiles
+  const teams = dataStore.team_profiles?.profiles || dataStore.team_profiles || [];
+  if (Array.isArray(teams)) {
+    for (const t of teams) {
+      const name = (t.name || t.school || t.TeamName || '').toLowerCase();
+      if (name && lc.includes(name)) {
+        context.push({ type: 'team_profile', team: t });
+      }
     }
   }
-  // add optimizer snippets if relevant
-  const optimizer = dataStore.bracket_optimizer_results || [];
-  for (const opt of optimizer.slice(0, 10)) {
-    if (JSON.stringify(opt).toLowerCase().includes(lc)) {
-      context.push({ type: 'optimizer', item: opt });
+
+  // Search predictions for mentioned teams or seeds
+  const basePreds = dataStore.chatbot_predictions_base?.predictions || [];
+  for (const p of basePreds) {
+    const t1 = (p.t1_name || '').toLowerCase();
+    const t2 = (p.t2_name || '').toLowerCase();
+    if ((t1 && lc.includes(t1)) || (t2 && lc.includes(t2))) {
+      context.push({ type: 'prediction', item: p });
+    }
+    // Check for seed references like "12 seed" or "5 vs 12"
+    const seedMatch = lc.match(/(\d+)\s*(?:seed|vs|versus)/);
+    if (seedMatch) {
+      const seed = parseInt(seedMatch[1]);
+      if (p.t1_seed === seed || p.t2_seed === seed) {
+        context.push({ type: 'prediction', item: p });
+      }
     }
   }
-  return context;
+
+  // Search upset predictions
+  const upsetPreds = dataStore.chatbot_predictions_upset?.predictions || [];
+  for (const p of upsetPreds) {
+    const t1 = (p.t1_name || '').toLowerCase();
+    const t2 = (p.t2_name || '').toLowerCase();
+    if ((t1 && lc.includes(t1)) || (t2 && lc.includes(t2))) {
+      context.push({ type: 'prediction', item: p });
+    }
+  }
+
+  // Add optimizer results if asking about bracket strategy
+  if (lc.includes('bracket') || lc.includes('optim') || lc.includes('strategy') || lc.includes('pool')) {
+    const opt = dataStore.bracket_optimizer_results?.results || [];
+    for (const o of opt.slice(0, 5)) {
+      context.push({ type: 'optimizer', item: o });
+    }
+  }
+
+  // If user asks about upsets generally
+  if (lc.includes('upset') || lc.includes('cinderella') || lc.includes('underdog')) {
+    for (const p of basePreds) {
+      if (p.upset_flag && p.upset_flag.includes('upset')) {
+        context.push({ type: 'prediction', item: p });
+      }
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set();
+  return context.filter(c => {
+    const key = JSON.stringify(c);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 15);
 }
 
-// Stubbed provider callers (replace with real API calls as needed)
+// Provider callers (DeepSeek / Claude / Gemini)
 async function sendToProvider(provider, payload) {
-  // payload: {system, messages, temperature, maxTokens, model}
-  // This function returns a simple synthetic reply for demo/testing
-  const base = buildSystemPrompt();
-  const userMsg = (payload.messages && payload.messages.length) ? payload.messages[payload.messages.length - 1].content : '';
-  const ctxSummary = (payload.context || []).slice(0,3).map(c=>c.type==='team_profile'?`Profile:${c.team.name||c.team.school}`:c.type).join(', ');
-  const reply = `Provider(${provider}) response using model ${payload.model||config.model||'default'}:\nStrategy suggestions (safe/balanced/contrarian) for: ${userMsg}\nContext: ${ctxSummary}`;
-  return reply;
+  const key = config.apiKey;
+  if (!key) return 'Error: No API key set. Go to /admin to add your API key.';
+
+  const systemPrompt = payload.system;
+  const messages = payload.messages || [];
+  const contextStr = (payload.context || []).map(c => {
+    if (c.type === 'team_profile') return 'Team: ' + JSON.stringify(c.team);
+    if (c.type === 'prediction') return 'Prediction: ' + JSON.stringify(c.item);
+    if (c.type === 'optimizer') return 'Optimizer: ' + JSON.stringify(c.item);
+    return '';
+  }).filter(Boolean).join('\n');
+
+  const fullSystem = systemPrompt + (contextStr ? '\n\nRELEVANT DATA:\n' + contextStr : '');
+
+  if (provider === 'deepseek') {
+    const res = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: config.model || 'deepseek-chat',
+        messages: [{ role: 'system', content: fullSystem }, ...messages],
+        temperature: payload.temperature || 0.7,
+        max_tokens: payload.maxTokens || 800,
+      })
+    });
+    const data = await res.json();
+    if (data.error) return 'API Error: ' + (data.error.message || JSON.stringify(data.error));
+    return data.choices?.[0]?.message?.content || 'No response';
+  }
+
+  if (provider === 'claude') {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: config.model || 'claude-sonnet-4-20250514',
+        max_tokens: payload.maxTokens || 800,
+        system: fullSystem,
+        messages: messages,
+      })
+    });
+    const data = await res.json();
+    if (data.error) return 'API Error: ' + (data.error.message || JSON.stringify(data.error));
+    return data.content?.[0]?.text || 'No response';
+  }
+
+  if (provider === 'gemini') {
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (config.model || 'gemini-pro') + ':generateContent?key=' + key, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: fullSystem + '\n\n' + messages.map(m => m.role + ': ' + m.content).join('\n') }] }],
+        generationConfig: { temperature: payload.temperature || 0.7, maxOutputTokens: payload.maxTokens || 800 }
+      })
+    });
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
+  }
+
+  return 'Unknown provider: ' + provider;
 }
 
 // Public GET /api/config (limited)
@@ -227,8 +367,8 @@ app.post('/admin/password', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// File uploads for data
-const upload = multer({ dest: path.join(DATA_DIR, 'tmp') });
+// File uploads for data (use ensured tmp path)
+const upload = multer({ dest: DATA_TMP });
 app.post('/admin/upload', requireAdmin, upload.single('file'), (req, res) => {
   const t = req.body.type;
   const allowed = ['teams','base','upset','floor','optimizer'];
@@ -398,7 +538,13 @@ app.get('/admin', (req, res) => {
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
+  const indexPath = path.join(__dirname, '..', 'frontend', 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error('Failed to send index.html', err);
+      if (!res.headersSent) res.status(404).send('Not Found');
+    }
+  });
 });
 
 // start server
