@@ -248,15 +248,15 @@
         <h1 id="an">BRACKETGPT</h1>
         <div class="sub" id="at">AI TOURNAMENT PREDICTOR</div>
       </div>
-      <span class="live">Live Model</span>
+      <span class="live" id="live-tag">Live Model</span>
     </div>
 
     <div class="msgs" id="msgs">
       <div class="hero" id="wel">
         <div>
           <div class="kicker">Championship Intelligence</div>
-          <h2>BracketGPT</h2>
-          <div class="tagline">Win Your Pool. Dominate Your Friends.</div>
+          <h2 id="hero-brand">BracketGPT</h2>
+          <div class="tagline" id="hero-tagline">Win Your Pool. Dominate Your Friends.</div>
           <p>Broadcast-style matchup projections, upset alerts, and bracket strategy built for March Madness chaos.</p>
           <div class="cta">
             <button class="cta-btn" onclick="go('Start my bracket strategy for this year')">Start My Bracket</button>
@@ -304,9 +304,14 @@
           const c = await r.json();
           if (c.brandName) {
             $('an').textContent = c.brandName.toUpperCase();
+            $('hero-brand').textContent = c.brandName;
             document.title = c.brandName;
           }
-          if (c.tagline) $('at').textContent = c.tagline.toUpperCase();
+          if (c.tagline) {
+            $('at').textContent = c.tagline.toUpperCase();
+            $('hero-tagline').textContent = c.tagline;
+          }
+          if (c.activeSeason) $('live-tag').textContent = `Season ${c.activeSeason}`;
         }
       } catch (e) {}
     })();
