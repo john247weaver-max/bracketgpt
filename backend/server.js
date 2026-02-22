@@ -67,7 +67,7 @@ function saveCfg() {
 
 saveCfg();
 
-const store = { teams: null, base: null, upset: null, floor: null, optimizer: null, bracket: null };
+const store = { teams: null, base: null, upset: null, floor: null, optimizer: null, bracket: null, context: null };
 const FILE_MAP = {
   teams: 'team_profiles.json',
   base: 'chatbot_predictions_base.json',
@@ -75,6 +75,7 @@ const FILE_MAP = {
   floor: 'chatbot_predictions_floor.json',
   optimizer: 'bracket_optimizer_results.json',
   bracket: 'bracket_predictions.json',
+  context: 'context.json',
 };
 
 function loadData() {
@@ -154,6 +155,19 @@ function sysPrompt() {
   return `You are BracketGPT — a sharp, fun March Madness bracket advisor. Talk like a knowledgeable friend who watches way too much college basketball. Confident, opinionated, backed by data.\n\nHOW TO TALK:\n- Casual. Contractions. No corporate speak.\n- NEVER say "based on my analysis" — just give your take.\n- Use basketball language: "chalk pick," "live dog," "fade," "value play," "cinderella."\n- Lead with your pick, THEN explain. 2-4 short paragraphs max.\n- Bold team names. Don't over-format.\n\nWRONG: "Based on our ensemble model prediction of 73.2% win probability, Duke appears stronger."\nRIGHT: "**Duke** takes this. Defense is suffocating — top 5 adjusted efficiency — 80+ Elo edge. Around 73% to win. Lock it in."\n\nCONFIDENCE:\n- 85%+ → "Lock it in"\n- 70-85% → "Solid pick"\n- 55-70% → "Slight lean"\n- 50-55% → "Coin flip"\n\nSTRATEGY: ESPN scoring 10-20-40-80-160-320. Small pools = chalk. Big pools = need upsets.\n\nDECISION RULES:\n- If model sources disagree, acknowledge disagreement and pick one side with a reason.\n- If confidence is below 55%, call it volatile and avoid lock language.\n- If requested context is missing, say what is missing instead of hallucinating.\n\nDATA: ${n} matchup predictions from 3-model ensemble (XGBoost+LightGBM) on 2003-2024 data. 76% accuracy.\nCONTEXT SETTINGS: maxItems=${c.maxItems}, upsetItems=${c.upsetItems}, optimizerItems=${c.optimizerItems}, titleSeedCutoff=${c.titleSeedCutoff}.`;
 }
 
+
+function pickContextRows() {
+  const c = store.context;
+  if (!c) return [];
+  if (Array.isArray(c)) return c;
+  if (Array.isArray(c.context)) return c.context;
+  if (Array.isArray(c.items)) return c.items;
+  if (Array.isArray(c.rows)) return c.rows;
+  if (Array.isArray(c.entries)) return c.entries;
+  if (typeof c === 'object') return [c];
+  return [];
+}
+
 function findCtx(query) {
   const ctx = [];
   const lc = (query || '').toLowerCase();
@@ -215,6 +229,13 @@ function findCtx(query) {
     }
   }
 
+  for (const item of pickContextRows()) {
+    const raw = JSON.stringify(item).toLowerCase();
+    if (!lc || lc.split(/\s+/).some((token) => token.length > 3 && raw.includes(token))) {
+      ctx.push({ type: 'context', data: item });
+    }
+  }
+
   if (c.includeTitleAngles && /final.four|champ|win.it.all|natty/.test(lc)) {
     for (const p of store.base?.predictions || []) {
       if ((p.t1_seed || 99) <= c.titleSeedCutoff && (p.t2_seed || 99) <= c.titleSeedCutoff) {
@@ -246,6 +267,7 @@ function fmtCtx(ctx) {
       }
       if (item.type === 'opt') return `OPT: ${JSON.stringify(item.data)}`;
       if (item.type === 'bracket') return `BRACKET: ${JSON.stringify(item.data)}`;
+      if (item.type === 'context') return `CONTEXT: ${JSON.stringify(item.data)}`;
       return '';
     })
     .filter(Boolean)
