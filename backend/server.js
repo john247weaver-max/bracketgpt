@@ -75,6 +75,7 @@ const FILE_MAP = {
   floor: 'chatbot_predictions_floor.json',
   optimizer: 'bracket_optimizer_results.json',
   bracket: 'bracket_predictions.json',
+  bracket2025: 'bracket_2025.json',
   context: 'context.json',
 };
 
@@ -255,6 +256,17 @@ function findCtx(query) {
     .slice(0, c.maxItems);
 }
 
+
+const SUPPORTED_SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
+
+function seedKey(seed) {
+  return `seed_${seed}`;
+}
+
+function requiredSeedHeaders() {
+  return SUPPORTED_SEEDS.map((seed) => `### SEED_${seed}`);
+}
+
 function fmtCtx(ctx) {
   return ctx
     .map((item) => {
@@ -274,10 +286,283 @@ function fmtCtx(ctx) {
     .join('\n');
 }
 
-async function callLLM(messages, ctxStr) {
+function normalizeTeamName(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[’']/g, '')
+    .replace(/\./g, '')
+    .replace(/&/g, ' and ')
+    .replace(/\bsaint\b/gi, 'st')
+    .replace(/\bstate\b/gi, 'st')
+    .replace(/\buniversity\b/gi, 'univ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function readBracket2025Source() {
+  return store.bracket2025 || store.bracket || null;
+}
+
+function flattenBracketGames(node, out = []) {
+  if (!node) return out;
+  if (Array.isArray(node)) {
+    for (const item of node) flattenBracketGames(item, out);
+    return out;
+  }
+  if (typeof node !== 'object') return out;
+
+  const looksLikeGame = (
+    node.team || node.team_name || node.name || node.school ||
+    node.seed || node.region || node.slot || node.home_team || node.away_team
+  );
+  if (looksLikeGame) out.push(node);
+
+  for (const value of Object.values(node)) {
+    if (value && (Array.isArray(value) || typeof value === 'object')) {
+      flattenBracketGames(value, out);
+    }
+  }
+  return out;
+}
+
+function extractTeamRowsFromBracket(rawBracket) {
+  const rows = [];
+  const games = flattenBracketGames(rawBracket);
+  for (const g of games) {
+    const candidates = [];
+    if (g.team || g.team_name || g.name || g.school) candidates.push(g);
+    if (g.home_team || g.away_team) {
+      if (g.home_team) candidates.push({ ...g.home_team, region: g.region || g.home_region || g.bracket_region });
+      if (g.away_team) candidates.push({ ...g.away_team, region: g.region || g.away_region || g.bracket_region });
+    }
+    if (Array.isArray(g.teams)) {
+      for (const t of g.teams) candidates.push({ ...t, region: t.region || g.region || g.bracket_region });
+    }
+
+    for (const team of candidates) {
+      const name = team.team || team.team_name || team.name || team.school;
+      const seed = Number(team.seed ?? team.team_seed ?? team.seed_number);
+      const region = team.region || g.region || g.bracket_region || g.conference || 'Unknown';
+      if (!name || !Number.isFinite(seed)) continue;
+      rows.push({ team: String(name), seed, region: String(region) });
+    }
+  }
+  return rows;
+}
+
+function buildCanonicalSeedBuckets(rawBracket) {
+  const rows = extractTeamRowsFromBracket(rawBracket);
+  const seen = new Set();
+  const buckets = Object.fromEntries(SUPPORTED_SEEDS.map((seed) => [seedKey(seed), []]));
+
+  for (const row of rows) {
+    if (!SUPPORTED_SEEDS.includes(row.seed)) continue;
+    const key = `${normalizeTeamName(row.team)}|${row.seed}|${normalizeTeamName(row.region)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    buckets[seedKey(row.seed)].push(row);
+  }
+
+  for (const key of Object.keys(buckets)) {
+    buckets[key].sort((a, b) => a.region.localeCompare(b.region) || a.team.localeCompare(b.team));
+  }
+
+  return buckets;
+}
+
+function buildProfileLookup() {
+  const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
+  const out = new Map();
+  for (const p of profiles) {
+    const name = p.name || p.school || p.team;
+    if (!name) continue;
+    out.set(normalizeTeamName(name), p);
+  }
+  return out;
+}
+
+function buildSeedArchetypeStats() {
+  const out = {};
+  const preds = store.base?.predictions || [];
+  const stats = new Map();
+
+  function bump(seedA, seedB, aWon) {
+    const key = `${seedA}v${seedB}`;
+    const item = stats.get(key) || { games: 0, seedAWinRate: 0 };
+    item.games += 1;
+    if (aWon) item.seedAWinRate += 1;
+    stats.set(key, item);
+  }
+
+  for (const p of preds) {
+    const s1 = Number(p.t1_seed);
+    const s2 = Number(p.t2_seed);
+    if (!Number.isFinite(s1) || !Number.isFinite(s2)) continue;
+    const winner = normalizeTeamName(p.predicted_winner_name || '');
+    const t1 = normalizeTeamName(p.t1_name || '');
+    const t2 = normalizeTeamName(p.t2_name || '');
+    bump(s1, s2, winner && winner === t1);
+    bump(s2, s1, winner && winner === t2);
+  }
+
+  for (const [k, v] of stats.entries()) {
+    out[k] = { games: v.games, seedAWinRate: v.games ? Number((v.seedAWinRate / v.games).toFixed(3)) : null };
+  }
+
+  return out;
+}
+
+const STAGE2_PROMPT_TEMPLATE = `You are BracketGPT writing a grounded seed-bucket analysis from canonical data only.
+
+STRICT RULES:
+1) Only reference teams present in the provided CANONICAL_BUCKETS object.
+2) Use exactly these markdown headers in this order:
+${requiredSeedHeaders().join('\n')}
+3) Under each section, discuss only the teams assigned to that seed.
+4) For each team mention, include:
+   - archetype from TEAM_PROFILES when available
+   - model view (probabilities/confidence if available)
+   - historical seed/archetype angle from HISTORICAL_SEED_STATS when relevant
+5) Never invent teams, seeds, regions, or constraints.
+6) If a field is unavailable, say "data not available" instead of guessing.
+
+OUTPUT FORMAT:
+- Keep each section short and information-dense.
+- Use bullet points per team.
+- Keep all claims tied to provided JSON.
+`;
+
+const CORRECTION_PROMPT_TEMPLATE = `Your previous response violated seed-bucket grounding rules.
+
+You must rewrite the full answer and correct every violation.
+
+Error report:
+{{ERROR_REPORT}}
+
+Repeat requirements:
+- Use only teams in CANONICAL_BUCKETS.
+- Use headers exactly and in order:
+${requiredSeedHeaders().join('\n')}
+- Teams may appear only in their canonical section.
+- No invented teams/seeds/regions.
+
+Return only the corrected final markdown answer.`;
+
+function buildStage2Payload(userRequest, buckets) {
+  const profileLookup = buildProfileLookup();
+  const archetypeStats = buildSeedArchetypeStats();
+  const matchedProfiles = {};
+
+  for (const [bucket, rows] of Object.entries(buckets)) {
+    matchedProfiles[bucket] = rows.map((r) => {
+      const profile = profileLookup.get(normalizeTeamName(r.team)) || null;
+      return {
+        team: r.team,
+        seed: r.seed,
+        region: r.region,
+        profile,
+      };
+    });
+  }
+
+  return {
+    userRequest,
+    canonicalBuckets: buckets,
+    teamProfiles: matchedProfiles,
+    historicalSeedStats: archetypeStats,
+  };
+}
+
+function parseNarrativeSections(text) {
+  const sections = Object.fromEntries(SUPPORTED_SEEDS.map((seed) => [seedKey(seed), '']));
+  const regex = /^###\s*SEED_(\d{1,2})\s*$/gim;
+  const matches = Array.from(text.matchAll(regex)).filter((m) => SUPPORTED_SEEDS.includes(Number(m[1])));
+
+  for (let i = 0; i < matches.length; i += 1) {
+    const start = matches[i].index + matches[i][0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+    const bucket = seedKey(Number(matches[i][1]));
+    sections[bucket] = text.slice(start, end).trim();
+  }
+
+  return sections;
+}
+
+function validateNarrativeAgainstBuckets(text, buckets) {
+  const sections = parseNarrativeSections(text);
+  const allTeams = [];
+  for (const [bucket, rows] of Object.entries(buckets)) {
+    for (const row of rows) {
+      const norm = normalizeTeamName(row.team);
+      allTeams.push({ norm, team: row.team, bucket });
+    }
+  }
+
+  const errors = [];
+  for (const [bucket, textBlock] of Object.entries(sections)) {
+    const blockNorm = normalizeTeamName(textBlock);
+    for (const t of allTeams) {
+      if (!t.norm || !blockNorm.includes(t.norm)) continue;
+      if (t.bucket !== bucket) {
+        errors.push(`Team "${t.team}" belongs in ${t.bucket} but was mentioned in ${bucket}.`);
+      }
+    }
+  }
+
+  for (const [bucket, block] of Object.entries(sections)) {
+    if (!block) errors.push(`Missing required section content for ${bucket}.`);
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+async function generateSeedBucketNarrative(userRequest) {
+  const rawBracket = readBracket2025Source();
+  if (!rawBracket) {
+    return { error: 'Missing bracket_2025.json (or fallback bracket_predictions.json).' };
+  }
+
+  const buckets = buildCanonicalSeedBuckets(rawBracket);
+  const payload = buildStage2Payload(userRequest, buckets);
+  const userContent = `CANONICAL_BUCKETS:\n${JSON.stringify(payload.canonicalBuckets, null, 2)}\n\nTEAM_PROFILES:\n${JSON.stringify(payload.teamProfiles, null, 2)}\n\nHISTORICAL_SEED_STATS:\n${JSON.stringify(payload.historicalSeedStats, null, 2)}\n\nUser request: ${userRequest || 'Provide seed analysis.'}`;
+
+  let narrative = await callLLM([{ role: 'user', content: userContent }], STAGE2_PROMPT_TEMPLATE, { temperature: 0, rawSystemPrompt: true });
+  let validation = validateNarrativeAgainstBuckets(narrative, buckets);
+  let attempts = 0;
+
+  while (!validation.ok && attempts < 2) {
+    attempts += 1;
+    const errorReport = validation.errors.map((e, i) => `${i + 1}. ${e}`).join('\n');
+    const correctionPrompt = CORRECTION_PROMPT_TEMPLATE.replace('{{ERROR_REPORT}}', errorReport);
+    narrative = await callLLM(
+      [
+        { role: 'user', content: userContent },
+        { role: 'assistant', content: narrative },
+        { role: 'user', content: correctionPrompt },
+      ],
+      STAGE2_PROMPT_TEMPLATE,
+      { temperature: 0, rawSystemPrompt: true },
+    );
+    validation = validateNarrativeAgainstBuckets(narrative, buckets);
+  }
+
+  return {
+    stage1: buckets,
+    stage2: narrative,
+    validation,
+    prompts: {
+      stage2Prompt: STAGE2_PROMPT_TEMPLATE,
+      correctionPrompt: CORRECTION_PROMPT_TEMPLATE,
+    },
+  };
+}
+
+async function callLLM(messages, ctxStr, options = {}) {
   const key = cfg.apiKey;
   if (!key) return 'Need an API key! Admin: set LLM_API_KEY in Railway env vars or go to /admin.';
-  const system = sysPrompt() + (ctxStr ? `\n\n-- DATA --\n${ctxStr}` : '');
+  const system = options.rawSystemPrompt ? ctxStr : (sysPrompt() + (ctxStr ? `\n\n-- DATA --\n${ctxStr}` : ''));
+  const temperature = Number.isFinite(options.temperature) ? options.temperature : cfg.temperature;
 
   try {
     if (cfg.provider === 'deepseek') {
@@ -287,7 +572,7 @@ async function callLLM(messages, ctxStr) {
         body: JSON.stringify({
           model: cfg.model || 'deepseek-chat',
           messages: [{ role: 'system', content: system }, ...messages],
-          temperature: cfg.temperature,
+          temperature,
           max_tokens: cfg.maxTokens,
         }),
       });
@@ -323,7 +608,7 @@ async function callLLM(messages, ctxStr) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: `${system}\n\n${messages.map((m) => `${m.role}: ${m.content}`).join('\n')}` }] }],
-          generationConfig: { temperature: cfg.temperature, maxOutputTokens: cfg.maxTokens },
+          generationConfig: { temperature, maxOutputTokens: cfg.maxTokens },
         }),
       });
       const d = await r.json();
@@ -389,6 +674,19 @@ app.post('/api/chat', async (req, res) => {
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: 'Something broke.' });
+  }
+});
+
+app.post('/api/seed-bucket-analysis', async (req, res) => {
+  try {
+    if (!rateOk(req.ip || 'x')) return res.status(429).json({ error: 'Too many messages.' });
+    const userRequest = req.body?.query || req.body?.request || '';
+    const result = await generateSeedBucketNarrative(userRequest);
+    if (result.error) return res.status(400).json(result);
+    return res.json(result);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Seed bucket analysis failed.' });
   }
 });
 
