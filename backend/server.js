@@ -67,13 +67,14 @@ function saveCfg() {
 
 saveCfg();
 
-const store = { teams: null, base: null, upset: null, floor: null, optimizer: null };
+const store = { teams: null, base: null, upset: null, floor: null, optimizer: null, bracket: null };
 const FILE_MAP = {
   teams: 'team_profiles.json',
   base: 'chatbot_predictions_base.json',
   upset: 'chatbot_predictions_upset.json',
   floor: 'chatbot_predictions_floor.json',
   optimizer: 'bracket_optimizer_results.json',
+  bracket: 'bracket_predictions.json',
 };
 
 function loadData() {
