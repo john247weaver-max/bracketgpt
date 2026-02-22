@@ -112,6 +112,30 @@ function asPositiveInt(v, fallback, min = 1, max = 100) {
   return Math.min(Math.max(n, min), max);
 }
 
+function hasContent(data) {
+  if (!data) return false;
+  if (Array.isArray(data)) return data.length > 0;
+  if (typeof data !== 'object') return false;
+
+  const candidates = [
+    data.predictions,
+    data.profiles,
+    data.results,
+    data.bracket,
+    data.games,
+    data.matchups,
+    data.picks,
+    data.rounds,
+  ];
+
+  for (const item of candidates) {
+    if (Array.isArray(item) && item.length) return true;
+    if (item && typeof item === 'object' && Object.keys(item).length) return true;
+  }
+
+  return Object.keys(data).length > 0;
+}
+
 function contextCfg() {
   return {
     maxItems: asPositiveInt(cfg.context?.maxItems, defaultContext.maxItems, 1, 100),
@@ -173,6 +197,24 @@ function findCtx(query) {
     }
   }
 
+  if (/bracket|round|elite.?8|final.?four|championship|pool/.test(lc)) {
+    const bracketData = store.bracket;
+    if (Array.isArray(bracketData)) {
+      for (const item of bracketData.slice(0, c.maxItems)) {
+        ctx.push({ type: 'bracket', data: item });
+      }
+    } else if (bracketData && typeof bracketData === 'object') {
+      const arr = bracketData.predictions || bracketData.games || bracketData.matchups || bracketData.picks || bracketData.rounds;
+      if (Array.isArray(arr)) {
+        for (const item of arr.slice(0, c.maxItems)) {
+          ctx.push({ type: 'bracket', data: item });
+        }
+      } else {
+        ctx.push({ type: 'bracket', data: bracketData });
+      }
+    }
+  }
+
   if (c.includeTitleAngles && /final.four|champ|win.it.all|natty/.test(lc)) {
     for (const p of store.base?.predictions || []) {
       if ((p.t1_seed || 99) <= c.titleSeedCutoff && (p.t2_seed || 99) <= c.titleSeedCutoff) {
@@ -203,6 +245,7 @@ function fmtCtx(ctx) {
         return `[${item.model}] (${p.t1_seed})${p.t1_name} vs (${p.t2_seed})${p.t2_name} > ${p.predicted_winner_name} ${confidence} ${p.confidence} ${p.upset_flag || ''}`;
       }
       if (item.type === 'opt') return `OPT: ${JSON.stringify(item.data)}`;
+      if (item.type === 'bracket') return `BRACKET: ${JSON.stringify(item.data)}`;
       return '';
     })
     .filter(Boolean)
@@ -331,7 +374,7 @@ app.get('/admin/config', auth, (req, res) => {
   const dataStatus = {};
   for (const key of Object.keys(FILE_MAP)) {
     const d = store[key];
-    dataStatus[key] = !!(d && (Array.isArray(d) ? d.length : d.predictions?.length || d.profiles?.length || d.results?.length));
+    dataStatus[key] = hasContent(d);
   }
   res.json({ ...cfg, context: contextCfg(), dataStatus });
 });
@@ -387,7 +430,11 @@ app.post('/admin/upload', auth, up.single('file'), (req, res) => {
 
   try {
     const raw = fs.readFileSync(req.file.path, 'utf8');
-    JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!hasContent(parsed)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, error: 'JSON is empty or missing supported fields.' });
+    }
     fs.writeFileSync(path.join(DATA_DIR, FILE_MAP[type]), raw);
     fs.unlinkSync(req.file.path);
     hasData = loadData();
