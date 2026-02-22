@@ -36,3 +36,20 @@ Set Railway env vars: `LLM_API_KEY`, `LLM_PROVIDER`, `ADMIN_PASSWORD`.
 5. **Only then tune prompt/model**
    - If logic is off but retrieval is correct, adjust system prompt/model settings.
    - If retrieval is wrong, adjust context settings or upstream feature engineering first.
+
+## Robust seed-bucket pipeline (anti-hallucination)
+
+Use `POST /api/seed-bucket-analysis` for deterministic bracket seed analysis.
+
+Pipeline:
+1. Stage 1 (deterministic): parses `bracket_2025.json` (fallback `bracket_predictions.json`) and builds canonical `seed_1` through `seed_16` buckets.
+2. Stage 2 (LLM, temperature=0): model gets only canonical buckets + matched team profiles + historical seed matchup summaries.
+3. Validator + repair loop: narrative sections are checked so teams only appear in their canonical seed section. Violations trigger automatic correction re-prompt.
+
+Normalization used for team matching:
+- case-insensitive
+- strips apostrophes/periods
+- `&` -> `and`
+- `saint` -> `st`
+- `state` -> `st`
+- collapses repeated whitespace
