@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BracketGPT | Value Picks</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #0b1c3d; color: #fff; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 16px 40px; }
+    h1 { margin: 0; font-size: 34px; }
+    .sub { color: #aab7d6; margin-top: 8px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0; }
+    button, a.btn { border: 1px solid rgba(255,255,255,.2); background: #112752; color: #fff; padding: 9px 12px; border-radius: 10px; cursor: pointer; text-decoration: none; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+    .card { background: rgba(17,39,82,.9); border: 1px solid rgba(255,255,255,.15); border-radius: 14px; padding: 12px; }
+    .name { font-weight: 800; font-size: 18px; }
+    .meta { color: #aab7d6; font-size: 12px; margin-top: 4px; }
+    .k { color: #aab7d6; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .v { font-weight: 700; }
+    .row { display: flex; justify-content: space-between; margin-top: 8px; }
+    .pos { color: #60d394; }
+    .neg { color: #ff6b6b; }
+    h2 { margin: 24px 0 10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Where The Public Is Wrong</h1>
+    <p class="sub">Teams our model prices differently than ESPN bracket consensus.</p>
+
+    <div class="toolbar">
+      <button onclick="setSort('total_ev')">Sort: Total EV</button>
+      <button onclick="setSort('championEdge')">Sort: Champion Edge</button>
+      <button onclick="setSort('finalFourEdge')">Sort: Final Four Edge</button>
+      <button onclick="setSort('round32Edge')">Sort: Round of 32 Edge</button>
+      <a class="btn" href="/">Ask BracketGPT about any of these picks →</a>
+    </div>
+
+    <h2>Leaderboard</h2>
+    <div id="leaderboard" class="grid"></div>
+
+    <h2>Hidden Gems</h2>
+    <div id="gems" class="grid"></div>
+
+    <h2>Fade These</h2>
+    <div id="fades" class="grid"></div>
+  </div>
+
+  <script>
+    let data = null;
+    let sortKey = 'total_ev';
+
+    function cls(v) { return Number(v) >= 0 ? 'pos' : 'neg'; }
+    function n(v) { return Number(v || 0); }
+
+    function card(team) {
+      const champ = n(team.championEdge);
+      const ff = n(team.finalFourEdge);
+      const r32 = n(team.round32Edge);
+      return `<div class="card">
+        <div class="name">${team.name} (#${team.seed})</div>
+        <div class="meta">${team.region || 'Region n/a'}</div>
+        <div class="row"><span class="k">Total EV</span><span class="v">${n(team.total_ev).toFixed(1)}</span></div>
+        <div class="row"><span class="k">Champion Edge</span><span class="v ${cls(champ)}">${champ.toFixed(1)} pts</span></div>
+        <div class="row"><span class="k">Final Four Edge</span><span class="v ${cls(ff)}">${ff.toFixed(1)} pts</span></div>
+        <div class="row"><span class="k">Round of 32 Edge</span><span class="v ${cls(r32)}">${r32.toFixed(1)} pts</span></div>
+      </div>`;
+    }
+
+    function render() {
+      const sorted = [...(data.leaderboard || [])].sort((a, b) => n(b[sortKey]) - n(a[sortKey]));
+      document.getElementById('leaderboard').innerHTML = sorted.map(card).join('');
+      document.getElementById('gems').innerHTML = (data.hiddenGems || []).sort((a,b)=>n(b.championEdge)-n(a.championEdge)).map(card).join('');
+      document.getElementById('fades').innerHTML = (data.fadeThese || []).sort((a,b)=>n(a.championEdge)-n(b.championEdge)).map(card).join('');
+    }
+
+    function setSort(next) { sortKey = next; render(); }
+
+    fetch('/api/value-picks').then((r) => r.json()).then((json) => { data = json; render(); }).catch(() => {
+      document.getElementById('leaderboard').innerHTML = '<div class="card">Value data not loaded yet. Upload bracket_ev_espn.json in admin.</div>';
+    });
+  </script>
+</body>
+</html>

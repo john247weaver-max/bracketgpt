@@ -165,6 +165,30 @@
       border: 1px solid rgba(243, 112, 33, 0.45);
     }
 
+    .hypo {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto;
+      gap: 8px;
+      align-items: center;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hypo input {
+      padding: 10px 11px;
+      border-radius: 10px;
+      border: 1px solid var(--panel-border);
+      background: rgba(17, 39, 82, .95);
+      color: var(--white);
+      outline: none;
+      min-width: 0;
+    }
+
+    .hypo .vs-text { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+    .hypo button { padding: 10px 12px; font-size: 11px; }
+
     .m { display: flex; gap: 10px; max-width: 92%; animation: rise .3s ease; }
     .m.u { margin-left: auto; flex-direction: row-reverse; }
     .av { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 14px; flex-shrink: 0; margin-top: 3px; }
@@ -261,12 +285,20 @@
           <div class="cta">
             <button class="cta-btn" onclick="go('Start my bracket strategy for this year')">Start My Bracket</button>
             <button class="cta-btn" onclick="go('Analyze a matchup: Duke vs Houston')">Analyze a Matchup</button>
+            <button class="cta-btn" onclick="window.location.href='/value-picks'">Where The Public Is Wrong</button>
           </div>
           <div class="quick">
             <button onclick="go('Best upset picks this tournament?')">Upset Radar</button>
             <button onclick="go('Which 12-seed has the best shot?')">12-seed dark horse</button>
             <button onclick="go('Compare top 1-seeds')">Compare 1-seeds</button>
             <button onclick="go('Build a contrarian Final Four')">Contrarian Final Four</button>
+            <button onclick="go('Compare any two teams')">Compare any two teams</button>
+          </div>
+          <div class="hypo">
+            <input id="hypo-a" type="text" placeholder="Team A (e.g., Florida)" />
+            <span class="vs-text">VS</span>
+            <input id="hypo-b" type="text" placeholder="Team B (e.g., Auburn)" />
+            <button class="cta-btn" onclick="runHypo()">Hypothetical Matchup</button>
           </div>
         </div>
       </div>
@@ -410,6 +442,13 @@
       animateMessage(d);
       scroll();
       return d;
+    }
+
+    function runHypo() {
+      const a = document.getElementById('hypo-a')?.value?.trim();
+      const b = document.getElementById('hypo-b')?.value?.trim();
+      if (!a || !b) return;
+      go(`Who would win if ${a} played ${b}?`);
     }
 
     async function go(text) {
