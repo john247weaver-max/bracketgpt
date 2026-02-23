@@ -6,21 +6,39 @@
   <title>BracketGPT | Value Picks</title>
   <style>
     body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #0b1c3d; color: #fff; }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 16px 40px; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 16px 40px; }
     h1 { margin: 0; font-size: 34px; }
     .sub { color: #aab7d6; margin-top: 8px; }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 14px; }
     button, a.btn { border: 1px solid rgba(255,255,255,.2); background: #112752; color: #fff; padding: 9px 12px; border-radius: 10px; cursor: pointer; text-decoration: none; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+    .explainer { background: rgba(17,39,82,.9); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+    .explainer h2 { margin: 0 0 8px; font-size: 18px; }
+    .explainer p { margin: 0; color: #d2dcf7; line-height: 1.45; }
+
+    .table-wrap { border: 1px solid rgba(255,255,255,.14); border-radius: 14px; overflow: auto; background: rgba(17,39,82,.84); }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.1); text-align: left; }
+    th { color: #aab7d6; text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+
+    .grid { display: none; gap: 10px; }
     .card { background: rgba(17,39,82,.9); border: 1px solid rgba(255,255,255,.15); border-radius: 14px; padding: 12px; }
     .name { font-weight: 800; font-size: 18px; }
     .meta { color: #aab7d6; font-size: 12px; margin-top: 4px; }
     .k { color: #aab7d6; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
     .v { font-weight: 700; }
     .row { display: flex; justify-content: space-between; margin-top: 8px; }
-    .pos { color: #60d394; }
-    .neg { color: #ff6b6b; }
+
+    .edge-pos { color: #60d394; }
+    .edge-neg { color: #ff6b6b; }
+    .edge-neutral { color: #b7bfcc; }
+    .ask-link { display: inline-block; margin-top: 10px; color: #ffc72c; text-decoration: none; font-weight: 700; }
+
     h2 { margin: 24px 0 10px; }
+
+    @media (max-width: 760px) {
+      .table-wrap { display: none; }
+      .grid { display: grid; grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -28,30 +46,65 @@
     <h1>Where The Public Is Wrong</h1>
     <p class="sub">Teams our model prices differently than ESPN bracket consensus.</p>
 
+    <div class="explainer">
+      <h2>How to use this board</h2>
+      <p>
+        <strong>Champion Edge</strong> is the gap between model value and public pick rate for winning it all.
+        Bigger positive edge = hidden gem leverage in big pools. Negative edge = likely public trap. We sort by Champion Edge by default.
+      </p>
+    </div>
+
     <div class="toolbar">
-      <button onclick="setSort('total_ev')">Sort: Total EV</button>
       <button onclick="setSort('championEdge')">Sort: Champion Edge</button>
+      <button onclick="setSort('total_ev')">Sort: Total EV</button>
       <button onclick="setSort('finalFourEdge')">Sort: Final Four Edge</button>
       <button onclick="setSort('round32Edge')">Sort: Round of 32 Edge</button>
-      <a class="btn" href="/">Ask BracketGPT about any of these picks →</a>
+      <a class="btn" href="/">Open BracketGPT chat →</a>
     </div>
 
     <h2>Leaderboard</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Team</th><th>Region</th><th>Total EV</th><th>Champion Edge</th><th>Final Four Edge</th><th>Round of 32 Edge</th><th>Ask</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-table"></tbody>
+      </table>
+    </div>
     <div id="leaderboard" class="grid"></div>
 
     <h2>Hidden Gems</h2>
-    <div id="gems" class="grid"></div>
+    <div id="gems" class="grid" style="display:grid"></div>
 
     <h2>Fade These</h2>
-    <div id="fades" class="grid"></div>
+    <div id="fades" class="grid" style="display:grid"></div>
   </div>
 
   <script>
     let data = null;
-    let sortKey = 'total_ev';
+    let sortKey = 'championEdge';
 
-    function cls(v) { return Number(v) >= 0 ? 'pos' : 'neg'; }
     function n(v) { return Number(v || 0); }
+    function askHref(teamName) { return `/?q=${encodeURIComponent(`Tell me about ${teamName} as a value pick`)}`; }
+    function edgeClass(v) {
+      const val = n(v);
+      if (val > 5) return 'edge-pos';
+      if (val < -5) return 'edge-neg';
+      return 'edge-neutral';
+    }
+    function edgeIcon(v) {
+      const val = n(v);
+      if (val > 5) return '🟢';
+      if (val < -5) return '🔴';
+      return '';
+    }
+    function edgeText(v) {
+      const val = n(v);
+      const icon = edgeIcon(val);
+      return `${icon ? `${icon} ` : ''}${val.toFixed(1)} pts`;
+    }
 
     function card(team) {
       const champ = n(team.championEdge);
@@ -61,15 +114,29 @@
         <div class="name">${team.name} (#${team.seed})</div>
         <div class="meta">${team.region || 'Region n/a'}</div>
         <div class="row"><span class="k">Total EV</span><span class="v">${n(team.total_ev).toFixed(1)}</span></div>
-        <div class="row"><span class="k">Champion Edge</span><span class="v ${cls(champ)}">${champ.toFixed(1)} pts</span></div>
-        <div class="row"><span class="k">Final Four Edge</span><span class="v ${cls(ff)}">${ff.toFixed(1)} pts</span></div>
-        <div class="row"><span class="k">Round of 32 Edge</span><span class="v ${cls(r32)}">${r32.toFixed(1)} pts</span></div>
+        <div class="row"><span class="k">Champion Edge</span><span class="v ${edgeClass(champ)}">${edgeText(champ)}</span></div>
+        <div class="row"><span class="k">Final Four Edge</span><span class="v ${edgeClass(ff)}">${edgeText(ff)}</span></div>
+        <div class="row"><span class="k">Round of 32 Edge</span><span class="v ${edgeClass(r32)}">${edgeText(r32)}</span></div>
+        <a class="ask-link" href="${askHref(team.name)}">Ask BracketGPT</a>
       </div>`;
+    }
+
+    function tableRow(team) {
+      return `<tr>
+        <td>${team.name} (#${team.seed})</td>
+        <td>${team.region || 'Region n/a'}</td>
+        <td>${n(team.total_ev).toFixed(1)}</td>
+        <td class="${edgeClass(team.championEdge)}">${edgeText(team.championEdge)}</td>
+        <td class="${edgeClass(team.finalFourEdge)}">${edgeText(team.finalFourEdge)}</td>
+        <td class="${edgeClass(team.round32Edge)}">${edgeText(team.round32Edge)}</td>
+        <td><a class="ask-link" href="${askHref(team.name)}">Ask BracketGPT</a></td>
+      </tr>`;
     }
 
     function render() {
       const sorted = [...(data.leaderboard || [])].sort((a, b) => n(b[sortKey]) - n(a[sortKey]));
       document.getElementById('leaderboard').innerHTML = sorted.map(card).join('');
+      document.getElementById('leaderboard-table').innerHTML = sorted.map(tableRow).join('');
       document.getElementById('gems').innerHTML = (data.hiddenGems || []).sort((a,b)=>n(b.championEdge)-n(a.championEdge)).map(card).join('');
       document.getElementById('fades').innerHTML = (data.fadeThese || []).sort((a,b)=>n(a.championEdge)-n(b.championEdge)).map(card).join('');
     }
@@ -78,6 +145,7 @@
 
     fetch('/api/value-picks').then((r) => r.json()).then((json) => { data = json; render(); }).catch(() => {
       document.getElementById('leaderboard').innerHTML = '<div class="card">Value data not loaded yet. Upload bracket_ev_espn.json in admin.</div>';
+      document.getElementById('leaderboard-table').innerHTML = '<tr><td colspan="7">Value data not loaded yet. Upload bracket_ev_espn.json in admin.</td></tr>';
     });
   </script>
 </body>
