@@ -1,0 +1,71 @@
+{
+  "description": "BracketGPT 2025 Human Narrative Team Summaries — rich editorial context to complement statistical profiles",
+  "season": 2025,
+  "sources": [
+    "ESPN",
+    "Bleacher Report",
+    "Yahoo Sports",
+    "Washington Post"
+  ],
+  "lastUpdated": "2025-03-16",
+  "note": "Inject these summaries alongside team_profiles_2025 for chatbot context. humanStory gives the 'feel' of the team. tournamentResult reflects actual 2025 outcome.",
+  "teams": [
+    {
+      "name": "Auburn",
+      "seed": 1,
+      "region": "South",
+      "record": "28-5",
+      "coach": "Bruce Pearl",
+      "humanStory": "Auburn earned the No. 1 overall seed on the strength of a season-long body of work that included wins over six top-15 KenPom squads. Johni Broome — 18.6 points, 10.6 rebounds, 2.6 blocks — was the only real competition for Cooper Flagg in the Wooden Award race, making him the most complete big man in the tournament. The Tigers did stumble late, dropping three of their last four, which raised legitimate questions heading into March. But Pearl's roster is unusually experienced — Chad Baker-Mazara at 25 is older than Zion Williamson — and that veteran IQ matters when games get tight. This was Auburn's best shot at the program's first national title in its history.",
+      "strengths": "Elite two-way big man in Broome, experienced veteran roster, won the hardest schedule in America all season",
+      "weaknesses": "Late-season fade (3-of-last-4 losses) raised durability questions, guard depth outside Pettiford is thin",
+      "vibeCheck": "A battle-tested war machine that may have peaked too early. The résumé said champion; the final weeks said question mark.",
+      "keyQuote": "This is a team with résumé credentials of a champion but the wobble of a team that lost its footing heading into March.",
+      "tournamentResult": "Final Four — lost to Florida in national semifinal",
+      "tournamentHighlight": "Survived the South region behind Broome's dominance before falling to the eventual champion"
+    },
+    {
+      "name": "Duke",
+      "seed": 1,
+      "region": "East",
+      "record": "31-3",
+      "coach": "Jon Scheyer",
+      "humanStory": "Duke was the most hyped team in the country and for good reason — Cooper Flagg is a generational talent, a 6-foot-9 freshman who does literally everything: score, rebound, defend, facilitate. Scheyer went young when the rest of college basketball is going old via the portal, and this roster of three freshman starters (Flagg, Kon Knueppel, Khaman Maluach) somehow won 31 games. The Blue Devils finished the regular season on a 19-1 run after Flagg's 18th birthday. The concern heading in: Flagg tweaked his ankle in the ACC tournament and Maliq Brown (key defender) had a shoulder injury. Young teams can crumble under the pressure of March. This one didn't — until Houston put them away.",
+      "strengths": "Cooper Flagg is the best player in the tournament. Top-4 adjusted defense nationally. Best pure talent top-to-bottom.",
+      "weaknesses": "Three freshmen starters — youth means inconsistency. Ankle injury to Flagg was a real wildcard going in.",
+      "vibeCheck": "The glamour pick. Every blue-blood fan's dream and every Cinderella hunter's nightmare. Had the best player on the floor in virtually every game.",
+      "keyQuote": "Duke finished the regular season on a 19-1 run after Flagg turned 18. These Blue Devils are special.",
+      "tournamentResult": "Final Four — lost to Houston in national semifinal",
+      "tournamentHighlight": "Cooper Flagg delivered, but Kelvin Sampson's Houston defense was too much in the semis"
+    },
+    {
+      "name": "Houston",
+      "seed": 1,
+      "region": "Midwest",
+      "record": "30-4",
+      "coach": "Kelvin Sampson",
+      "humanStory": "This was Kelvin Sampson's best Houston team — not because of the defense (always elite), but because for the first time his Cougars had real offensive weapons. LJ Cryer shot 43% from three and averaged 18.0 points in the final 12 games of the season. Milos Uzan dropped 25 in the Big 12 title game. The Cougars went 19-1 in the Big 12 and lost just one regular-season game after Thanksgiving. J'Wan Roberts' ankle injury late in the year was the only real concern for a team that looked like a freight train. Sampson, a Hall of Famer in waiting, still needed that elusive first national title.",
+      "strengths": "Kelvin Sampson is the tournament's best coach. Elite defense as always. Added legit offensive firepower this year.",
+      "weaknesses": "Roberts' ankle injury created frontcourt depth questions. History of tournament underperformance relative to talent.",
+      "vibeCheck": "The machine. Not the fun pick, not the story pick — the grind-you-out, make-every-game-ugly pick that wins 30 games every single year.",
+      "keyQuote": "This Houston squad, which finished 19-1 in the Big 12, is Sampson's best shot at his first national title.",
+      "tournamentResult": "Runner-Up — lost to Florida 65-63 in national championship",
+      "tournamentHighlight": "Beat Duke in the Final Four before falling one possession short of Sampson's first title"
+    },
+    {
+      "name": "Florida",
+      "seed": 1,
+      "region": "West",
+      "record": "30-4",
+      "coach": "Todd Golden",
+      "humanStory": "Todd Golden made one decision in the offseason that changed everything: he moved Walter Clayton Jr. to point guard. The result was the third-best adjusted offensive efficiency in the country and a team averaging 84.8 points. Clayton (17.3 PPG, 4.4 APG, 37% from three), Will Richard, Alex Condon, and Florida Atlantic transfer Alijah Martin — all averaging double digits — formed one of the deepest starting fives in America. The Gators went 3-1 against Tennessee, Auburn, and Alabama, and Golden entered the tournament with complete confidence in his group. The program's first national title since 2006-07 was genuinely in reach — and they delivered.",
+      "strengths": "Third-best offense in America by adjusted efficiency. Four double-figure scorers. Deep and battle-tested against elite SEC competition all year.",
+      "weaknesses": "Some questions about depth beyond the starting five. Pressure of being the 'other' No. 1 seed overshadowed by Duke and Auburn hype.",
+      "vibeCheck": "The quiet killer. Went about their business while the country was screaming about Cooper Flagg and Johni Broome. Then they cut down the nets.",
+      "keyQuote": "When we're playing like this, I think we are the best team in America. — Coach Todd Golden after the SEC tournament",
+      "tournamentResult": "National Champion — defeated Houston 65-63",
+      "tournamentHighlight": "Walter Clayton Jr. delivered in every big moment. Florida became the first program since 2006-07 to win consecutive Gators titles."
+    }
+  ],
+  "teamCount": 4
+}
