@@ -67,25 +67,44 @@ function saveCfg() {
 
 saveCfg();
 
-const store = { teams: null, base: null, upset: null, floor: null, optimizer: null, bracket: null, context: null };
-const FILE_MAP = {
-  teams: 'team_profiles.json',
-  base: 'chatbot_predictions_base.json',
-  upset: 'chatbot_predictions_upset.json',
-  floor: 'chatbot_predictions_floor.json',
-  optimizer: 'bracket_optimizer_results.json',
-  bracket: 'bracket_predictions.json',
-  bracket2025: 'bracket_2025.json',
-  context: 'context.json',
+const store = {
+  teams: null,
+  base: null,
+  upset: null,
+  floor: null,
+  optimizer: null,
+  bracket: null,
+  context: null,
+  bracket2025: null,
+  ev: null,
 };
+const FILE_MAP = {
+  teams: ['team_profiles_2025.json', 'team_profiles.json'],
+  base: ['chatbot_predictions_base_2025.json', 'chatbot_predictions_base.json'],
+  upset: ['chatbot_predictions_upset_2025.json', 'chatbot_predictions_upset.json'],
+  floor: ['chatbot_predictions_floor_2025.json', 'chatbot_predictions_floor.json'],
+  optimizer: ['bracket_optimizer_results_2025.json', 'bracket_optimizer_results.json'],
+  bracket: ['bracket_predictions_2025.json', 'bracket_predictions.json'],
+  bracket2025: ['bracket_2025.json'],
+  ev: ['bracket_ev_espn.json'],
+  context: ['context_2025.json', 'context.json'],
+};
+
+function firstExistingFile(candidates) {
+  for (const fileName of candidates) {
+    const p = path.join(DATA_DIR, fileName);
+    if (fs.existsSync(p)) return { fileName, path: p };
+  }
+  return null;
+}
 
 function loadData() {
   let anyLoaded = false;
-  for (const [key, fileName] of Object.entries(FILE_MAP)) {
-    const p = path.join(DATA_DIR, fileName);
+  for (const [key, candidates] of Object.entries(FILE_MAP)) {
+    const selected = firstExistingFile(candidates);
     try {
-      if (fs.existsSync(p)) {
-        store[key] = JSON.parse(fs.readFileSync(p, 'utf8'));
+      if (selected) {
+        store[key] = JSON.parse(fs.readFileSync(selected.path, 'utf8'));
         anyLoaded = true;
       } else {
         store[key] = null;
@@ -97,7 +116,32 @@ function loadData() {
   return anyLoaded;
 }
 
+function getProfileMap() {
+  const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
+  const profileMap = {};
+  for (const p of profiles) {
+    const id = p.teamId ?? p.team_id ?? p.id;
+    if (id !== undefined && id !== null) profileMap[id] = p;
+  }
+  return profileMap;
+}
+
+function enrichBracketWithPlayers() {
+  if (!store.bracket2025 || !Array.isArray(store.bracket2025.bracketGames)) return;
+  const profileMap = getProfileMap();
+  store.bracket2025.bracketGames = store.bracket2025.bracketGames.map((game) => ({
+    ...game,
+    team1Players: Array.isArray(game.team1Players) && game.team1Players.length > 0
+      ? game.team1Players
+      : (profileMap[game.team1Id]?.keyPlayers || []),
+    team2Players: Array.isArray(game.team2Players) && game.team2Players.length > 0
+      ? game.team2Players
+      : (profileMap[game.team2Id]?.keyPlayers || []),
+  }));
+}
+
 let hasData = loadData();
+enrichBracketWithPlayers();
 
 function normProb(value) {
   const n = Number(value);
@@ -153,7 +197,19 @@ function contextCfg() {
 function sysPrompt() {
   const n = (store.base?.predictions || []).length;
   const c = contextCfg();
-  return `You are BracketGPT — a sharp, fun March Madness bracket advisor. Talk like a knowledgeable friend who watches way too much college basketball. Confident, opinionated, backed by data.\n\nHOW TO TALK:\n- Casual. Contractions. No corporate speak.\n- NEVER say "based on my analysis" — just give your take.\n- Use basketball language: "chalk pick," "live dog," "fade," "value play," "cinderella."\n- Lead with your pick, THEN explain. 2-4 short paragraphs max.\n- Bold team names. Don't over-format.\n\nWRONG: "Based on our ensemble model prediction of 73.2% win probability, Duke appears stronger."\nRIGHT: "**Duke** takes this. Defense is suffocating — top 5 adjusted efficiency — 80+ Elo edge. Around 73% to win. Lock it in."\n\nCONFIDENCE:\n- 85%+ → "Lock it in"\n- 70-85% → "Solid pick"\n- 55-70% → "Slight lean"\n- 50-55% → "Coin flip"\n\nSTRATEGY: ESPN scoring 10-20-40-80-160-320. Small pools = chalk. Big pools = need upsets.\n\nDECISION RULES:\n- If model sources disagree, acknowledge disagreement and pick one side with a reason.\n- If confidence is below 55%, call it volatile and avoid lock language.\n- If requested context is missing, say what is missing instead of hallucinating.\n\nDATA: ${n} matchup predictions from 3-model ensemble (XGBoost+LightGBM) on 2003-2024 data. 76% accuracy.\nCONTEXT SETTINGS: maxItems=${c.maxItems}, upsetItems=${c.upsetItems}, optimizerItems=${c.optimizerItems}, titleSeedCutoff=${c.titleSeedCutoff}.`;
+  return `You are BracketGPT — a sharp, fun March Madness bracket advisor. Talk like a knowledgeable friend who watches way too much college basketball. Confident, opinionated, backed by data.\n\nHOW TO TALK:\n- Casual. Contractions. No corporate speak.\n- NEVER say "based on my analysis" — just give your take.\n- Use basketball language: "chalk pick," "live dog," "fade," "value play," "cinderella."\n- Lead with your pick, THEN explain. 2-4 short paragraphs max.\n- Bold team names. Don't over-format.\n\nWRONG: "Based on our ensemble model prediction of 73.2% win probability, Duke appears stronger."\nRIGHT: "**Duke** takes this. Defense is suffocating — top 5 adjusted efficiency — 80+ Elo edge. Around 73% to win. Lock it in."\n\nCONFIDENCE:\n- 85%+ → "Lock it in"\n- 70-85% → "Solid pick"\n- 55-70% → "Slight lean"\n- 50-55% → "Coin flip"\n\nSTRATEGY: ESPN scoring 10-20-40-80-160-320. Small pools = chalk. Big pools = need upsets.\n\nPOOL STRATEGY & VALUE PICKS:\n- For value/contrarian questions, prioritize EV and value_edge vs public pick rate over raw win probability.\n- Positive value_edge = underpicked by the public (good leverage); negative value_edge = public trap / fade candidate.\n- Anchor examples: Auburn champion is major +EV, Houston champion is overpicked, Drake R32 is strong leverage.\n\nDECISION RULES:\n- If model sources disagree, acknowledge disagreement and pick one side with a reason.\n- If confidence is below 55%, call it volatile and avoid lock language.\n- If requested context is missing, say what is missing instead of hallucinating.\n\nDATA: ${n} matchup predictions from 3-model ensemble (XGBoost+LightGBM) on 2003-2024 data. 76% accuracy.\nCONTEXT SETTINGS: maxItems=${c.maxItems}, upsetItems=${c.upsetItems}, optimizerItems=${c.optimizerItems}, titleSeedCutoff=${c.titleSeedCutoff}.`;
+}
+
+function detectIntent(message) {
+  const lc = String(message || '').toLowerCase();
+  if (/value pick|undervalued|beat my pool|contrarian|best bang for buck|who should i pick|value play/.test(lc)) return 'value';
+  if (/compare|\bvs\b|versus|matchup|who wins|who would win/.test(lc)) return 'compare';
+  if (/\b(south|east|west|midwest)\s+region\b/.test(lc)) return 'region';
+  if (/win it all|cut the nets|champion|national title|natty/.test(lc)) return 'champion';
+  if (/upset|cinderella|underdog|dark.?horse|sleeper/.test(lc)) return 'upset';
+  if (/stats|numbers|probability|elo|kenpom/.test(lc)) return 'stats';
+  if (/bracket|pool|strategy|final four|elite 8|round/.test(lc)) return 'bracket';
+  return 'quick';
 }
 
 
@@ -169,11 +225,73 @@ function pickContextRows() {
   return [];
 }
 
+function parseTeamPairFromQuery(query) {
+  const raw = String(query || '').replace(/[?]/g, ' ').trim();
+  if (!raw) return null;
+  const patterns = [
+    /([a-z0-9 .&'’-]+?)\s+(?:vs\.?|versus)\s+([a-z0-9 .&'’-]+)/i,
+    /who\s+would\s+win\s+if\s+([a-z0-9 .&'’-]+?)\s+played\s+([a-z0-9 .&'’-]+)/i,
+  ];
+  for (const rx of patterns) {
+    const m = raw.match(rx);
+    if (m) return [m[1].trim(), m[2].trim()];
+  }
+  return null;
+}
+
+function findPredictionForTeams(teamA, teamB) {
+  if (!teamA || !teamB) return null;
+  const a = normalizeTeamName(teamA);
+  const b = normalizeTeamName(teamB);
+  for (const p of store.base?.predictions || []) {
+    const t1 = normalizeTeamName(p.t1_name);
+    const t2 = normalizeTeamName(p.t2_name);
+    if ((t1 === a && t2 === b) || (t1 === b && t2 === a)) return p;
+  }
+  return null;
+}
+
+function findEvByTeamName(teamName) {
+  const name = normalizeTeamName(teamName);
+  const teams = store.ev?.teams || store.ev?.data || (Array.isArray(store.ev) ? store.ev : []);
+  return teams.find((t) => normalizeTeamName(t.name) === name) || null;
+}
+
+function isRealBracketMatchup(teamA, teamB) {
+  if (!store.bracket2025?.bracketGames) return false;
+  const a = normalizeTeamName(teamA);
+  const b = normalizeTeamName(teamB);
+  return store.bracket2025.bracketGames.some((g) => {
+    const g1 = normalizeTeamName(g.team1 || g.team1Name || g.team1_name || g.team1School);
+    const g2 = normalizeTeamName(g.team2 || g.team2Name || g.team2_name || g.team2School);
+    return (g1 === a && g2 === b) || (g1 === b && g2 === a);
+  });
+}
+
 function findCtx(query) {
   const ctx = [];
   const lc = (query || '').toLowerCase();
   const c = contextCfg();
+  const intent = detectIntent(query || '');
   const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
+
+  const pair = parseTeamPairFromQuery(query);
+  const directMatchup = pair ? findPredictionForTeams(pair[0], pair[1]) : null;
+
+  if (directMatchup) {
+    const hypothetical = !isRealBracketMatchup(directMatchup.t1_name, directMatchup.t2_name);
+    ctx.push({ type: 'pred', model: 'base', data: directMatchup, hypothetical });
+    const ev1 = findEvByTeamName(directMatchup.t1_name);
+    const ev2 = findEvByTeamName(directMatchup.t2_name);
+    if (ev1) ctx.push({ type: 'ev', data: ev1 });
+    if (ev2) ctx.push({ type: 'ev', data: ev2 });
+    if (hypothetical) {
+      ctx.push({
+        type: 'note',
+        data: 'These teams are in different regions — this is a hypothetical matchup based on all-vs-all model projections.',
+      });
+    }
+  }
 
   if (c.includeTeamProfiles) {
     for (const t of profiles) {
@@ -204,6 +322,12 @@ function findCtx(query) {
         if (count >= c.upsetItems) break;
       }
     }
+  }
+
+  if (intent === 'value') {
+    const evRows = store.ev?.teams || store.ev?.data || (Array.isArray(store.ev) ? store.ev : []);
+    const sorted = [...evRows].sort((a, b) => Number(b.total_ev || 0) - Number(a.total_ev || 0));
+    for (const row of sorted.slice(0, 12)) ctx.push({ type: 'ev', data: row });
   }
 
   if (c.includeOptimizer && /bracket|strateg|pool|optim/.test(lc)) {
@@ -275,8 +399,11 @@ function fmtCtx(ctx) {
         const p = item.data;
         const wp = normProb(p.model_win_prob);
         const confidence = wp === null ? 'n/a' : `${(Math.max(wp, 1 - wp) * 100).toFixed(0)}%`;
-        return `[${item.model}] (${p.t1_seed})${p.t1_name} vs (${p.t2_seed})${p.t2_name} > ${p.predicted_winner_name} ${confidence} ${p.confidence} ${p.upset_flag || ''}`;
+        const hypotheticalTag = item.hypothetical ? ' [HYPOTHETICAL]' : '';
+        return `[${item.model}]${hypotheticalTag} (${p.t1_seed})${p.t1_name} vs (${p.t2_seed})${p.t2_name} > ${p.predicted_winner_name} ${confidence} ${p.confidence} ${p.upset_flag || ''}`;
       }
+      if (item.type === 'ev') return `POOL STRATEGY & VALUE PICKS: ${JSON.stringify(item.data)}`;
+      if (item.type === 'note') return `NOTE: ${item.data}`;
       if (item.type === 'opt') return `OPT: ${JSON.stringify(item.data)}`;
       if (item.type === 'bracket') return `BRACKET: ${JSON.stringify(item.data)}`;
       if (item.type === 'context') return `CONTEXT: ${JSON.stringify(item.data)}`;
@@ -669,12 +796,35 @@ app.post('/api/chat', async (req, res) => {
     const msgs = req.body?.messages;
     if (!Array.isArray(msgs) || !msgs.length) return res.status(400).json({ error: 'No message.' });
 
-    const ctx = findCtx(msgs.map((m) => m.content).join(' '));
-    return res.json({ reply: await callLLM(msgs, fmtCtx(ctx)) });
+    const joined = msgs.map((m) => m.content).join(' ');
+    const intent = detectIntent(joined);
+    const ctx = findCtx(joined);
+    const intentHint = intent === 'value'
+      ? 'INTENT: VALUE. Lead with EV/value-edge vs public pick rates and bracket leverage.'
+      : `INTENT: ${intent.toUpperCase()}.`;
+    return res.json({ reply: await callLLM(msgs, `${intentHint}
+${fmtCtx(ctx)}`), intent });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: 'Something broke.' });
   }
+});
+
+
+app.get('/api/value-picks', (req, res) => {
+  const teams = store.ev?.teams || store.ev?.data || (Array.isArray(store.ev) ? store.ev : []);
+  const normalized = teams.map((team) => ({
+    ...team,
+    championEdge: Number(team.rounds?.Champion?.value_edge || 0),
+    finalFourEdge: Number(team.rounds?.['Final Four']?.value_edge || 0),
+    round32Edge: Number(team.rounds?.['Round of 32']?.value_edge || 0),
+  }));
+  res.json({
+    count: normalized.length,
+    leaderboard: normalized.sort((a, b) => Number(b.total_ev || 0) - Number(a.total_ev || 0)),
+    hiddenGems: normalized.filter((t) => t.championEdge >= 10 || t.finalFourEdge >= 10 || t.round32Edge >= 10),
+    fadeThese: normalized.filter((t) => t.championEdge <= -10 || t.finalFourEdge <= -10 || t.round32Edge <= -10),
+  });
 });
 
 app.post('/api/seed-bucket-analysis', async (req, res) => {
@@ -746,6 +896,7 @@ const up = multer({ dest: TMP_DIR });
 app.post('/admin/upload', auth, up.single('file'), (req, res) => {
   const type = req.body.type;
   if (!type || !FILE_MAP[type]) return res.status(400).json({ success: false, error: 'Bad type' });
+  const targetFile = FILE_MAP[type][0];
   if (!req.file) return res.status(400).json({ success: false, error: 'No file' });
 
   try {
@@ -755,9 +906,10 @@ app.post('/admin/upload', auth, up.single('file'), (req, res) => {
       fs.unlinkSync(req.file.path);
       return res.status(400).json({ success: false, error: 'JSON is empty or missing supported fields.' });
     }
-    fs.writeFileSync(path.join(DATA_DIR, FILE_MAP[type]), raw);
+    fs.writeFileSync(path.join(DATA_DIR, targetFile), raw);
     fs.unlinkSync(req.file.path);
     hasData = loadData();
+    enrichBracketWithPlayers();
     return res.json({ success: true });
   } catch (e) {
     if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -767,6 +919,12 @@ app.post('/admin/upload', auth, up.single('file'), (req, res) => {
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'admin.html'), (err) => {
+    if (err && !res.headersSent) res.status(404).send('Not found');
+  });
+});
+
+app.get('/value-picks', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'value-picks.html'), (err) => {
     if (err && !res.headersSent) res.status(404).send('Not found');
   });
 });
