@@ -350,6 +350,14 @@
 
     inp.addEventListener('input', () => btn.classList.toggle('on', inp.value.trim().length > 0));
 
+    (function prefillFromQuery() {
+      const q = new URLSearchParams(window.location.search).get('q');
+      if (!q) return;
+      inp.value = q;
+      btn.classList.add('on');
+      setTimeout(() => go(q), 0);
+    })();
+
     function scroll() { msgs.scrollTop = msgs.scrollHeight; }
 
     function esc(t) {
