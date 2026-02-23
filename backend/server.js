@@ -69,6 +69,7 @@ saveCfg();
 
 const store = {
   teams: null,
+  humanSummaries: null,
   base: null,
   upset: null,
   floor: null,
@@ -80,6 +81,7 @@ const store = {
 };
 const FILE_MAP = {
   teams: ['team_profiles_2025.json', 'team_profiles.json'],
+  humanSummaries: ['team_human_summaries_2025.json', 'team_human_summaries.json'],
   base: ['chatbot_predictions_base_2025.json', 'chatbot_predictions_base.json'],
   upset: ['chatbot_predictions_upset_2025.json', 'chatbot_predictions_upset.json'],
   floor: ['chatbot_predictions_floor_2025.json', 'chatbot_predictions_floor.json'],
@@ -274,6 +276,7 @@ function findCtx(query) {
   const c = contextCfg();
   const intent = detectIntent(query || '');
   const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
+  const humanSummaries = store.humanSummaries?.teams || (Array.isArray(store.humanSummaries) ? store.humanSummaries : []);
 
   const pair = parseTeamPairFromQuery(query);
   const directMatchup = pair ? findPredictionForTeams(pair[0], pair[1]) : null;
@@ -297,6 +300,11 @@ function findCtx(query) {
     for (const t of profiles) {
       const name = (t.name || t.school || '').toLowerCase();
       if (name && lc.includes(name)) ctx.push({ type: 'team', data: t });
+    }
+
+    for (const t of humanSummaries) {
+      const name = (t.name || t.school || '').toLowerCase();
+      if (name && lc.includes(name)) ctx.push({ type: 'human', data: t });
     }
   }
 
@@ -395,6 +403,7 @@ function fmtCtx(ctx) {
   return ctx
     .map((item) => {
       if (item.type === 'team') return `TEAM: ${JSON.stringify(item.data)}`;
+      if (item.type === 'human') return `HUMAN_SUMMARY: ${JSON.stringify(item.data)}`;
       if (item.type === 'pred') {
         const p = item.data;
         const wp = normProb(p.model_win_prob);
