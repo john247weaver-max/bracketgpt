@@ -498,6 +498,80 @@ function buildCanonicalSeedBuckets(rawBracket) {
   return buckets;
 }
 
+const BRACKET_SEED_ORDER = [1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15];
+
+function uniqTeamRows(rows) {
+  const seen = new Set();
+  const out = [];
+  for (const row of rows) {
+    const key = `${normalizeTeamName(row.team)}|${row.seed}|${normalizeTeamName(row.region)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+}
+
+function buildRegionSeedLookup(rows) {
+  const lookup = new Map();
+  for (const row of rows) {
+    const region = row.region;
+    if (!lookup.has(region)) lookup.set(region, new Map());
+    const seedMap = lookup.get(region);
+    if (!seedMap.has(row.seed)) seedMap.set(row.seed, []);
+    const teams = seedMap.get(row.seed);
+    if (!teams.includes(row.team)) teams.push(row.team);
+  }
+  return lookup;
+}
+
+function fmtSeedOpponent(regionSeedLookup, region, seed) {
+  const seedMap = regionSeedLookup.get(region);
+  const teams = seedMap?.get(seed) || [];
+  if (!teams.length) return `(${seed}) TBD`;
+  return `(${seed}) ${teams.join(' / ')}`;
+}
+
+function buildProjectedPath(regionSeedLookup, row) {
+  const idx = BRACKET_SEED_ORDER.indexOf(row.seed);
+  if (idx === -1) return null;
+
+  const r2Idx = idx % 2 === 0 ? idx + 1 : idx - 1;
+  const r2Seed = BRACKET_SEED_ORDER[r2Idx];
+
+  const g4Start = Math.floor(idx / 4) * 4;
+  const g4 = BRACKET_SEED_ORDER.slice(g4Start, g4Start + 4);
+  const s16Seeds = g4.filter((seed) => seed !== row.seed && seed !== r2Seed);
+
+  const g8Start = Math.floor(idx / 8) * 8;
+  const g8 = BRACKET_SEED_ORDER.slice(g8Start, g8Start + 8);
+  const e8Seeds = g8.filter((seed) => !g4.includes(seed));
+
+  const r2 = fmtSeedOpponent(regionSeedLookup, row.region, r2Seed);
+  const s16 = s16Seeds.map((seed) => fmtSeedOpponent(regionSeedLookup, row.region, seed)).join(' vs ');
+  const e8 = e8Seeds.map((seed) => fmtSeedOpponent(regionSeedLookup, row.region, seed)).join(' / ');
+
+  return `R2 vs ${r2} → S16 vs winner of ${s16} → E8 vs winner of ${e8}`;
+}
+
+function buildBracketGroundingContext() {
+  const rawBracket = readBracket2025Source();
+  if (!rawBracket) return 'BRACKET_GROUNDING: bracket data not available.';
+
+  const rows = uniqTeamRows(extractTeamRowsFromBracket(rawBracket)).filter((row) => SUPPORTED_SEEDS.includes(row.seed));
+  if (!rows.length) return 'BRACKET_GROUNDING: bracket data loaded but no seed rows parsed.';
+
+  const regionSeedLookup = buildRegionSeedLookup(rows);
+  const lines = rows
+    .map((row) => {
+      const path = buildProjectedPath(regionSeedLookup, row) || 'data not available';
+      return `- (${row.seed}) ${row.team} | ${row.region} | Path: ${path}`;
+    })
+    .sort((a, b) => a.localeCompare(b));
+
+  return `BRACKET_GROUNDING_2025 (authoritative seed/region/path source; never override with memory):\n${lines.join('\n')}`;
+}
+
 function buildProfileLookup() {
   const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
   const out = new Map();
@@ -802,7 +876,9 @@ app.post('/api/chat', async (req, res) => {
     const intentHint = intent === 'value'
       ? 'INTENT: VALUE. Lead with EV/value-edge vs public pick rates and bracket leverage.'
       : `INTENT: ${intent.toUpperCase()}.`;
+    const bracketGrounding = buildBracketGroundingContext();
     return res.json({ reply: await callLLM(msgs, `${intentHint}
+${bracketGrounding}
 ${fmtCtx(ctx)}`), intent });
   } catch (e) {
     console.error(e);
