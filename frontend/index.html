@@ -2,167 +2,245 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <title>BracketGPT</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --navy: #0b1c3d;
-      --orange: #f37021;
-      --white: #ffffff;
-      --red: #e10600;
-      --gold: #ffc72c;
-      --panel: #112752;
-      --panel-border: rgba(255, 255, 255, 0.14);
-      --muted: #aab7d6;
-      --text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-      --radius: 16px;
+      --bg: #f6f8fc;
+      --bg-soft: #eef2f9;
+      --surface: #ffffff;
+      --surface-2: #f9fbff;
+      --text: #101828;
+      --text-muted: #667085;
+      --primary: #2563eb;
+      --primary-soft: rgba(37, 99, 235, 0.12);
+      --success: #12b76a;
+      --border: #dbe3f0;
+      --border-strong: #c8d3e6;
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 18px;
+      --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06);
+      --shadow-md: 0 12px 28px rgba(16, 24, 40, 0.08);
+      --font-body: 'Manrope', sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+      --transition: 0.18s ease;
     }
 
     html, body { height: 100%; }
 
     body {
-      overflow: hidden;
-      font-family: 'Inter', system-ui, sans-serif;
-      color: var(--white);
+      font-family: var(--font-body);
+      color: var(--text);
       background:
-        linear-gradient(145deg, rgba(11, 28, 61, 0.86), rgba(6, 15, 34, 0.94)),
-        radial-gradient(circle at 18% 20%, rgba(243, 112, 33, 0.2), transparent 35%),
-        radial-gradient(circle at 80% 10%, rgba(255, 199, 44, 0.1), transparent 40%),
-        var(--navy);
+        radial-gradient(circle at 2% 0%, rgba(37, 99, 235, 0.06), transparent 28%),
+        radial-gradient(circle at 100% 15%, rgba(18, 183, 106, 0.05), transparent 35%),
+        var(--bg);
       -webkit-font-smoothing: antialiased;
+      overflow: hidden;
     }
 
     .app {
-      display: flex;
-      flex-direction: column;
       height: 100%;
-      max-width: 980px;
+      max-width: 1120px;
       margin: 0 auto;
-      animation: fade-in .55s ease;
+      padding: 14px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
     }
 
     .hdr {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--panel-border);
-      background: rgba(8, 20, 45, 0.82);
-      backdrop-filter: blur(10px);
-      flex-shrink: 0;
+      gap: 12px;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(8px);
+      box-shadow: var(--shadow-sm);
     }
 
     .logo {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
       display: grid;
       place-items: center;
-      background: linear-gradient(135deg, var(--orange), #cf510b);
-      box-shadow: 0 0 20px rgba(243, 112, 33, 0.5);
-      font-size: 20px;
+      color: #fff;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: linear-gradient(140deg, #1d4ed8, #2563eb);
     }
 
-    .hdr h1, .hero h2 {
-      font-family: 'Anton', Impact, sans-serif;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      text-shadow: var(--text-shadow);
+    .title-wrap h1 {
+      font-size: 15px;
       line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0.01em;
     }
 
-    .hdr h1 { font-size: 20px; }
-    .sub { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+    .sub {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
 
     .live {
       margin-left: auto;
-      border: 1px solid rgba(255, 199, 44, 0.45);
-      color: var(--gold);
-      border-radius: 999px;
-      padding: 4px 12px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      background: rgba(255, 199, 44, 0.08);
+      gap: 8px;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      color: #03543f;
+      background: #ecfdf3;
+      border: 1px solid #abefc6;
+      border-radius: 999px;
+      padding: 6px 10px;
+      white-space: nowrap;
     }
 
     .live::before {
       content: '';
-      width: 6px;
-      height: 6px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      background: var(--gold);
-      animation: pulse 1.5s ease infinite;
+      background: var(--success);
     }
 
     .msgs {
-      flex: 1 1 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      box-shadow: var(--shadow-md);
       overflow-y: auto;
-      padding: 20px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
+      min-height: 0;
     }
 
     .hero {
-      min-height: calc(100vh - 190px);
+      min-height: 100%;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
       display: grid;
       place-items: center;
+      padding: 34px 22px;
       text-align: center;
-      border: 1px solid var(--panel-border);
-      border-radius: 24px;
-      padding: 42px 24px;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
-        linear-gradient(160deg, rgba(243, 112, 33, 0.12), rgba(11, 28, 61, 0.12));
-      box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.3), 0 14px 40px rgba(0, 0, 0, 0.35);
     }
 
-    .hero h2 { font-size: clamp(44px, 11vw, 110px); }
-    .hero .kicker { color: var(--gold); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; font-size: 12px; margin-bottom: 12px; }
-    .hero .tagline { margin-top: 12px; font-size: clamp(20px, 2.5vw, 30px); font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
-    .hero p { color: var(--muted); margin: 12px auto 28px; max-width: 600px; }
-
-    .cta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-
-    .cta-btn, .quick button, .snd {
-      border: none;
-      color: var(--white);
-      background: linear-gradient(135deg, var(--orange), #cb4f0f);
-      border-radius: 12px;
-      cursor: pointer;
-      font-weight: 700;
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      font-size: 11px;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: .05em;
-      transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
-      box-shadow: 0 0 18px rgba(243, 112, 33, 0.35);
+      letter-spacing: 0.06em;
     }
 
-    .cta-btn { padding: 14px 20px; font-size: 13px; }
-    .cta-btn:hover, .quick button:hover, .snd:hover { transform: scale(1.05); filter: brightness(1.05); box-shadow: 0 0 26px rgba(243, 112, 33, 0.48); }
+    .hero h2 {
+      margin-top: 14px;
+      font-size: clamp(30px, 5vw, 44px);
+      line-height: 1.06;
+      letter-spacing: -0.02em;
+    }
+
+    .tagline {
+      margin-top: 8px;
+      font-size: clamp(16px, 2vw, 20px);
+      color: #344054;
+      font-weight: 700;
+    }
+
+    .hero p {
+      margin: 12px auto 22px;
+      max-width: 620px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .cta {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .cta-btn {
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+    }
+
+    .cta-btn.primary {
+      border-color: #1d4ed8;
+      background: linear-gradient(140deg, #1d4ed8, #2563eb);
+      color: #fff;
+    }
+
+    .cta-btn:hover {
+      border-color: #98a2b3;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(16, 24, 40, 0.08);
+    }
+
+    .cta-btn.primary:hover {
+      border-color: #1e40af;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
+    }
 
     .quick {
-      margin-top: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      justify-content: center;
+      max-width: 760px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
     }
 
     .quick button {
-      padding: 10px 13px;
-      font-size: 11px;
-      background: rgba(243, 112, 33, 0.16);
-      border: 1px solid rgba(243, 112, 33, 0.45);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      color: #344054;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 10px;
+      cursor: pointer;
+      text-align: left;
+      transition: all var(--transition);
+    }
+
+    .quick button:hover {
+      background: var(--surface-2);
+      border-color: #bfd1f8;
+      color: #1d4ed8;
     }
 
     .hypo {
@@ -171,152 +249,268 @@
       grid-template-columns: 1fr auto 1fr auto;
       gap: 8px;
       align-items: center;
-      max-width: 600px;
+      max-width: 760px;
       margin-left: auto;
       margin-right: auto;
     }
 
     .hypo input {
-      padding: 10px 11px;
-      border-radius: 10px;
-      border: 1px solid var(--panel-border);
-      background: rgba(17, 39, 82, .95);
-      color: var(--white);
-      outline: none;
       min-width: 0;
+      height: 40px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0 12px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
     }
 
-    .hypo .vs-text { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
-    .hypo button { padding: 10px 12px; font-size: 11px; }
+    .hypo input:focus { border-color: #87a8f9; box-shadow: 0 0 0 3px var(--primary-soft); }
+    .hypo .vs-text { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
 
-    .m { display: flex; gap: 10px; max-width: 92%; animation: rise .3s ease; }
-    .m.u { margin-left: auto; flex-direction: row-reverse; }
-    .av { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 14px; flex-shrink: 0; margin-top: 3px; }
-    .m.b .av { background: linear-gradient(135deg, var(--orange), #cc520f); }
-    .m.u .av { background: #24467f; }
-    .bd { padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--panel-border); background: rgba(17, 39, 82, 0.9); font-size: 14px; line-height: 1.55; }
-    .m.u .bd { background: rgba(243, 112, 33, 0.17); border-color: rgba(243, 112, 33, 0.45); }
+    .m {
+      max-width: 86%;
+      display: flex;
+      gap: 8px;
+      animation: rise .18s ease;
+    }
+
+    .m.u {
+      margin-left: auto;
+      flex-direction: row-reverse;
+    }
+
+    .av {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+
+    .m.b .av { background: #eaf1ff; color: #1d4ed8; border: 1px solid #bfd1f8; }
+    .m.u .av { background: #f2f4f7; color: #344054; border: 1px solid #d0d5dd; }
+
+    .bd {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 10px 12px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+
+    .m.u .bd {
+      background: #f8faff;
+      border-color: #c4d6ff;
+    }
 
     .scoreboard {
-      margin: 10px 0;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 14px;
-      background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.14));
+      margin: 8px 0 10px;
+      border: 1px solid #d0ddff;
+      border-radius: 12px;
+      background: #f8faff;
       overflow: hidden;
     }
 
-    .teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; }
-    .team { padding: 12px; text-align: center; }
-    .team .name { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: 12px; }
-    .team .score { font-family: 'Anton', sans-serif; font-size: 44px; line-height: .95; margin-top: 4px; }
-    .winner { color: var(--gold); text-shadow: 0 0 16px rgba(255, 199, 44, .55); animation: winner-glow 2s ease infinite; }
-    .vs { padding: 14px 8px; display: grid; place-items: center; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+    .teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+    .team { padding: 10px; text-align: center; }
+    .team .name { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #475467; }
+    .team .score { margin-top: 4px; font-size: 34px; line-height: 1; font-weight: 800; color: #101828; }
+    .winner .score, .winner .name { color: #1d4ed8; }
+    .vs { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); padding: 0 6px; }
 
-    .metrics { border-top: 1px solid rgba(255,255,255,.14); padding: 10px 12px 12px; }
-    .bar-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-    .bar-track { height: 8px; border-radius: 999px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
-    .bar-fill { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--orange), var(--gold)); transition: width 1s cubic-bezier(.22,.61,.36,1); }
+    .metrics { border-top: 1px solid #d0ddff; padding: 10px; }
+    .bar-head { display: flex; justify-content: space-between; font-size: 11px; color: #475467; text-transform: uppercase; letter-spacing: .05em; }
+    .bar-track { margin-top: 6px; height: 8px; border-radius: 999px; background: #e4e7ec; overflow: hidden; }
+    .bar-fill { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #1d4ed8, #2e90fa); transition: width .8s ease; }
 
     .upset {
-      margin-top: 10px;
-      display: inline-flex;
-      gap: 6px;
-      align-items: center;
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: rgba(225, 6, 0, 0.18);
-      color: #ff8b87;
-      border: 1px solid rgba(225, 6, 0, 0.55);
+      margin-top: 8px;
+      display: inline-block;
       font-size: 10px;
-      font-weight: 800;
-      letter-spacing: .08em;
+      font-family: var(--font-mono);
+      color: #b42318;
+      background: #fef3f2;
+      border: 1px solid #fecdca;
+      border-radius: 999px;
+      padding: 4px 8px;
       text-transform: uppercase;
-      animation: pulse 1.25s ease infinite;
+      letter-spacing: .04em;
     }
 
-    .typing { display: none; gap: 10px; }
+    .typing { display: none; }
     .typing.on { display: flex; }
-    .dots { display: flex; gap: 5px; border: 1px solid var(--panel-border); border-radius: 12px; background: rgba(17, 39, 82, .9); padding: 14px 12px; }
-    .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.4s infinite both; }
+    .dots {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      padding: 12px 10px;
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #98a2b3;
+      animation: blink 1.2s infinite both;
+    }
+
     .dots span:nth-child(2) { animation-delay: .2s; }
     .dots span:nth-child(3) { animation-delay: .4s; }
 
-    .iw { flex-shrink: 0; padding: 12px 16px 16px; border-top: 1px solid var(--panel-border); background: rgba(6, 15, 34, 0.75); }
-    .ir { display: flex; align-items: center; gap: 8px; border: 1px solid var(--panel-border); border-radius: 13px; padding: 4px 4px 4px 14px; background: rgba(17, 39, 82, .95); }
-    .ir:focus-within { border-color: rgba(243, 112, 33, .62); box-shadow: 0 0 0 3px rgba(243, 112, 33, .15); }
-    .ir input { flex: 1; background: none; border: none; color: var(--white); outline: none; font-size: 14px; }
-    .ir input::placeholder { color: #8ca2cf; }
-    .snd { width: 38px; height: 38px; display: grid; place-items: center; }
-    .hint { text-align: center; margin-top: 7px; font-size: 11px; color: var(--muted); }
+    .iw {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+      padding: 10px;
+    }
 
-    @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .ir {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px 6px 6px 12px;
+      background: #fff;
+    }
+
+    .ir:focus-within {
+      border-color: #87a8f9;
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+
+    .ir input {
+      border: none;
+      outline: none;
+      background: transparent;
+      flex: 1;
+      min-width: 0;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .ir input::placeholder { color: #98a2b3; }
+
+    .snd {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(140deg, #1d4ed8, #2563eb);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+
+    .snd:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(37, 99, 235, 0.32); }
+    .hint { text-align: center; margin-top: 7px; font-size: 11px; color: var(--text-muted); }
+
+    code {
+      font-family: var(--font-mono);
+      background: #f2f4f7;
+      border: 1px solid #e4e7ec;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-size: 12px;
+    }
+
+    @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes blink { 0%, 80%, 100% { opacity: .35; } 40% { opacity: 1; } }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
-    @keyframes winner-glow { 0%,100% { text-shadow: 0 0 12px rgba(255, 199, 44, .4); } 50% { text-shadow: 0 0 22px rgba(255, 199, 44, .75); } }
+
+    @media (max-width: 900px) {
+      .quick { grid-template-columns: 1fr 1fr; }
+    }
 
     @media (max-width: 700px) {
-      .msgs { padding: 12px; }
-      .hero { min-height: calc(100vh - 170px); padding: 30px 14px; }
-      .hero .tagline { font-size: 19px; }
-      .m { max-width: 96%; }
-      .team .score { font-size: 38px; }
+      .app { padding: 10px; gap: 10px; }
+      .hdr { padding: 10px 12px; }
+      .sub { display: none; }
+      .msgs { padding: 10px; }
+      .hero { padding: 24px 14px; }
+      .hero p { margin-bottom: 16px; }
+      .quick { grid-template-columns: 1fr; }
+      .hypo { grid-template-columns: 1fr 1fr; }
+      .hypo .vs-text { display: none; }
+      .hypo .cta-btn { grid-column: span 2; }
+      .m { max-width: 94%; }
+      .team .score { font-size: 30px; }
     }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="hdr">
-      <div class="logo">🏀</div>
-      <div>
-        <h1 id="an">BRACKETGPT</h1>
-        <div class="sub" id="at">AI TOURNAMENT PREDICTOR</div>
+      <div class="logo">BG</div>
+      <div class="title-wrap">
+        <h1 id="an">BracketGPT</h1>
+        <div class="sub" id="at">Data-Driven Tournament Assistant</div>
       </div>
-      <span class="live" id="live-tag">Live Model</span>
+      <span class="live" id="live-tag">Model online</span>
     </div>
 
     <div class="msgs" id="msgs">
       <div class="hero" id="wel">
         <div>
-          <div class="kicker">Championship Intelligence</div>
+          <div class="kicker">NCAA Analytics Workspace</div>
           <h2 id="hero-brand">BracketGPT</h2>
-          <div class="tagline" id="hero-tagline">Win Your Pool. Dominate Your Friends.</div>
-          <p>Broadcast-style matchup projections, upset alerts, and bracket strategy built for March Madness chaos.</p>
+          <div class="tagline" id="hero-tagline">Sharper picks, cleaner process, better pool outcomes.</div>
+          <p>Use matchup projections, upset probability, and bracket strategy in one chat-first workspace.</p>
+
           <div class="cta">
-            <button class="cta-btn" onclick="go('Start my bracket strategy for this year')">Start My Bracket</button>
-            <button class="cta-btn" onclick="go('Analyze a matchup: Duke vs Houston')">Analyze a Matchup</button>
-            <button class="cta-btn" onclick="window.location.href='/value-picks'">Where The Public Is Wrong</button>
+            <button class="cta-btn primary" onclick="go('Build my bracket strategy for this season')">Build My Strategy</button>
+            <button class="cta-btn" onclick="go('Analyze a matchup: Duke vs Houston')">Analyze Matchup</button>
+            <button class="cta-btn" onclick="window.location.href='/value-picks'">Value Picks</button>
           </div>
+
           <div class="quick">
-            <button onclick="go('Best upset picks this tournament?')">Upset Radar</button>
-            <button onclick="go('Which 12-seed has the best shot?')">12-seed dark horse</button>
-            <button onclick="go('Compare top 1-seeds')">Compare 1-seeds</button>
-            <button onclick="go('Build a contrarian Final Four')">Contrarian Final Four</button>
-            <button onclick="go('Compare any two teams')">Compare any two teams</button>
+            <button onclick="go('Best upset candidates in round one?')">Round 1 upset candidates</button>
+            <button onclick="go('Which 12-seeds profile best this year?')">Top 12-seed profiles</button>
+            <button onclick="go('Compare the top 1-seeds')">Compare top 1-seeds</button>
+            <button onclick="go('Give me a contrarian Final Four for a large pool')">Contrarian Final Four</button>
+            <button onclick="go('What are the safest chalk picks?')">Safest chalk picks</button>
+            <button onclick="go('How should I optimize for a 50-person pool?')">50-person pool plan</button>
           </div>
+
           <div class="hypo">
             <input id="hypo-a" type="text" placeholder="Team A (e.g., Florida)" />
             <span class="vs-text">VS</span>
             <input id="hypo-b" type="text" placeholder="Team B (e.g., Auburn)" />
-            <button class="cta-btn" onclick="runHypo()">Hypothetical Matchup</button>
+            <button class="cta-btn primary" onclick="runHypo()">Run Matchup</button>
           </div>
         </div>
       </div>
 
       <div class="typing" id="typ">
-        <div class="av" style="background:linear-gradient(135deg,var(--orange),#cc520f)">🏀</div>
+        <div class="av">BG</div>
         <div class="dots"><span></span><span></span><span></span></div>
       </div>
     </div>
 
     <div class="iw">
       <div class="ir">
-        <input type="text" id="inp" placeholder="Ask about any matchup…" autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();go()}" />
+        <input type="text" id="inp" placeholder="Ask about any team, matchup, or strategy..." autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();go()}" />
         <button class="snd" id="btn" onclick="go()" aria-label="Send prompt">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
         </button>
       </div>
-      <div class="hint">Tournament simulation engine · upset detection live</div>
+      <div class="hint">Model ensemble and matchup projections</div>
     </div>
   </div>
 
@@ -335,12 +529,12 @@
         if (r.ok) {
           const c = await r.json();
           if (c.brandName) {
-            $('an').textContent = c.brandName.toUpperCase();
+            $('an').textContent = c.brandName;
             $('hero-brand').textContent = c.brandName;
             document.title = c.brandName;
           }
           if (c.tagline) {
-            $('at').textContent = c.tagline.toUpperCase();
+            $('at').textContent = c.tagline;
             $('hero-tagline').textContent = c.tagline;
           }
           if (c.activeSeason) $('live-tag').textContent = `Season ${c.activeSeason}`;
@@ -395,7 +589,7 @@
         <div class="metrics">
           <div class="bar-head"><span>${esc(winner)} win probability</span><span>${winPct}%</span></div>
           <div class="bar-track"><div class="bar-fill" data-width="${winPct}"></div></div>
-          ${upsetPct > 30 ? `<div class="upset">🔥 Upset Alert ${upsetPct}%</div>` : ''}
+          ${upsetPct > 30 ? `<div class="upset">Upset risk ${upsetPct}%</div>` : ''}
         </div>
       </div>`;
     }
@@ -405,7 +599,7 @@
       let s = t
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,.12);padding:1px 5px;border-radius:4px;font-size:12px">$1</code>');
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
 
       const blocks = s.split(/\n{2,}/);
       let h = card;
@@ -413,9 +607,9 @@
         const tr = b.trim();
         if (!tr) continue;
         const lines = tr.split('\n');
-        const isList = lines.length > 1 && lines.filter(l => l.trim()).every(l => /^\s*[-*]\s|^\s*\d+[.)]\s/.test(l));
+        const isList = lines.length > 1 && lines.filter((l) => l.trim()).every((l) => /^\s*[-*]\s|^\s*\d+[.)]\s/.test(l));
         if (isList) {
-          h += '<ul style="margin:8px 0 8px 18px">' + lines.filter(l => l.trim()).map(l => `<li>${l.replace(/^\s*[-*]\s*/, '').replace(/^\s*\d+[.)]\s*/, '')}</li>`).join('') + '</ul>';
+          h += '<ul style="margin:8px 0 8px 18px">' + lines.filter((l) => l.trim()).map((l) => `<li>${l.replace(/^\s*[-*]\s*/, '').replace(/^\s*\d+[.)]\s*/, '')}</li>`).join('') + '</ul>';
         } else {
           h += `<p style="margin:0 0 8px">${tr.replace(/\n/g, '<br>')}</p>`;
         }
@@ -445,7 +639,7 @@
       if (e) e.remove();
       const d = document.createElement('div');
       d.className = `m ${w === 'u' ? 'u' : 'b'}`;
-      d.innerHTML = `<div class="av">${w === 'u' ? '👤' : '🏀'}</div><div class="bd">${w === 'u' ? esc(t) : fmt(t)}</div>`;
+      d.innerHTML = `<div class="av">${w === 'u' ? 'YOU' : 'BG'}</div><div class="bd">${w === 'u' ? esc(t) : fmt(t)}</div>`;
       msgs.insertBefore(d, typ);
       animateMessage(d);
       scroll();
@@ -483,7 +677,7 @@
         add('b', reply);
       } catch (e) {
         typ.classList.remove('on');
-        add('b', 'Lost connection — try again.');
+        add('b', 'Lost connection. Try again.');
       }
       busy = false;
       inp.focus();
