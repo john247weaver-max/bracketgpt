@@ -198,8 +198,58 @@ function contextCfg() {
 
 function sysPrompt() {
   const n = (store.base?.predictions || []).length;
-  const c = contextCfg();
-  return `You are BracketGPT — a sharp, fun March Madness bracket advisor. Talk like a knowledgeable friend who watches way too much college basketball. Confident, opinionated, backed by data.\n\nHOW TO TALK:\n- Casual. Contractions. No corporate speak.\n- NEVER say "based on my analysis" — just give your take.\n- Use basketball language: "chalk pick," "live dog," "fade," "value play," "cinderella."\n- Lead with your pick, THEN explain. 2-4 short paragraphs max.\n- Bold team names. Don't over-format.\n\nWRONG: "Based on our ensemble model prediction of 73.2% win probability, Duke appears stronger."\nRIGHT: "**Duke** takes this. Defense is suffocating — top 5 adjusted efficiency — 80+ Elo edge. Around 73% to win. Lock it in."\n\nCONFIDENCE:\n- 85%+ → "Lock it in"\n- 70-85% → "Solid pick"\n- 55-70% → "Slight lean"\n- 50-55% → "Coin flip"\n\nSTRATEGY: ESPN scoring 10-20-40-80-160-320. Small pools = chalk. Big pools = need upsets.\n\nPOOL STRATEGY & VALUE PICKS:\n- For value/contrarian questions, prioritize EV and value_edge vs public pick rate over raw win probability.\n- Positive value_edge = underpicked by the public (good leverage); negative value_edge = public trap / fade candidate.\n- Anchor examples: Auburn champion is major +EV, Houston champion is overpicked, Drake R32 is strong leverage.\n\nBRACKET ACCURACY RULES (MANDATORY):\n- Before recommending ANY team, pull and display from bracket_2025.json: exact seed number, exact region (South/East/Midwest/West), and projected path based on the actual bracket structure.\n- Required format for every team mention: (Seed) Team Name | Region | Path: R2 vs [opp] → S16 vs [projected] → E8 vs [projected]\n- Self-check before every response:\n  [ ] Seed pulled from bracket data, not memory\n  [ ] Region pulled from bracket data, not memory\n  [ ] Path opponents traced from actual bracket structure\n  [ ] Win probabilities from chatbot_predictions or bracket_ev data\n- If you cannot verify seed/region/path from loaded data, respond exactly: "I need to verify [team]'s bracket position" — do not guess.\n- Never place a team in the wrong region, use path opponents from a different region, or confuse seed lines.\n\nDECISION RULES:\n- If model sources disagree, acknowledge disagreement and pick one side with a reason.\n- If confidence is below 55%, call it volatile and avoid lock language.\n- If requested context is missing, say what is missing instead of hallucinating.\n\nDATA: ${n} matchup predictions from 3-model ensemble (XGBoost+LightGBM) on 2003-2024 data. 76% accuracy.\nCONTEXT SETTINGS: maxItems=${c.maxItems}, upsetItems=${c.upsetItems}, optimizerItems=${c.optimizerItems}, titleSeedCutoff=${c.titleSeedCutoff}.`;
+  return `You are BracketGPT — a sharp, opinionated March Madness bracket advisor.
+You sound like Bill Simmons meets Nate Silver: data-backed but conversational.
+Confident, opinionated, backed by data.
+
+MODEL: v5.2 stacked ensemble (Optuna-tuned XGBoost + LightGBM + CatBoost, 5-fold OOF stacking, isotonic calibration) trained on 2003-2024 NCAA tournament data. ${n} matchup predictions loaded.
+
+V5 FEATURES YOU KNOW ABOUT:
+- MOMENTUM: Each team has a margin_trend (slope of scoring margin over the season) and last10_win_rate. "Rising" = trending up AND winning lately. "Fading" = declining or losing. "Steady" = flat.
+- VOLATILITY: margin_std measures game-to-game scoring variance. volatility_score is 0-100 (min-max normalized). High volatility = unpredictable — great for upsets, bad for chalk picks.
+- INJURY PROXY: If a team's last 5 games scoring margin dropped 6+ points vs their season average, they get an injury_alert. This flags possible injuries, suspensions, or fatigue without needing an injury database.
+- CONFERENCE TOURNEY: How far they went — champion, finalist, semifinalist, or first_round_exit. Momentum signal.
+- HOME/AWAY SPLIT: home_away_net_diff shows how much better a team plays at home. Big splits mean they may struggle on neutral courts (all tournament games are neutral).
+- MATCHUP RISK NOTE: Flags like "High variance matchup", "Momentum mismatch favoring X", or "Injury concern — monitor roster news".
+
+HOW TO USE V5 DATA:
+- When someone asks about a team, ALWAYS mention momentum status if rising or fading.
+- If a team has an injury_alert, warn about it and quote the drop: "Their net margin dropped X pts in the final 5 games — could signal injuries or fatigue."
+- For upset picks, favor teams that are RISING + opponent is FADING or has high volatility.
+- For safe/chalk picks, favor teams that are STEADY or RISING with LOW volatility.
+- Mention the matchup_risk_note when it exists — it's pre-computed analysis.
+- Conference tourney results matter: a conf tourney champion has momentum, a first-round exit raises questions.
+
+ARCHETYPES: Each team has a named archetype (Juggernaut, Fortress, Glass Cannon, etc.) with historical matchup win rates. Use these for color and narrative.
+
+HOW TO TALK:
+- Casual. Contractions. No corporate speak.
+- NEVER say: "based on my analysis", "it's important to note", "it's worth noting", "let's dive in", "certainly", "I'd be happy to", "great question"
+- Use basketball language: "chalk pick", "live dog", "fade", "value play", "cinderella", "bracket buster", "trending up"
+- Lead with your pick, THEN explain. 2-4 short paragraphs max.
+- Bold team names when first mentioned. Don't over-format — no bullet point dumps.
+- When data shows momentum/injury flags, weave them into the narrative naturally. Don't just list stats.
+
+EXAMPLES OF GOOD RESPONSES:
+
+Q: "Who wins Duke vs Vermont?"
+A: "**Duke** cruises. They're a Juggernaut archetype — elite on both ends — and they're trending up with a 9-1 last-10 record. Vermont's been fading down the stretch (margin dropped 5 pts in the final 5 games, possible injury concern). Duke by 15+, lock it in."
+
+Q: "Best upset pick in the first round?"
+A: "Love **New Mexico** as a 10-seed over 7-seed Marquette. The Lobos are rising — 8-2 in their last 10, conference tourney champs, and their margin trend is +1.3 pts per game improvement. Marquette's a Glass Cannon with a volatility score of 78 — that inconsistency kills you in March. Model gives New Mexico 48%, but the momentum gap makes this closer to a coin flip I'd lean into for a big pool."
+
+Q: "Is Houston safe to go deep?"
+A: "**Houston** is the safest bet in the bracket. Fortress archetype — elite defense, steady momentum, volatility score of just 22. Their home/away split is tight too, meaning they play the same everywhere. No injury alert. Conference tourney finalists. The only concern is their offense can stall against elite D, but that's a Sweet 16 problem, not a first weekend problem."
+
+CONFIDENCE TIERS:
+- 85%+ → "Lock it in"
+- 70-85% → "Solid pick"
+- 55-70% → "Slight lean"
+- 50-55% → "Coin flip — go with your gut"
+
+STRATEGY: ESPN scoring 10-20-40-80-160-320. Small pools = chalk. Big pools = need upsets in later rounds for max value.
+
+If you don't have data on a specific matchup, say so honestly — don't make up numbers.`;
 }
 
 function detectIntent(message) {
@@ -273,110 +323,160 @@ function isRealBracketMatchup(teamA, teamB) {
 function findCtx(query) {
   const ctx = [];
   const lc = (query || '').toLowerCase();
-  const c = contextCfg();
-  const intent = detectIntent(query || '');
+
+  // Context config with defaults
+  const c = typeof contextCfg === 'function' ? contextCfg() : {
+    maxItems: 25,
+    includeTeamProfiles: true,
+    upsetItems: 8,
+    includeOptimizer: true,
+    optimizerItems: 5,
+    includeTitleAngles: true,
+    titleSeedCutoff: 3,
+  };
+
+  // Team profiles
   const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
-  const humanSummaries = store.humanSummaries?.teams || (Array.isArray(store.humanSummaries) ? store.humanSummaries : []);
-
-  const pair = parseTeamPairFromQuery(query);
-  const directMatchup = pair ? findPredictionForTeams(pair[0], pair[1]) : null;
-
-  if (directMatchup) {
-    const hypothetical = !isRealBracketMatchup(directMatchup.t1_name, directMatchup.t2_name);
-    ctx.push({ type: 'pred', model: 'base', data: directMatchup, hypothetical });
-    const ev1 = findEvByTeamName(directMatchup.t1_name);
-    const ev2 = findEvByTeamName(directMatchup.t2_name);
-    if (ev1) ctx.push({ type: 'ev', data: ev1 });
-    if (ev2) ctx.push({ type: 'ev', data: ev2 });
-    if (hypothetical) {
-      ctx.push({
-        type: 'note',
-        data: 'These teams are in different regions — this is a hypothetical matchup based on all-vs-all model projections.',
-      });
-    }
-  }
-
-  if (c.includeTeamProfiles) {
+  if (c.includeTeamProfiles !== false) {
     for (const t of profiles) {
       const name = (t.name || t.school || '').toLowerCase();
       if (name && lc.includes(name)) ctx.push({ type: 'team', data: t });
     }
-
-    for (const t of humanSummaries) {
-      const name = (t.name || t.school || '').toLowerCase();
-      if (name && lc.includes(name)) ctx.push({ type: 'human', data: t });
-    }
   }
 
+  // Bracket games (if loaded)
+  const bracketGames = store.bracket?.games || store.bracket?.predictions || [];
+
+  // Prediction search across all models
   for (const model of ['base', 'upset', 'floor']) {
-    for (const p of store[model]?.predictions || []) {
+    for (const p of (store[model]?.predictions || [])) {
       const t1 = (p.t1_name || '').toLowerCase();
       const t2 = (p.t2_name || '').toLowerCase();
       let hit = (t1 && lc.includes(t1)) || (t2 && lc.includes(t2));
+
+      // Seed-based matching
       if (!hit) {
         const m = lc.match(/(\d+)\s*(?:seed|vs|versus)/);
         if (m && (p.t1_seed === +m[1] || p.t2_seed === +m[1])) hit = true;
       }
+
+      // Archetype matching
+      if (!hit && /juggernaut|fortress|glass.cannon|gunslinger|grinder|wall|crusher|lockdown|sniper|sharpshooter/.test(lc)) {
+        const a1 = (p.t1_archetype || '').toLowerCase();
+        const a2 = (p.t2_archetype || '').toLowerCase();
+        if (lc.includes(a1.replace('the ', '')) || lc.includes(a2.replace('the ', ''))) hit = true;
+      }
+
       if (hit) ctx.push({ type: 'pred', model, data: p });
     }
   }
 
-  if (/upset|cinderella|underdog|dark.?horse|sleeper/.test(lc)) {
-    let count = 0;
-    for (const p of store.base?.predictions || []) {
-      if (p.upset_flag === 'upset') {
+  // V5: Momentum/trending queries — find teams that are rising or fading
+  if (/momentum|trending|hot|cold|streak|surge|slump|fading|rising|peaking|form/.test(lc)) {
+    for (const p of (store.base?.predictions || [])) {
+      const fr = p.form_and_risk || {};
+      const t1_rising = fr.t1_momentum === 'rising';
+      const t2_rising = fr.t2_momentum === 'rising';
+      const t1_fading = fr.t1_momentum === 'fading';
+      const t2_fading = fr.t2_momentum === 'fading';
+
+      if (/hot|rising|surge|peaking|trending.up/.test(lc) && (t1_rising || t2_rising)) {
         ctx.push({ type: 'pred', model: 'base', data: p });
-        count += 1;
-        if (count >= c.upsetItems) break;
+      } else if (/cold|fading|slump|declining/.test(lc) && (t1_fading || t2_fading)) {
+        ctx.push({ type: 'pred', model: 'base', data: p });
+      } else if (/momentum|form|trending/.test(lc) && (t1_rising || t2_rising || t1_fading || t2_fading)) {
+        ctx.push({ type: 'pred', model: 'base', data: p });
       }
     }
   }
 
-  if (intent === 'value') {
-    const evRows = store.ev?.teams || store.ev?.data || (Array.isArray(store.ev) ? store.ev : []);
-    const sorted = [...evRows].sort((a, b) => Number(b.total_ev || 0) - Number(a.total_ev || 0));
-    for (const row of sorted.slice(0, 12)) ctx.push({ type: 'ev', data: row });
+  // V5: Injury/risk queries
+  if (/injur|hurt|risk|concern|health|questionable|doubtful|alert|monitor/.test(lc)) {
+    for (const p of (store.base?.predictions || [])) {
+      const fr = p.form_and_risk || {};
+      if (fr.t1_injury_alert || fr.t2_injury_alert) {
+        ctx.push({ type: 'pred', model: 'base', data: p });
+      }
+    }
   }
 
-  if (c.includeOptimizer && /bracket|strateg|pool|optim/.test(lc)) {
-    for (const o of (store.optimizer?.results || []).slice(0, c.optimizerItems)) {
+  // V5: Volatility/variance queries
+  if (/volatil|variance|inconsisten|unpredictable|wild.card|chaos|bust|reliable|steady|consistent|safe/.test(lc)) {
+    for (const p of (store.base?.predictions || [])) {
+      const fr = p.form_and_risk || {};
+      const v1 = fr.t1_volatility_score || 0;
+      const v2 = fr.t2_volatility_score || 0;
+      if (/safe|reliable|steady|consistent/.test(lc) && (v1 < 30 || v2 < 30)) {
+        ctx.push({ type: 'pred', model: 'base', data: p });
+      } else if (/volatil|wild|chaos|bust|unpredictable|inconsisten/.test(lc) && (v1 > 60 || v2 > 60)) {
+        ctx.push({ type: 'pred', model: 'base', data: p });
+      }
+    }
+  }
+
+  // V5: Conference tourney champion queries
+  if (/conference.tourn|conf.champ|conf.winner|tournament.champ/.test(lc)) {
+    for (const p of (store.base?.predictions || [])) {
+      const fr = p.form_and_risk || {};
+      if (fr.t1_conf_tourney_result === 'champion' || fr.t2_conf_tourney_result === 'champion') {
+        ctx.push({ type: 'pred', model: 'base', data: p });
+      }
+    }
+  }
+
+  // Upset queries
+  if (/upset|cinderella|underdog|dark.?horse|sleeper|bust/.test(lc)) {
+    let count = 0;
+    // Bracket-aware upsets first
+    for (const g of bracketGames) {
+      if (g.upsetFlag === 'upset' || (g.predictedWinner && g.seed1 < g.seed2 && g.predictedWinner === g.team2)) {
+        ctx.push({ type: 'bracket', data: g });
+        count++;
+        if (count >= (c.upsetItems || 8)) break;
+      }
+    }
+    // V5 enhancement: also surface high-volatility opponents + rising underdogs
+    if (count < (c.upsetItems || 8)) {
+      for (const p of (store.base?.predictions || [])) {
+        if (p.upset_flag && p.upset_flag !== '' && p.upset_flag !== 'chalk') {
+          ctx.push({ type: 'pred', model: 'base', data: p });
+          count++;
+          if (count >= (c.upsetItems || 8)) break;
+        }
+      }
+    }
+  }
+
+  // Bracket structure queries
+  if (/bracket|region|draw|path|south|east|midwest|west/.test(lc)) {
+    for (const g of bracketGames) {
+      if (g.round === 'Round of 64') ctx.push({ type: 'bracket', data: g });
+    }
+  }
+
+  // Optimizer / strategy queries
+  if (c.includeOptimizer !== false && /bracket|strateg|pool|optim|espn|points/.test(lc)) {
+    for (const o of (store.optimizer?.results || []).slice(0, c.optimizerItems || 5)) {
       ctx.push({ type: 'opt', data: o });
     }
   }
 
-  if (/bracket|round|elite.?8|final.?four|championship|pool/.test(lc)) {
-    const bracketData = store.bracket;
-    if (Array.isArray(bracketData)) {
-      for (const item of bracketData.slice(0, c.maxItems)) {
-        ctx.push({ type: 'bracket', data: item });
-      }
-    } else if (bracketData && typeof bracketData === 'object') {
-      const arr = bracketData.predictions || bracketData.games || bracketData.matchups || bracketData.picks || bracketData.rounds;
-      if (Array.isArray(arr)) {
-        for (const item of arr.slice(0, c.maxItems)) {
-          ctx.push({ type: 'bracket', data: item });
-        }
-      } else {
-        ctx.push({ type: 'bracket', data: bracketData });
+  // Final Four / champion queries
+  if (/final.four|champ|win.it.all|natty|title|favorite/.test(lc)) {
+    for (const g of bracketGames) {
+      if ((g.seed1 || 99) <= (c.titleSeedCutoff || 3) || (g.seed2 || 99) <= (c.titleSeedCutoff || 3)) {
+        ctx.push({ type: 'bracket', data: g });
       }
     }
-  }
-
-  for (const item of pickContextRows()) {
-    const raw = JSON.stringify(item).toLowerCase();
-    if (!lc || lc.split(/\s+/).some((token) => token.length > 3 && raw.includes(token))) {
-      ctx.push({ type: 'context', data: item });
-    }
-  }
-
-  if (c.includeTitleAngles && /final.four|champ|win.it.all|natty/.test(lc)) {
-    for (const p of store.base?.predictions || []) {
-      if ((p.t1_seed || 99) <= c.titleSeedCutoff && (p.t2_seed || 99) <= c.titleSeedCutoff) {
+    // Also surface base predictions for top seeds
+    for (const p of (store.base?.predictions || [])) {
+      if ((p.t1_seed || 99) <= 2 && (p.t2_seed || 99) <= 2) {
         ctx.push({ type: 'pred', model: 'base', data: p });
       }
     }
   }
 
+  // Deduplicate
   const seen = new Set();
   return ctx
     .filter((item) => {
@@ -385,9 +485,8 @@ function findCtx(query) {
       seen.add(key);
       return true;
     })
-    .slice(0, c.maxItems);
+    .slice(0, c.maxItems || 25);
 }
-
 
 const SUPPORTED_SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
 
@@ -400,26 +499,87 @@ function requiredSeedHeaders() {
 }
 
 function fmtCtx(ctx) {
-  return ctx
-    .map((item) => {
-      if (item.type === 'team') return `TEAM: ${JSON.stringify(item.data)}`;
-      if (item.type === 'human') return `HUMAN_SUMMARY: ${JSON.stringify(item.data)}`;
-      if (item.type === 'pred') {
-        const p = item.data;
-        const wp = normProb(p.model_win_prob);
-        const confidence = wp === null ? 'n/a' : `${(Math.max(wp, 1 - wp) * 100).toFixed(0)}%`;
-        const hypotheticalTag = item.hypothetical ? ' [HYPOTHETICAL]' : '';
-        return `[${item.model}]${hypotheticalTag} (${p.t1_seed})${p.t1_name} vs (${p.t2_seed})${p.t2_name} > ${p.predicted_winner_name} ${confidence} ${p.confidence} ${p.upset_flag || ''}`;
+  return ctx.map((item) => {
+    if (item.type === 'team') {
+      return 'TEAM: ' + JSON.stringify(item.data);
+    }
+
+    if (item.type === 'pred') {
+      const p = item.data;
+      const prob = Math.max(p.model_win_prob || 0.5, 1 - (p.model_win_prob || 0.5));
+      const winner = p.predicted_winner_name || (p.model_win_prob > 0.5 ? p.t1_name : p.t2_name);
+
+      // Base prediction line
+      let line = `[${item.model}] (${p.t1_seed})${p.t1_name} vs (${p.t2_seed})${p.t2_name}`;
+      line += ` → ${winner} ${(prob * 100).toFixed(0)}% ${p.confidence || ''}`;
+
+      if (p.upset_flag) line += ` ${p.upset_flag}`;
+
+      // Archetype info
+      if (p.t1_archetype || p.t2_archetype) {
+        line += ` | Archetypes: ${p.t1_archetype || '?'} vs ${p.t2_archetype || '?'}`;
       }
-      if (item.type === 'ev') return `POOL STRATEGY & VALUE PICKS: ${JSON.stringify(item.data)}`;
-      if (item.type === 'note') return `NOTE: ${item.data}`;
-      if (item.type === 'opt') return `OPT: ${JSON.stringify(item.data)}`;
-      if (item.type === 'bracket') return `BRACKET: ${JSON.stringify(item.data)}`;
-      if (item.type === 'context') return `CONTEXT: ${JSON.stringify(item.data)}`;
-      return '';
-    })
-    .filter(Boolean)
-    .join('\n');
+
+      // V5: form_and_risk — this is the key upgrade
+      const fr = p.form_and_risk;
+      if (fr) {
+        // Momentum
+        const momParts = [];
+        if (fr.t1_momentum && fr.t1_momentum !== 'steady') {
+          momParts.push(`${p.t1_name}: ${fr.t1_momentum} (L10: ${((fr.t1_last10_win_rate || 0) * 100).toFixed(0)}%, trend: ${fr.t1_margin_trend > 0 ? '+' : ''}${(fr.t1_margin_trend || 0).toFixed(1)})`);
+        }
+        if (fr.t2_momentum && fr.t2_momentum !== 'steady') {
+          momParts.push(`${p.t2_name}: ${fr.t2_momentum} (L10: ${((fr.t2_last10_win_rate || 0) * 100).toFixed(0)}%, trend: ${fr.t2_margin_trend > 0 ? '+' : ''}${(fr.t2_margin_trend || 0).toFixed(1)})`);
+        }
+        if (momParts.length) line += ` | Momentum: ${momParts.join('; ')}`;
+
+        // Volatility
+        if (fr.t1_volatility_score > 60 || fr.t2_volatility_score > 60) {
+          line += ` | Volatility: ${p.t1_name}=${fr.t1_volatility_score}/100 ${p.t2_name}=${fr.t2_volatility_score}/100`;
+        }
+
+        // Injury alerts
+        if (fr.t1_injury_alert) {
+          line += ` | ⚠️ INJURY ALERT ${p.t1_name}: ${fr.t1_injury_context || 'efficiency drop in final 5 games'}`;
+        }
+        if (fr.t2_injury_alert) {
+          line += ` | ⚠️ INJURY ALERT ${p.t2_name}: ${fr.t2_injury_context || 'efficiency drop in final 5 games'}`;
+        }
+
+        // Conference tourney results (if notable)
+        const confParts = [];
+        if (fr.t1_conf_tourney_result === 'champion') confParts.push(`${p.t1_name}: conf tourney CHAMP`);
+        if (fr.t2_conf_tourney_result === 'champion') confParts.push(`${p.t2_name}: conf tourney CHAMP`);
+        if (fr.t1_conf_tourney_result === 'first_round_exit') confParts.push(`${p.t1_name}: conf tourney 1st round exit`);
+        if (fr.t2_conf_tourney_result === 'first_round_exit') confParts.push(`${p.t2_name}: conf tourney 1st round exit`);
+        if (confParts.length) line += ` | Conf: ${confParts.join('; ')}`;
+
+        // Risk note
+        if (fr.matchup_risk_note) {
+          line += ` | RISK: ${fr.matchup_risk_note}`;
+        }
+      }
+
+      return line;
+    }
+
+    if (item.type === 'bracket') {
+      const g = item.data;
+      const prob = g.winProb ? Math.max(g.winProb, 1 - g.winProb) : 0.5;
+      let line = `🏀 BRACKET ${g.round || ''}`;
+      if (g.projected) line += ' (PROJECTED)';
+      line += `: (${g.seed1})${g.team1} vs (${g.seed2})${g.team2}`;
+      if (g.predictedWinner) line += ` → ${g.predictedWinner} ${(prob * 100).toFixed(0)}%`;
+      if (g.region) line += ` [${g.region}]`;
+      return line;
+    }
+
+    if (item.type === 'opt') {
+      return 'OPT: ' + JSON.stringify(item.data);
+    }
+
+    return '';
+  }).filter(Boolean).join('\n');
 }
 
 function normalizeTeamName(value) {
