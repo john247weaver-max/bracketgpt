@@ -11,6 +11,27 @@ app.use(express.json({ limit: '5mb' }));
 const DATA_DIR = path.join(__dirname, 'data');
 const TMP_DIR = path.join(DATA_DIR, 'tmp');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
+const ENV_FILE = path.join(__dirname, '..', '.env');
+
+function loadDotEnv(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = String(rawLine || '').trim();
+    if (!line || line.startsWith('#')) continue;
+    const idx = line.indexOf('=');
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    let value = line.slice(idx + 1).trim();
+    if (!key || process.env[key] !== undefined) continue;
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
+loadDotEnv(ENV_FILE);
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
@@ -32,6 +53,7 @@ const defaultContext = {
   includeTeamProfiles: true,
   includeOptimizer: true,
   includeTitleAngles: true,
+  autoOptimize: true,
 };
 
 const cfg = {
@@ -145,6 +167,25 @@ function enrichBracketWithPlayers() {
 let hasData = loadData();
 enrichBracketWithPlayers();
 
+function reloadDataFromDisk(reason = 'reload') {
+  const loaded = loadData();
+  enrichBracketWithPlayers();
+  hasData = loaded;
+  console.log(`[data] ${reason} | loaded:${loaded ? 'yes' : 'no'}`);
+}
+
+let dataReloadTimer = null;
+try {
+  fs.watch(DATA_DIR, { persistent: false }, (eventType, fileName) => {
+    if (!fileName || fileName.startsWith('tmp')) return;
+    if (!fileName.toLowerCase().endsWith('.json')) return;
+    clearTimeout(dataReloadTimer);
+    dataReloadTimer = setTimeout(() => reloadDataFromDisk(`fs:${eventType}:${fileName}`), 150);
+  });
+} catch (e) {
+  console.warn('[data] watch unavailable, continuing without file watch');
+}
+
 function normProb(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
@@ -193,6 +234,7 @@ function contextCfg() {
     includeTeamProfiles: cfg.context?.includeTeamProfiles !== false,
     includeOptimizer: cfg.context?.includeOptimizer !== false,
     includeTitleAngles: cfg.context?.includeTitleAngles !== false,
+    autoOptimize: cfg.context?.autoOptimize !== false,
   };
 }
 
@@ -320,7 +362,7 @@ function isRealBracketMatchup(teamA, teamB) {
   });
 }
 
-function findCtx(query) {
+function findCtx(query, opts = {}) {
   const ctx = [];
   const lc = (query || '').toLowerCase();
 
@@ -476,16 +518,144 @@ function findCtx(query) {
     }
   }
 
-  // Deduplicate
+  // Base dedupe before optimization
   const seen = new Set();
-  return ctx
-    .filter((item) => {
-      const key = JSON.stringify(item);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, c.maxItems || 25);
+  const deduped = ctx.filter((item) => {
+    const key = JSON.stringify(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (c.autoOptimize === false) {
+    return deduped.slice(0, c.maxItems || 25);
+  }
+
+  return optimizeCtx(deduped, query, { ...opts, cfg: c });
+}
+
+function ctxFingerprint(item) {
+  if (!item || !item.type) return '';
+  if (item.type === 'pred') {
+    const p = item.data || {};
+    return `pred:${item.model || 'x'}:${normalizeTeamName(p.t1_name)}:${normalizeTeamName(p.t2_name)}:${p.t1_seed || ''}:${p.t2_seed || ''}`;
+  }
+  if (item.type === 'team') {
+    const t = item.data || {};
+    return `team:${normalizeTeamName(t.name || t.school || t.team)}`;
+  }
+  if (item.type === 'bracket') {
+    const g = item.data || {};
+    return `bracket:${g.round || ''}:${normalizeTeamName(g.team1)}:${normalizeTeamName(g.team2)}:${g.region || ''}`;
+  }
+  if (item.type === 'opt') {
+    const o = item.data || {};
+    return `opt:${normalizeTeamName(o.team || o.name || o.school)}:${o.seed || ''}:${o.round || ''}`;
+  }
+  return JSON.stringify(item);
+}
+
+function scoreCtxItem(item, lc, intent) {
+  let score = 0;
+
+  if (item.type === 'pred') score += 5;
+  if (item.type === 'bracket') score += 4;
+  if (item.type === 'team') score += 3;
+  if (item.type === 'opt') score += 2;
+
+  if (item.type === 'pred') {
+    const p = item.data || {};
+    const t1 = String(p.t1_name || '').toLowerCase();
+    const t2 = String(p.t2_name || '').toLowerCase();
+    if (t1 && lc.includes(t1)) score += 8;
+    if (t2 && lc.includes(t2)) score += 8;
+    if (p.upset_flag && /upset|cinderella|underdog|dark.?horse|sleeper/.test(lc)) score += 6;
+    const fr = p.form_and_risk || {};
+    if ((fr.t1_injury_alert || fr.t2_injury_alert) && /injur|hurt|health|risk|concern/.test(lc)) score += 6;
+    const volatile = (fr.t1_volatility_score || 0) > 60 || (fr.t2_volatility_score || 0) > 60;
+    if (volatile && /volatil|variance|chaos|wild|upset/.test(lc)) score += 5;
+  }
+
+  if (item.type === 'team') {
+    const t = item.data || {};
+    const name = String(t.name || t.school || '').toLowerCase();
+    if (name && lc.includes(name)) score += 7;
+  }
+
+  if (item.type === 'bracket') {
+    const g = item.data || {};
+    if ((g.round || '').toLowerCase().includes('round of 64') && /upset|first round|round of 64/.test(lc)) score += 3;
+    if ((g.region || '').toLowerCase() && lc.includes(String(g.region || '').toLowerCase())) score += 5;
+  }
+
+  if (item.type === 'opt' && /pool|strateg|espn|points|optimi|value/.test(lc)) score += 5;
+
+  if (intent === 'compare' && item.type === 'pred') score += 4;
+  if (intent === 'upset' && (item.type === 'pred' || item.type === 'bracket')) score += 4;
+  if (intent === 'bracket' && item.type === 'bracket') score += 4;
+  if (intent === 'value' && item.type === 'opt') score += 6;
+  if (intent === 'champion' && item.type === 'bracket') score += 3;
+
+  return score;
+}
+
+function optimizeCtx(ctx, query, opts = {}) {
+  const c = opts.cfg || contextCfg();
+  const intent = opts.intent || detectIntent(query);
+  const messageCount = Number(opts.messageCount || 1);
+  const lc = String(query || '').toLowerCase();
+  const tokenishLen = lc.split(/\s+/).filter(Boolean).length;
+
+  let limit = c.maxItems || 20;
+  if (intent === 'compare') limit = Math.min(limit, 14);
+  if (intent === 'quick') limit = Math.max(8, Math.min(limit, 12));
+  if (intent === 'value') limit = Math.min(limit, 18);
+  if (intent === 'upset') limit = Math.min(limit + 2, 24);
+  if (intent === 'bracket' || intent === 'champion' || intent === 'region') limit = Math.min(limit + 3, 26);
+  if (tokenishLen > 60) limit = Math.max(8, limit - 3);
+  if (messageCount > 12) limit = Math.max(8, limit - 2);
+
+  const unique = [];
+  const seen = new Set();
+  for (const item of ctx) {
+    const fp = ctxFingerprint(item);
+    if (!fp || seen.has(fp)) continue;
+    seen.add(fp);
+    unique.push(item);
+  }
+
+  const scored = unique
+    .map((item) => ({ item, score: scoreCtxItem(item, lc, intent) }))
+    .sort((a, b) => b.score - a.score);
+
+  // Keep type diversity: avoid flooding with only one type.
+  const typeCaps = {
+    pred: Math.max(4, Math.floor(limit * 0.65)),
+    bracket: Math.max(2, Math.floor(limit * 0.4)),
+    team: Math.max(2, Math.floor(limit * 0.35)),
+    opt: Math.max(1, Math.floor(limit * 0.25)),
+  };
+  const typeCount = { pred: 0, bracket: 0, team: 0, opt: 0 };
+  const selected = [];
+  const deferred = [];
+
+  for (const row of scored) {
+    const t = row.item.type;
+    if (typeCaps[t] !== undefined && typeCount[t] >= typeCaps[t]) {
+      deferred.push(row.item);
+      continue;
+    }
+    selected.push(row.item);
+    if (typeCount[t] !== undefined) typeCount[t] += 1;
+    if (selected.length >= limit) return selected;
+  }
+
+  for (const item of deferred) {
+    selected.push(item);
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
 }
 
 const SUPPORTED_SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
@@ -1041,7 +1211,7 @@ app.post('/api/chat', async (req, res) => {
 
     const joined = msgs.map((m) => m.content).join(' ');
     const intent = detectIntent(joined);
-    const ctx = findCtx(joined);
+    const ctx = findCtx(joined, { intent, messageCount: msgs.length });
     const intentHint = intent === 'value'
       ? 'INTENT: VALUE. Lead with EV/value-edge vs public pick rates and bracket leverage.'
       : `INTENT: ${intent.toUpperCase()}.`;
@@ -1118,9 +1288,11 @@ app.post('/admin/config', auth, (req, res) => {
 
 app.post('/admin/context-preview', auth, (req, res) => {
   const query = req.body?.query || '';
-  const ctx = findCtx(query);
+  const intent = detectIntent(query);
+  const ctx = findCtx(query, { intent, messageCount: 1 });
   res.json({
     query,
+    intent,
     contextSettings: contextCfg(),
     contextCount: ctx.length,
     contextPreview: ctx,
@@ -1153,8 +1325,7 @@ app.post('/admin/upload', auth, up.single('file'), (req, res) => {
     }
     fs.writeFileSync(path.join(DATA_DIR, targetFile), raw);
     fs.unlinkSync(req.file.path);
-    hasData = loadData();
-    enrichBracketWithPlayers();
+    reloadDataFromDisk('admin-upload');
     return res.json({ success: true });
   } catch (e) {
     if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
