@@ -419,6 +419,117 @@
     .snd:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(37, 99, 235, 0.32); }
     .hint { text-align: center; margin-top: 7px; font-size: 11px; color: var(--text-muted); }
 
+    .onboarding-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(16, 24, 40, 0.58);
+      backdrop-filter: blur(8px);
+      animation: ob-fade .22s ease;
+    }
+
+    .onboarding-overlay.hidden { display: none; }
+
+    .onboarding-card {
+      width: min(520px, 92vw);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 0 18px 40px rgba(16, 24, 40, 0.18);
+      padding: 24px;
+    }
+
+    .onboarding-header { text-align: center; margin-bottom: 18px; }
+    .ob-logo {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 12px;
+      border-radius: 12px;
+      background: linear-gradient(140deg, #1d4ed8, #2563eb);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      display: grid;
+      place-items: center;
+    }
+    .onboarding-header h2 { font-size: 22px; letter-spacing: -0.02em; }
+    .onboarding-header p { color: var(--text-muted); margin-top: 6px; font-size: 14px; }
+
+    .ob-step { display: none; }
+    .ob-step.active { display: block; animation: ob-slide .2s ease; }
+    .ob-question { font-size: 16px; font-weight: 700; }
+    .ob-hint { margin-top: 4px; margin-bottom: 12px; color: var(--text-muted); font-size: 13px; }
+
+    .ob-options { display: grid; gap: 8px; }
+    .ob-option {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      text-align: left;
+      padding: 11px 12px;
+      cursor: pointer;
+      transition: border-color var(--transition), background var(--transition), transform var(--transition);
+      color: var(--text);
+      font-family: var(--font-body);
+    }
+    .ob-option:hover { border-color: #87a8f9; background: #f8faff; transform: translateX(2px); }
+    .ob-option.selected {
+      border-color: #1d4ed8;
+      background: linear-gradient(180deg, #ffffff, #f5f9ff);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+
+    .ob-emoji {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #eef4ff;
+      color: #1d4ed8;
+      border: 1px solid #d8e5ff;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .ob-label { font-size: 14px; font-weight: 700; }
+    .ob-desc { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+    .ob-nav {
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ob-dots { display: flex; gap: 6px; }
+    .ob-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d0d5dd;
+      transition: background var(--transition);
+    }
+    .ob-dot.active { background: #1d4ed8; }
+    .ob-skip {
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: var(--font-body);
+    }
+    .ob-skip:hover { color: #344054; }
+
     code {
       font-family: var(--font-mono);
       background: #f2f4f7;
@@ -430,6 +541,8 @@
 
     @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes blink { 0%, 80%, 100% { opacity: .35; } 40% { opacity: 1; } }
+    @keyframes ob-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes ob-slide { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
     @media (max-width: 900px) {
       .quick { grid-template-columns: 1fr 1fr; }
@@ -448,11 +561,99 @@
       .hypo .cta-btn { grid-column: span 2; }
       .m { max-width: 94%; }
       .team .score { font-size: 30px; }
+      .onboarding-card { padding: 18px; }
+      .ob-option { grid-template-columns: auto 1fr; }
+      .ob-desc { grid-column: 2; white-space: normal; margin-top: -2px; }
     }
   </style>
 </head>
 <body>
   <div class="app">
+    <div class="onboarding-overlay" id="onboarding">
+      <div class="onboarding-card">
+        <div class="onboarding-header">
+          <div class="ob-logo">BG</div>
+          <h2>Welcome to BracketGPT</h2>
+          <p>Answer 3 quick questions so recommendations match your pool.</p>
+        </div>
+
+        <div class="ob-step active" data-step="1">
+          <div class="ob-question">How big is your bracket pool?</div>
+          <div class="ob-hint">This sets how contrarian your picks should be.</div>
+          <div class="ob-options">
+            <button class="ob-option" type="button" data-key="poolSize" data-value="small" onclick="selectOption(this)">
+              <span class="ob-emoji">S</span>
+              <span class="ob-label">Small</span>
+              <span class="ob-desc">Under 25 people</span>
+            </button>
+            <button class="ob-option" type="button" data-key="poolSize" data-value="medium" onclick="selectOption(this)">
+              <span class="ob-emoji">M</span>
+              <span class="ob-label">Medium</span>
+              <span class="ob-desc">25-100 people</span>
+            </button>
+            <button class="ob-option" type="button" data-key="poolSize" data-value="large" onclick="selectOption(this)">
+              <span class="ob-emoji">L</span>
+              <span class="ob-label">Large</span>
+              <span class="ob-desc">100+ people</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="ob-step" data-step="2">
+          <div class="ob-question">What is your bracket style?</div>
+          <div class="ob-hint">No wrong answer. This calibrates risk level.</div>
+          <div class="ob-options">
+            <button class="ob-option" type="button" data-key="style" data-value="chalk" onclick="selectOption(this)">
+              <span class="ob-emoji">S</span>
+              <span class="ob-label">Play it safe</span>
+              <span class="ob-desc">Mostly favorites</span>
+            </button>
+            <button class="ob-option" type="button" data-key="style" data-value="balanced" onclick="selectOption(this)">
+              <span class="ob-emoji">B</span>
+              <span class="ob-label">Balanced</span>
+              <span class="ob-desc">Mix of chalk and upsets</span>
+            </button>
+            <button class="ob-option" type="button" data-key="style" data-value="chaos" onclick="selectOption(this)">
+              <span class="ob-emoji">C</span>
+              <span class="ob-label">High variance</span>
+              <span class="ob-desc">Contrarian approach</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="ob-step" data-step="3">
+          <div class="ob-question">Which scoring system do you use?</div>
+          <div class="ob-hint">Scoring weights change the value of upsets.</div>
+          <div class="ob-options">
+            <button class="ob-option" type="button" data-key="scoring" data-value="espn" onclick="selectOption(this)">
+              <span class="ob-emoji">E</span>
+              <span class="ob-label">ESPN standard</span>
+              <span class="ob-desc">10-20-40-80-160-320</span>
+            </button>
+            <button class="ob-option" type="button" data-key="scoring" data-value="yahoo" onclick="selectOption(this)">
+              <span class="ob-emoji">Y</span>
+              <span class="ob-label">Yahoo doubling</span>
+              <span class="ob-desc">1-2-4-8-16-32</span>
+            </button>
+            <button class="ob-option" type="button" data-key="scoring" data-value="upset_bonus" onclick="selectOption(this)">
+              <span class="ob-emoji">U</span>
+              <span class="ob-label">Upset bonus</span>
+              <span class="ob-desc">Extra points for upsets</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="ob-nav">
+          <div class="ob-dots">
+            <span class="ob-dot active"></span>
+            <span class="ob-dot"></span>
+            <span class="ob-dot"></span>
+          </div>
+          <button class="ob-skip" type="button" onclick="skipOnboarding()">Skip</button>
+        </div>
+      </div>
+    </div>
+
     <div class="hdr">
       <div class="logo">BG</div>
       <div class="title-wrap">
@@ -522,6 +723,8 @@
     const typ = $('typ');
     let hist = [];
     let busy = false;
+    let onboardingAnswers = {};
+    let currentStep = 1;
 
     (async () => {
       try {
@@ -551,6 +754,64 @@
       btn.classList.add('on');
       setTimeout(() => go(q), 0);
     })();
+
+    (function initOnboarding() {
+      const saved = sessionStorage.getItem('bracketgpt_profile');
+      if (!saved) return;
+      try {
+        onboardingAnswers = JSON.parse(saved) || {};
+      } catch (e) {
+        onboardingAnswers = {};
+      }
+      const overlay = $('onboarding');
+      if (overlay) overlay.classList.add('hidden');
+    })();
+
+    function selectOption(btnEl) {
+      const key = btnEl.dataset.key;
+      const value = btnEl.dataset.value;
+      onboardingAnswers[key] = value;
+
+      const wrap = btnEl.closest('.ob-options');
+      if (wrap) wrap.querySelectorAll('.ob-option').forEach((b) => b.classList.remove('selected'));
+      btnEl.classList.add('selected');
+
+      setTimeout(() => {
+        if (currentStep < 3) {
+          currentStep += 1;
+          showStep(currentStep);
+        } else {
+          finishOnboarding();
+        }
+      }, 220);
+    }
+
+    function showStep(step) {
+      document.querySelectorAll('.ob-step').forEach((s) => s.classList.remove('active'));
+      const target = document.querySelector(`.ob-step[data-step="${step}"]`);
+      if (target) target.classList.add('active');
+      document.querySelectorAll('.ob-dot').forEach((d, i) => d.classList.toggle('active', i < step));
+    }
+
+    function skipOnboarding() {
+      onboardingAnswers = { poolSize: 'medium', style: 'balanced', scoring: 'espn' };
+      finishOnboarding();
+    }
+
+    function finishOnboarding() {
+      sessionStorage.setItem('bracketgpt_profile', JSON.stringify(onboardingAnswers));
+      const overlay = $('onboarding');
+      if (overlay) overlay.classList.add('hidden');
+    }
+
+    function getPoolContext() {
+      const p = onboardingAnswers || {};
+      if (!p.poolSize) return '';
+      const poolMap = { small: '~10-25 person', medium: '~50-100 person', large: '100+ person' };
+      const styleMap = { chalk: 'safe/chalk', balanced: 'balanced', chaos: 'upset-heavy/contrarian' };
+      const scoringMap = { espn: 'ESPN 10-20-40-80-160-320', yahoo: 'Yahoo 1-2-4-8-16-32', upset_bonus: 'upset bonus scoring' };
+      return `[POOL CONTEXT: ${poolMap[p.poolSize] || 'medium'} pool, ${styleMap[p.style] || 'balanced'} style, ${scoringMap[p.scoring] || 'ESPN'} scoring] `;
+    }
 
     function scroll() { msgs.scrollTop = msgs.scrollHeight; }
 
@@ -659,7 +920,7 @@
       inp.value = '';
       btn.classList.remove('on');
       busy = true;
-      hist.push({ role: 'user', content: msg });
+      hist.push({ role: 'user', content: `${getPoolContext()}${msg}` });
       add('u', msg);
       typ.classList.add('on');
       scroll();
