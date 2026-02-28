@@ -1,0 +1,53 @@
+team,seed,region,r64_ownership,r32_ownership,s16_ownership,e8_ownership,f4_ownership,champion_ownership,source
+Duke,1,East,0.99,0.94,0.85,0.75,0.67,0.25,ESPN 25% champ / Yahoo 30% champ
+Florida,1,West,0.98,0.92,0.80,0.70,0.59,0.21,ESPN 21% champ / Yahoo 20.5%
+Auburn,1,South,0.98,0.90,0.78,0.65,0.52,0.11,Yahoo 11% champ
+Houston,1,Midwest,0.98,0.90,0.75,0.62,0.46,0.09,Yahoo ~9% champ / ESPN 46.1% F4
+Tennessee,2,Midwest,0.95,0.82,0.60,0.42,0.28,0.04,ESPN 28% public picked to win Midwest
+Michigan State,2,South,0.93,0.78,0.55,0.38,0.25,0.03,ESPN analysts 35% picked MSU South
+Alabama,2,East,0.93,0.80,0.58,0.40,0.22,0.035,ESPN analyst picks + public data
+St. John's,2,West,0.92,0.75,0.50,0.32,0.18,0.02,estimated from seed pattern
+Iowa State,3,South,0.88,0.68,0.45,0.28,0.15,0.015,estimated
+Wisconsin,3,West,0.87,0.65,0.42,0.25,0.12,0.01,estimated from seed + conference tourney fatigue
+Marquette,3,East,0.86,0.63,0.40,0.24,0.12,0.01,estimated
+Clemson,3,Midwest,0.85,0.62,0.38,0.22,0.10,0.008,estimated
+Texas A&M,4,South,0.82,0.55,0.32,0.18,0.08,0.005,estimated
+Arizona,4,East,0.80,0.52,0.30,0.18,0.09,0.015,ESPN BPI 9.6% champ / 5.6% public
+Purdue,4,Midwest,0.82,0.55,0.30,0.16,0.07,0.005,estimated — public down after last year
+Maryland,4,West,0.78,0.50,0.28,0.15,0.06,0.005,estimated
+Michigan,5,South,0.68,0.38,0.18,0.08,0.04,0.002,estimated
+Oregon,5,East,0.65,0.35,0.16,0.07,0.03,0.001,estimated
+Clemson,5,Midwest,0.66,0.36,0.17,0.08,0.03,0.001,estimated
+Ole Miss,6,South,0.62,0.30,0.14,0.06,0.02,0.001,estimated
+BYU,6,West,0.60,0.28,0.12,0.05,0.02,0.001,estimated
+Illinois,6,East,0.63,0.32,0.15,0.06,0.02,0.001,estimated
+Kentucky,7,East,0.58,0.28,0.12,0.05,0.02,0.001,estimated
+Saint Mary's,7,Midwest,0.55,0.25,0.10,0.04,0.015,0.001,estimated
+Texas Tech,7,West,0.56,0.26,0.11,0.05,0.02,0.003,ESPN analysts 5 picked TTU
+Louisville,8,South,0.50,0.22,0.08,0.03,0.01,0.001,estimated
+Gonzaga,8,Midwest,0.52,0.25,0.12,0.06,0.03,0.005,KenPom #9 despite 8-seed / Yahoo 12% R32
+Mississippi State,8,East,0.48,0.18,0.06,0.02,0.008,0.001,estimated
+UConn,8,West,0.48,0.20,0.08,0.03,0.025,0.005,2x defending champ narrative
+Creighton,9,South,0.50,0.18,0.06,0.02,0.008,0.001,estimated
+Georgia,9,Midwest,0.48,0.16,0.05,0.02,0.006,0.001,estimated
+Baylor,9,East,0.52,0.20,0.07,0.02,0.008,0.001,estimated
+Drake,9,West,0.41,0.14,0.04,0.015,0.005,0.001,Yahoo 41% picked Drake R64
+Vanderbilt,10,Midwest,0.38,0.14,0.05,0.02,0.005,0.001,estimated
+North Carolina,10,South,0.35,0.12,0.04,0.015,0.005,0.001,last team selected — bubble controversy
+New Mexico,10,East,0.32,0.10,0.03,0.01,0.004,0.001,estimated
+Colorado State,10,West,0.35,0.12,0.04,0.015,0.005,0.001,estimated
+VCU,11,West,0.30,0.10,0.03,0.01,0.003,0.001,estimated
+UC San Diego,12,South,0.35,0.12,0.04,0.01,0.003,0.001,15-game win streak — sleeper buzz
+Liberty,12,East,0.32,0.10,0.03,0.008,0.002,0.0005,classic 12-over-5 upset pick
+McNeese,12,Midwest,0.28,0.08,0.02,0.006,0.002,0.0005,estimated
+Akron,13,East,0.12,0.04,0.033,0.008,0.002,0.0005,ESPN BPI 3.3% S16 vs 3.0% public
+Yale,13,South,0.15,0.05,0.015,0.004,0.001,0.0002,estimated
+High Point,13,Midwest,0.10,0.03,0.008,0.002,0.001,0.0001,estimated
+Lipscomb,14,South,0.06,0.02,0.005,0.001,0.0005,0.0001,estimated
+Montana,14,West,0.08,0.02,0.005,0.001,0.0005,0.0001,estimated
+Robert Morris,15,East,0.04,0.01,0.003,0.001,0.0003,0.0001,estimated
+Troy,15,Midwest,0.04,0.01,0.003,0.001,0.0003,0.0001,estimated
+SIU Edwardsville,16,Midwest,0.02,0.005,0.001,0.0003,0.0001,0.00005,estimated
+Norfolk State,16,West,0.02,0.005,0.001,0.0003,0.0001,0.00005,estimated
+Alabama State,16,South,0.02,0.005,0.001,0.0003,0.0001,0.00005,First Four winner
+Mount St. Mary's,16,East,0.02,0.005,0.001,0.0003,0.0001,0.00005,First Four winner
