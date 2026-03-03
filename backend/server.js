@@ -313,6 +313,8 @@ CONFIDENCE TIERS:
 
 STRATEGY: ESPN scoring 10-20-40-80-160-320. Small pools = chalk. Big pools = need upsets in later rounds for max value.
 
+${poolStrategyPromptBlock()}
+
 If you don't have data on a specific matchup, say so honestly â€” don't make up numbers.`;
 }
 
@@ -1399,4 +1401,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`BracketGPT on :${PORT} | ${cfg.provider} | key:${cfg.apiKey ? 'yes' : 'NO'} | data:${hasData ? 'yes' : 'NO'}`);
 });
+
 
