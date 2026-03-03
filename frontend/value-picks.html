@@ -3,150 +3,529 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BracketGPT | Value Picks</title>
+  <title>BracketGPT | EV Picker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #0b1c3d; color: #fff; }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 16px 40px; }
-    h1 { margin: 0; font-size: 34px; }
-    .sub { color: #aab7d6; margin-top: 8px; }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 14px; }
-    button, a.btn { border: 1px solid rgba(255,255,255,.2); background: #112752; color: #fff; padding: 9px 12px; border-radius: 10px; cursor: pointer; text-decoration: none; }
-    .explainer { background: rgba(17,39,82,.9); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
-    .explainer h2 { margin: 0 0 8px; font-size: 18px; }
-    .explainer p { margin: 0; color: #d2dcf7; line-height: 1.45; }
-
-    .table-wrap { border: 1px solid rgba(255,255,255,.14); border-radius: 14px; overflow: auto; background: rgba(17,39,82,.84); }
-    table { width: 100%; border-collapse: collapse; min-width: 760px; }
-    th, td { padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.1); text-align: left; }
-    th { color: #aab7d6; text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
-
-    .grid { display: none; gap: 10px; }
-    .card { background: rgba(17,39,82,.9); border: 1px solid rgba(255,255,255,.15); border-radius: 14px; padding: 12px; }
-    .name { font-weight: 800; font-size: 18px; }
-    .meta { color: #aab7d6; font-size: 12px; margin-top: 4px; }
-    .k { color: #aab7d6; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-    .v { font-weight: 700; }
-    .row { display: flex; justify-content: space-between; margin-top: 8px; }
-
-    .edge-pos { color: #60d394; }
-    .edge-neg { color: #ff6b6b; }
-    .edge-neutral { color: #b7bfcc; }
-    .ask-link { display: inline-block; margin-top: 10px; color: #ffc72c; text-decoration: none; font-weight: 700; }
-
-    h2 { margin: 24px 0 10px; }
-
-    @media (max-width: 760px) {
-      .table-wrap { display: none; }
-      .grid { display: grid; grid-template-columns: 1fr; }
+    :root {
+      --bg-deep: #060b18;
+      --bg-card: rgba(12, 22, 50, 0.92);
+      --bg-card-hover: rgba(18, 32, 68, 0.95);
+      --border: rgba(255,255,255,0.08);
+      --border-accent: rgba(255,200,44,0.25);
+      --text: #e8ecf4;
+      --text-dim: #7a88a8;
+      --text-label: #5a6a8a;
+      --accent: #ffc72c;
+      --accent-glow: rgba(255,199,44,0.15);
+      --green: #34d399;
+      --green-dim: rgba(52,211,153,0.12);
+      --red: #f87171;
+      --red-dim: rgba(248,113,113,0.12);
+      --blue: #60a5fa;
+      --blue-dim: rgba(96,165,250,0.12);
+      --purple: #a78bfa;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Outfit', sans-serif;
     }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg-deep);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 999;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 20px 60px; position: relative; }
+
+    /* Header */
+    .header { margin-bottom: 32px; }
+    .header-top { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+    .logo { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: rgba(255,199,44,0.1); padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,199,44,0.2); }
+    h1 { font-size: 38px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; }
+    h1 span { color: var(--accent); }
+    .header-sub { color: var(--text-dim); font-size: 15px; margin-top: 8px; line-height: 1.5; max-width: 680px; }
+
+    /* Pool Selector */
+    .pool-selector {
+      display: flex; gap: 0; margin: 28px 0 8px;
+      background: rgba(12,22,50,0.6); border: 1px solid var(--border);
+      border-radius: 14px; padding: 4px; width: fit-content;
+    }
+    .pool-btn {
+      font-family: var(--sans); font-size: 13px; font-weight: 600;
+      padding: 10px 20px; border: none; background: transparent;
+      color: var(--text-dim); cursor: pointer; border-radius: 10px;
+      transition: all 0.2s ease; white-space: nowrap;
+    }
+    .pool-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+    .pool-btn.active { background: var(--accent); color: #0a0e17; box-shadow: 0 2px 12px rgba(255,199,44,0.3); }
+    .pool-desc { color: var(--text-dim); font-size: 13px; margin: 10px 0 24px; padding-left: 2px; }
+    .pool-desc strong { color: var(--accent); font-weight: 600; }
+
+    /* Custom Pool */
+    .custom-pool { display: none; align-items: center; gap: 10px; margin: -14px 0 24px; padding-left: 2px; }
+    .custom-pool.show { display: flex; }
+    .custom-pool input {
+      font-family: var(--mono); font-size: 15px; width: 90px; padding: 8px 12px;
+      background: rgba(12,22,50,0.8); border: 1px solid var(--border-accent);
+      border-radius: 8px; color: var(--accent); outline: none; text-align: center;
+    }
+    .custom-pool input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .custom-pool label { font-size: 13px; color: var(--text-dim); }
+    .custom-pool button {
+      font-family: var(--sans); font-size: 12px; font-weight: 700; padding: 8px 16px;
+      border: 1px solid var(--accent); background: transparent; color: var(--accent);
+      border-radius: 8px; cursor: pointer; transition: all 0.15s;
+    }
+    .custom-pool button:hover { background: var(--accent); color: #0a0e17; }
+
+    /* Strategy Banner */
+    .strategy-banner {
+      background: linear-gradient(135deg, rgba(255,199,44,0.08) 0%, rgba(12,22,50,0.9) 100%);
+      border: 1px solid var(--border-accent); border-radius: 16px;
+      padding: 22px 24px; margin-bottom: 28px;
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
+    }
+    .strat-col h3 { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-label); margin-bottom: 8px; }
+    .strat-champ { font-size: 20px; font-weight: 800; color: var(--accent); line-height: 1.3; }
+    .strat-champ .seed-tag { font-size: 12px; font-weight: 600; color: var(--text-dim); margin-left: 6px; }
+    .strat-champ .own-tag { font-family: var(--mono); font-size: 11px; color: var(--green); margin-left: 4px; }
+    .strat-list { list-style: none; padding: 0; }
+    .strat-list li { font-size: 14px; padding: 4px 0; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .strat-list li::before { content: '\2192'; color: var(--text-dim); font-size: 12px; }
+    .strat-list .fade-item::before { content: '\2715'; color: var(--red); }
+    @media (max-width: 768px) { .strategy-banner { grid-template-columns: 1fr; gap: 16px; } }
+
+    /* Sort Bar */
+    .sort-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .sort-bar span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-label); font-weight: 700; }
+    .sort-pill {
+      font-family: var(--sans); font-size: 12px; font-weight: 600;
+      padding: 6px 14px; border: 1px solid var(--border); background: transparent;
+      color: var(--text-dim); border-radius: 20px; cursor: pointer; transition: all 0.15s;
+    }
+    .sort-pill:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .sort-pill.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+    .chat-link {
+      margin-left: auto; font-size: 13px; font-weight: 700; color: var(--accent);
+      text-decoration: none; padding: 6px 16px; border: 1px solid var(--border-accent);
+      border-radius: 20px; transition: all 0.15s;
+    }
+    .chat-link:hover { background: var(--accent); color: #0a0e17; }
+
+    /* Table */
+    .table-wrap { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: var(--bg-card); }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    thead th {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-label); padding: 14px 14px; border-bottom: 1px solid var(--border);
+      text-align: left; cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.15s;
+    }
+    thead th:hover { color: var(--text); }
+    thead th.sorted { color: var(--accent); }
+    thead th.sorted::after { content: ' \25BE'; font-size: 8px; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    tbody tr:last-child { border-bottom: none; }
+    td { padding: 12px 14px; font-size: 14px; }
+    td.team-cell { font-weight: 700; font-size: 15px; white-space: nowrap; }
+    td.team-cell .seed {
+      font-family: var(--mono); font-size: 11px; font-weight: 700;
+      background: rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 5px;
+      margin-left: 8px; color: var(--text-dim);
+    }
+    td.region-cell { color: var(--text-dim); font-size: 13px; }
+    td.num { font-family: var(--mono); font-size: 13px; text-align: right; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .neutral { color: var(--text-dim); }
+
+    .lev-bar-wrap { width: 80px; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; display: inline-block; vertical-align: middle; margin-left: 8px; }
+    .lev-bar { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+
+    td .ask-btn {
+      font-family: var(--sans); font-size: 11px; font-weight: 700; color: var(--accent);
+      text-decoration: none; padding: 4px 10px; border: 1px solid rgba(255,199,44,0.3);
+      border-radius: 6px; transition: all 0.15s; white-space: nowrap;
+    }
+    td .ask-btn:hover { background: var(--accent); color: #0a0e17; }
+
+    /* Mobile */
+    .mobile-cards { display: none; }
+    @media (max-width: 920px) {
+      .table-wrap { display: none; }
+      .mobile-cards { display: block; }
+    }
+    .m-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 16px; margin-bottom: 10px; transition: border-color 0.15s;
+    }
+    .m-card:hover { border-color: rgba(255,255,255,0.15); }
+    .m-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .m-card-team { font-size: 18px; font-weight: 800; }
+    .m-card-team .seed { font-family: var(--mono); font-size: 12px; color: var(--text-dim); font-weight: 600; margin-left: 6px; }
+    .m-card-region { font-size: 12px; color: var(--text-dim); }
+    .m-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .m-card-stat .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-label); font-weight: 700; }
+    .m-card-stat .val { font-family: var(--mono); font-size: 15px; font-weight: 700; margin-top: 2px; }
+    .m-card .ask-btn { display: inline-block; margin-top: 12px; font-size: 12px; font-weight: 700; color: var(--accent); text-decoration: none; }
+
+    /* Formula */
+    .formula-box {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px 22px; margin-bottom: 28px; cursor: pointer; transition: border-color 0.15s;
+    }
+    .formula-box:hover { border-color: rgba(255,255,255,0.15); }
+    .formula-toggle { display: flex; justify-content: space-between; align-items: center; }
+    .formula-toggle h3 { font-size: 14px; font-weight: 700; color: var(--text); }
+    .formula-toggle .arrow { color: var(--text-dim); font-size: 14px; transition: transform 0.2s; }
+    .formula-box.open .arrow { transform: rotate(180deg); }
+    .formula-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .formula-box.open .formula-body { max-height: 400px; }
+    .formula-body p { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin-top: 12px; }
+    .formula-code {
+      font-family: var(--mono); font-size: 12px; color: var(--accent);
+      background: rgba(255,199,44,0.06); padding: 10px 14px; border-radius: 8px;
+      margin-top: 10px; display: block; line-height: 1.7;
+    }
+
+    /* Loading */
+    .loading { text-align: center; padding: 60px 20px; color: var(--text-dim); font-size: 15px; }
+    .loading .spinner {
+      width: 28px; height: 28px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.7s linear infinite; margin: 0 auto 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-in { animation: fadeUp 0.4s ease both; }
+    .delay-1 { animation-delay: 0.05s; }
+    .delay-2 { animation-delay: 0.1s; }
+    .delay-3 { animation-delay: 0.15s; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Where The Public Is Wrong</h1>
-    <p class="sub">Teams our model prices differently than ESPN bracket consensus.</p>
-
-    <div class="explainer">
-      <h2>How to use this board</h2>
-      <p>
-        <strong>Champion Edge</strong> is the gap between model value and public pick rate for winning it all.
-        Bigger positive edge = hidden gem leverage in big pools. Negative edge = likely public trap. We sort by Champion Edge by default.
+    <div class="header animate-in">
+      <div class="header-top"><span class="logo">BracketGPT</span></div>
+      <h1>EV <span>Picker</span></h1>
+      <p class="header-sub">
+        Leverage-adjusted expected value for every team, calibrated to your pool size.
+        Bigger pool = need more contrarian picks. The math changes everything.
       </p>
     </div>
 
-    <div class="toolbar">
-      <button onclick="setSort('championEdge')">Sort: Champion Edge</button>
-      <button onclick="setSort('total_ev')">Sort: Total EV</button>
-      <button onclick="setSort('finalFourEdge')">Sort: Final Four Edge</button>
-      <button onclick="setSort('round32Edge')">Sort: Round of 32 Edge</button>
-      <a class="btn" href="/">Open BracketGPT chat →</a>
+    <div class="pool-selector animate-in delay-1">
+      <button class="pool-btn active" data-tier="small" onclick="setTier('small')">Small 2-15</button>
+      <button class="pool-btn" data-tier="medium" onclick="setTier('medium')">Medium 16-50</button>
+      <button class="pool-btn" data-tier="large" onclick="setTier('large')">Large 51-250</button>
+      <button class="pool-btn" data-tier="mega" onclick="setTier('mega')">Mega 250+</button>
+      <button class="pool-btn" data-tier="custom" onclick="setTier('custom')">Custom</button>
+    </div>
+    <div class="pool-desc animate-in delay-1" id="pool-desc"></div>
+    <div class="custom-pool" id="custom-pool">
+      <label>Pool size:</label>
+      <input type="number" id="custom-n" min="2" max="10000" value="75" />
+      <button onclick="applyCustom()">Apply</button>
     </div>
 
-    <h2>Leaderboard</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Team</th><th>Region</th><th>Total EV</th><th>Champion Edge</th><th>Final Four Edge</th><th>Round of 32 Edge</th><th>Ask</th>
-          </tr>
-        </thead>
-        <tbody id="leaderboard-table"></tbody>
-      </table>
+    <div class="strategy-banner animate-in delay-2" id="strat-banner">
+      <div class="strat-col"><h3>&#127942; Champion Pick</h3><div id="strat-champ"></div></div>
+      <div class="strat-col"><h3>&#127919; Upset Targets</h3><ul class="strat-list" id="strat-upsets"></ul></div>
+      <div class="strat-col"><h3>&#128683; Fade These</h3><ul class="strat-list" id="strat-fades"></ul></div>
     </div>
-    <div id="leaderboard" class="grid"></div>
 
-    <h2>Hidden Gems</h2>
-    <div id="gems" class="grid" style="display:grid"></div>
+    <div class="formula-box animate-in delay-3" id="formula-box" onclick="this.classList.toggle('open')">
+      <div class="formula-toggle">
+        <h3>How leverage EV works</h3>
+        <span class="arrow">&#9662;</span>
+      </div>
+      <div class="formula-body">
+        <p>
+          Standard expected value multiplies win probability by points. But in a pool,
+          a correct pick only matters if it <strong>separates you from the field</strong>.
+          If 90% of your pool also picked Duke to the Final Four, being right gains you nothing.
+        </p>
+        <code class="formula-code">
+          Leverage EV = Model Prob x ESPN Points x 1/(1 + Ownership x (Pool Size - 1))<br><br>
+          Ownership = % of public brackets with this pick<br>
+          The denominator = expected # of people sharing your pick<br>
+          Small pool: denominator stays small, chalk is fine<br>
+          Mega pool: denominator explodes, only unique picks have value
+        </code>
+        <p>
+          This is why Iowa State at 2% champion ownership has higher leverage EV than Duke at 25%
+          in a 500-person pool, even though Duke is more likely to win it all.
+        </p>
+      </div>
+    </div>
 
-    <h2>Fade These</h2>
-    <div id="fades" class="grid" style="display:grid"></div>
+    <div class="sort-bar animate-in delay-3">
+      <span>Sort by</span>
+      <button class="sort-pill active" data-sort="total_lev" onclick="setSort('total_lev')">Leverage EV</button>
+      <button class="sort-pill" data-sort="champ_lev" onclick="setSort('champ_lev')">Champ Leverage</button>
+      <button class="sort-pill" data-sort="deep_lev" onclick="setSort('deep_lev')">Deep Run EV</button>
+      <button class="sort-pill" data-sort="ownership" onclick="setSort('ownership')">Lowest Owned</button>
+      <button class="sort-pill" data-sort="chalk_ev" onclick="setSort('chalk_ev')">Raw EV (Chalk)</button>
+      <a class="chat-link" href="/">&#8592; Chat with BracketGPT</a>
+    </div>
+
+    <div id="main-content">
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        Loading pool strategy data...
+      </div>
+    </div>
   </div>
 
   <script>
-    let data = null;
-    let sortKey = 'championEdge';
+    let poolData = null;
+    let currentTier = 'small';
+    let currentPoolSize = 10;
+    let currentSort = 'total_lev';
 
-    function n(v) { return Number(v || 0); }
-    function askHref(teamName) { return `/?q=${encodeURIComponent(`Tell me about ${teamName} as a value pick`)}`; }
-    function edgeClass(v) {
-      const val = n(v);
-      if (val > 5) return 'edge-pos';
-      if (val < -5) return 'edge-neg';
-      return 'edge-neutral';
-    }
-    function edgeIcon(v) {
-      const val = n(v);
-      if (val > 5) return '🟢';
-      if (val < -5) return '🔴';
-      return '';
-    }
-    function edgeText(v) {
-      const val = n(v);
-      const icon = edgeIcon(val);
-      return `${icon ? `${icon} ` : ''}${val.toFixed(1)} pts`;
+    const TIER_SIZES = { small: 10, medium: 30, large: 100, mega: 500 };
+    const TIER_LABELS = {
+      small: 'Maximize your floor. Pick the best teams and don\'t overthink it.',
+      medium: 'Take <strong>1-2 calculated upsets</strong> where the model sees edge. Slightly contrarian champion.',
+      large: '<strong>Differentiate or die.</strong> Your Final Four needs to look different from the public\'s.',
+      mega: 'You need to be <strong>the only one</strong> with your champion. Chalk early, go wild from Sweet 16 on.',
+    };
+
+    const ESPN = { r64: 10, r32: 20, s16: 40, e8: 80, f4: 160, champion: 320 };
+    const ROUNDS = ['r64','r32','s16','e8','f4','champion'];
+
+    function leverageFactor(ownership, poolSize) {
+      return 1.0 / (1.0 + ownership * (poolSize - 1));
     }
 
-    function card(team) {
-      const champ = n(team.championEdge);
-      const ff = n(team.finalFourEdge);
-      const r32 = n(team.round32Edge);
-      return `<div class="card">
-        <div class="name">${team.name} (#${team.seed})</div>
-        <div class="meta">${team.region || 'Region n/a'}</div>
-        <div class="row"><span class="k">Total EV</span><span class="v">${n(team.total_ev).toFixed(1)}</span></div>
-        <div class="row"><span class="k">Champion Edge</span><span class="v ${edgeClass(champ)}">${edgeText(champ)}</span></div>
-        <div class="row"><span class="k">Final Four Edge</span><span class="v ${edgeClass(ff)}">${edgeText(ff)}</span></div>
-        <div class="row"><span class="k">Round of 32 Edge</span><span class="v ${edgeClass(r32)}">${edgeText(r32)}</span></div>
-        <a class="ask-link" href="${askHref(team.name)}">Ask BracketGPT</a>
-      </div>`;
+    function computeTeamEV(team, poolSize) {
+      const own = team.ownership;
+      const seed = team.seed;
+      let total_lev = 0, total_raw = 0;
+      const rounds = {};
+      for (const rnd of ROUNDS) {
+        const o = own[rnd];
+        const pts = ESPN[rnd];
+        const lev = leverageFactor(o, poolSize);
+        let mp = o;
+        if (seed <= 2) mp = rnd === 'r64' || rnd === 'r32' ? o * 1.02 : o * 0.95;
+        else if (seed <= 4) mp = o * 1.05;
+        else if (seed <= 8) mp = o * 1.08;
+        else if (seed <= 12) mp = o * 1.10;
+        else mp = o * 0.90;
+        mp = Math.min(mp, 0.99);
+        const raw = mp * pts;
+        const lev_ev = raw * lev;
+        total_lev += lev_ev;
+        total_raw += raw;
+        rounds[rnd] = { ownership: o, model_prob: mp, pts: pts, leverage: lev, raw_ev: raw, lev_ev: lev_ev };
+      }
+      const deep_lev = rounds.s16.lev_ev + rounds.e8.lev_ev + rounds.f4.lev_ev + rounds.champion.lev_ev;
+      const champ_lev = rounds.champion.lev_ev;
+      return { rounds: rounds, total_lev: total_lev, total_raw: total_raw, deep_lev: deep_lev, champ_lev: champ_lev };
     }
 
-    function tableRow(team) {
-      return `<tr>
-        <td>${team.name} (#${team.seed})</td>
-        <td>${team.region || 'Region n/a'}</td>
-        <td>${n(team.total_ev).toFixed(1)}</td>
-        <td class="${edgeClass(team.championEdge)}">${edgeText(team.championEdge)}</td>
-        <td class="${edgeClass(team.finalFourEdge)}">${edgeText(team.finalFourEdge)}</td>
-        <td class="${edgeClass(team.round32Edge)}">${edgeText(team.round32Edge)}</td>
-        <td><a class="ask-link" href="${askHref(team.name)}">Ask BracketGPT</a></td>
-      </tr>`;
+    async function loadData() {
+      // Try the dedicated pool-strategy endpoint first
+      try {
+        const r = await fetch('/api/pool-strategy');
+        if (r.ok) { poolData = await r.json(); initApp(); return; }
+      } catch(e) {}
+      // Try static JSON
+      try {
+        const r = await fetch('/data/pool_strategy_2025.json');
+        if (r.ok) { poolData = await r.json(); initApp(); return; }
+      } catch(e) {}
+      document.getElementById('loading').innerHTML =
+        '<p style="color:var(--red)">Pool strategy data not loaded. Upload <code>pool_strategy_2025.json</code> via admin.</p>' +
+        '<p style="margin-top:10px"><a href="/admin" style="color:var(--accent)">Open Admin &#8594;</a></p>';
+    }
+
+    function initApp() {
+      document.getElementById('loading').style.display = 'none';
+      setTier('small');
+    }
+
+    function setTier(tier) {
+      if (tier === 'custom') {
+        document.getElementById('custom-pool').classList.add('show');
+        document.querySelectorAll('.pool-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tier === 'custom'); });
+        document.getElementById('pool-desc').innerHTML = 'Enter your exact pool size for precise leverage calculations.';
+        return;
+      }
+      document.getElementById('custom-pool').classList.remove('show');
+      currentTier = tier;
+      currentPoolSize = TIER_SIZES[tier];
+      document.querySelectorAll('.pool-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tier === tier); });
+      document.getElementById('pool-desc').innerHTML = TIER_LABELS[tier];
+      render();
+    }
+
+    function applyCustom() {
+      var n = parseInt(document.getElementById('custom-n').value);
+      if (n < 2 || n > 10000 || isNaN(n)) return;
+      currentPoolSize = n;
+      if (n <= 15) currentTier = 'small';
+      else if (n <= 50) currentTier = 'medium';
+      else if (n <= 250) currentTier = 'large';
+      else currentTier = 'mega';
+      document.getElementById('pool-desc').innerHTML = 'Computing for <strong>' + n + ' entries</strong>. ' + TIER_LABELS[currentTier];
+      render();
+    }
+
+    function setSort(key) {
+      currentSort = key;
+      document.querySelectorAll('.sort-pill').forEach(function(b) { b.classList.toggle('active', b.dataset.sort === key); });
+      render();
+    }
+
+    function extractTeams() {
+      var evTable = poolData.ev_tables && poolData.ev_tables[currentTier];
+      if (evTable) {
+        return evTable.map(function(t) {
+          return {
+            team: t.team, seed: t.seed, region: t.region,
+            ownership: {
+              r64: t.r64_ownership, r32: t.r32_ownership, s16: t.s16_ownership,
+              e8: t.e8_ownership, f4: t.f4_ownership, champion: t.champion_ownership
+            }
+          };
+        });
+      }
+      var all = [].concat(
+        (poolData.ownership_leaderboard && poolData.ownership_leaderboard.most_owned_champions) || [],
+        (poolData.ownership_leaderboard && poolData.ownership_leaderboard.least_owned_final_four) || [],
+        (poolData.ownership_leaderboard && poolData.ownership_leaderboard.highest_leverage_champions) || []
+      );
+      var seen = {};
+      return all.filter(function(t) {
+        if (seen[t.team]) return false;
+        seen[t.team] = true;
+        return true;
+      });
     }
 
     function render() {
-      const sorted = [...(data.leaderboard || [])].sort((a, b) => n(b[sortKey]) - n(a[sortKey]));
-      document.getElementById('leaderboard').innerHTML = sorted.map(card).join('');
-      document.getElementById('leaderboard-table').innerHTML = sorted.map(tableRow).join('');
-      document.getElementById('gems').innerHTML = (data.hiddenGems || []).sort((a,b)=>n(b.championEdge)-n(a.championEdge)).map(card).join('');
-      document.getElementById('fades').innerHTML = (data.fadeThese || []).sort((a,b)=>n(a.championEdge)-n(b.championEdge)).map(card).join('');
+      if (!poolData) return;
+      var strat = poolData.strategies && poolData.strategies[currentTier];
+      var allTeams = extractTeams();
+      var computed = allTeams.map(function(t) {
+        var ev = computeTeamEV(t, currentPoolSize);
+        var merged = {};
+        for (var k in t) merged[k] = t[k];
+        merged.ev = ev;
+        return merged;
+      });
+      renderStrategy(strat, computed);
+      renderTable(computed);
     }
 
-    function setSort(next) { sortKey = next; render(); }
+    function renderStrategy(strat, computed) {
+      if (!strat) return;
+      var champs = (strat.recommended_champions || []).slice(0, 3);
+      var champHtml = champs.map(function(c, i) {
+        var prefix = i === 0 ? '' : '<br><span style="color:var(--text-dim);font-size:14px;font-weight:400">or </span>';
+        return prefix + '<span class="strat-champ">' + c.team +
+          '<span class="seed-tag">' + c.seed + '-seed</span>' +
+          '<span class="own-tag">' + Math.round(c.champion_ownership * 100) + '% public</span></span>';
+      }).join('');
+      document.getElementById('strat-champ').innerHTML = champHtml;
 
-    fetch('/api/value-picks').then((r) => r.json()).then((json) => { data = json; render(); }).catch(() => {
-      document.getElementById('leaderboard').innerHTML = '<div class="card">Value data not loaded yet. Upload bracket_ev_espn.json in admin.</div>';
-      document.getElementById('leaderboard-table').innerHTML = '<tr><td colspan="7">Value data not loaded yet. Upload bracket_ev_espn.json in admin.</td></tr>';
-    });
+      var upsets = (strat.recommended_upsets || []).slice(0, 4);
+      document.getElementById('strat-upsets').innerHTML = upsets.length > 0
+        ? upsets.map(function(u) { return '<li>' + u.team + ' <span style="color:var(--text-dim)">(' + u.seed + '-seed, ' + u.round_label + ')</span></li>'; }).join('')
+        : '<li style="color:var(--text-dim)">Play chalk \u2014 no upsets needed</li>';
+
+      var fades = (strat.fade_candidates || []).slice(0, 3);
+      document.getElementById('strat-fades').innerHTML = fades.length > 0
+        ? fades.map(function(f) { return '<li class="fade-item">' + f.team + ' <span style="color:var(--text-dim)">(' + Math.round(f.ownership * 100) + '% to ' + f.round_label + ')</span></li>'; }).join('')
+        : '<li style="color:var(--text-dim)">No extreme fades at this pool size</li>';
+    }
+
+    function sortFn(a, b) {
+      if (currentSort === 'total_lev') return b.ev.total_lev - a.ev.total_lev;
+      if (currentSort === 'champ_lev') return b.ev.champ_lev - a.ev.champ_lev;
+      if (currentSort === 'deep_lev') return b.ev.deep_lev - a.ev.deep_lev;
+      if (currentSort === 'ownership') return a.ownership.champion - b.ownership.champion;
+      if (currentSort === 'chalk_ev') return b.ev.total_raw - a.ev.total_raw;
+      return 0;
+    }
+
+    function fmtNum(v, d) { return v.toFixed(d === undefined ? 1 : d); }
+    function fmtPct(v) { return (v * 100).toFixed(1) + '%'; }
+    function evClass(v, th) { th = th || 0; if (v > th + 0.5) return 'pos'; if (v < th - 0.5) return 'neg'; return 'neutral'; }
+
+    function levBarHtml(leverage, maxLev) {
+      var pct = Math.min(100, (leverage / (maxLev || 0.5)) * 100);
+      var color = leverage > 0.1 ? 'var(--green)' : leverage > 0.02 ? 'var(--blue)' : 'var(--red)';
+      return '<span class="lev-bar-wrap"><span class="lev-bar" style="width:' + pct + '%;background:' + color + '"></span></span>';
+    }
+
+    function renderTable(computed) {
+      var sorted = computed.slice().sort(sortFn);
+      var maxLev = 0;
+      sorted.forEach(function(t) { maxLev = Math.max(maxLev, t.ev.rounds.champion.leverage); });
+
+      var html = '<div class="table-wrap" style="overflow-x:auto"><table><thead><tr>' +
+        '<th>Team</th><th>Region</th>' +
+        '<th class="' + (currentSort==='total_lev'?'sorted':'') + '" onclick="setSort(\'total_lev\')">Leverage EV</th>' +
+        '<th class="' + (currentSort==='chalk_ev'?'sorted':'') + '" onclick="setSort(\'chalk_ev\')">Raw EV</th>' +
+        '<th class="' + (currentSort==='champ_lev'?'sorted':'') + '" onclick="setSort(\'champ_lev\')">Champ Lev EV</th>' +
+        '<th>Champ Own%</th><th>Champ Leverage</th>' +
+        '<th class="' + (currentSort==='deep_lev'?'sorted':'') + '" onclick="setSort(\'deep_lev\')">Deep Run EV</th>' +
+        '<th></th></tr></thead><tbody>';
+
+      sorted.forEach(function(t) {
+        var ev = t.ev;
+        var cr = ev.rounds.champion;
+        html += '<tr>' +
+          '<td class="team-cell">' + t.team + '<span class="seed">' + t.seed + '</span></td>' +
+          '<td class="region-cell">' + t.region + '</td>' +
+          '<td class="num" style="font-weight:700;color:var(--accent)">' + fmtNum(ev.total_lev) + '</td>' +
+          '<td class="num neutral">' + fmtNum(ev.total_raw) + '</td>' +
+          '<td class="num ' + evClass(cr.lev_ev, 0.3) + '">' + fmtNum(cr.lev_ev, 2) + '</td>' +
+          '<td class="num">' + fmtPct(cr.ownership) + '</td>' +
+          '<td class="num">' + fmtNum(cr.leverage, 4) + ' ' + levBarHtml(cr.leverage, maxLev) + '</td>' +
+          '<td class="num ' + evClass(ev.deep_lev, 1) + '">' + fmtNum(ev.deep_lev) + '</td>' +
+          '<td><a class="ask-btn" href="/?q=' + encodeURIComponent('Tell me about ' + t.team + ' for my ' + currentPoolSize + '-person pool') + '">Ask</a></td>' +
+          '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+
+      // Mobile
+      html += '<div class="mobile-cards">';
+      sorted.slice(0, 30).forEach(function(t) {
+        var ev = t.ev;
+        var cr = ev.rounds.champion;
+        html += '<div class="m-card">' +
+          '<div class="m-card-head"><span class="m-card-team">' + t.team + '<span class="seed">#' + t.seed + '</span></span>' +
+          '<span class="m-card-region">' + t.region + '</span></div>' +
+          '<div class="m-card-grid">' +
+          '<div class="m-card-stat"><div class="label">Leverage EV</div><div class="val" style="color:var(--accent)">' + fmtNum(ev.total_lev) + '</div></div>' +
+          '<div class="m-card-stat"><div class="label">Raw EV</div><div class="val neutral">' + fmtNum(ev.total_raw) + '</div></div>' +
+          '<div class="m-card-stat"><div class="label">Champ Lev</div><div class="val ' + evClass(cr.lev_ev, 0.3) + '">' + fmtNum(cr.lev_ev, 2) + '</div></div>' +
+          '<div class="m-card-stat"><div class="label">Champ Own</div><div class="val">' + fmtPct(cr.ownership) + '</div></div>' +
+          '<div class="m-card-stat"><div class="label">Deep Run</div><div class="val ' + evClass(ev.deep_lev, 1) + '">' + fmtNum(ev.deep_lev) + '</div></div>' +
+          '<div class="m-card-stat"><div class="label">Leverage</div><div class="val">' + fmtNum(cr.leverage, 4) + '</div></div>' +
+          '</div>' +
+          '<a class="ask-btn" href="/?q=' + encodeURIComponent('Tell me about ' + t.team + ' for my ' + currentPoolSize + '-person pool') + '">Ask BracketGPT &#8594;</a>' +
+          '</div>';
+      });
+      html += '</div>';
+
+      document.getElementById('main-content').innerHTML = html;
+    }
+
+    loadData();
   </script>
 </body>
 </html>

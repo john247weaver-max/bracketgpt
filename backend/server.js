@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
@@ -100,6 +100,7 @@ const store = {
   context: null,
   bracket2025: null,
   ev: null,
+  poolStrategy: null,
 };
 const FILE_MAP = {
   teams: ['team_profiles_2025.json', 'team_profiles.json'],
@@ -111,6 +112,7 @@ const FILE_MAP = {
   bracket: ['bracket_predictions_2025.json', 'bracket_predictions.json'],
   bracket2025: ['bracket_2025.json'],
   ev: ['bracket_ev_espn.json'],
+  poolStrategy: ['pool_strategy_2025.json', 'pool_strategy.json'],
   context: ['context_2025.json', 'context.json'],
 };
 
@@ -238,9 +240,29 @@ function contextCfg() {
   };
 }
 
+function poolStrategyPromptBlock() {
+  const quickRef = store.poolStrategy?.quick_reference;
+  if (!quickRef || typeof quickRef !== 'object') return '';
+
+  const order = ['small', 'medium', 'large', 'mega'];
+  const lines = [];
+  for (const tier of order) {
+    const item = quickRef[tier];
+    if (!item) continue;
+    const range = item.pool_range || tier;
+    const oneLiner = item.one_liner || '';
+    const champs = item.champion_picks || 'N/A';
+    const upsets = item.upset_picks || 'N/A';
+    lines.push(`- ${String(range)}: ${String(oneLiner)} Champion picks: ${String(champs)}. Upsets: ${String(upsets)}.`);
+  }
+
+  if (!lines.length) return '';
+  return `\nPOOL SIZE STRATEGY (from leverage EV model):\n${lines.join('\\n')}\nUse this when the user mentions pool size.\n`;
+}
+
 function sysPrompt() {
   const n = (store.base?.predictions || []).length;
-  return `You are BracketGPT — a sharp, opinionated March Madness bracket advisor.
+  return `You are BracketGPT â€” a sharp, opinionated March Madness bracket advisor.
 You sound like Bill Simmons meets Nate Silver: data-backed but conversational.
 Confident, opinionated, backed by data.
 
@@ -248,18 +270,18 @@ MODEL: v5.2 stacked ensemble (Optuna-tuned XGBoost + LightGBM + CatBoost, 5-fold
 
 V5 FEATURES YOU KNOW ABOUT:
 - MOMENTUM: Each team has a margin_trend (slope of scoring margin over the season) and last10_win_rate. "Rising" = trending up AND winning lately. "Fading" = declining or losing. "Steady" = flat.
-- VOLATILITY: margin_std measures game-to-game scoring variance. volatility_score is 0-100 (min-max normalized). High volatility = unpredictable — great for upsets, bad for chalk picks.
+- VOLATILITY: margin_std measures game-to-game scoring variance. volatility_score is 0-100 (min-max normalized). High volatility = unpredictable â€” great for upsets, bad for chalk picks.
 - INJURY PROXY: If a team's last 5 games scoring margin dropped 6+ points vs their season average, they get an injury_alert. This flags possible injuries, suspensions, or fatigue without needing an injury database.
-- CONFERENCE TOURNEY: How far they went — champion, finalist, semifinalist, or first_round_exit. Momentum signal.
+- CONFERENCE TOURNEY: How far they went â€” champion, finalist, semifinalist, or first_round_exit. Momentum signal.
 - HOME/AWAY SPLIT: home_away_net_diff shows how much better a team plays at home. Big splits mean they may struggle on neutral courts (all tournament games are neutral).
-- MATCHUP RISK NOTE: Flags like "High variance matchup", "Momentum mismatch favoring X", or "Injury concern — monitor roster news".
+- MATCHUP RISK NOTE: Flags like "High variance matchup", "Momentum mismatch favoring X", or "Injury concern â€” monitor roster news".
 
 HOW TO USE V5 DATA:
 - When someone asks about a team, ALWAYS mention momentum status if rising or fading.
-- If a team has an injury_alert, warn about it and quote the drop: "Their net margin dropped X pts in the final 5 games — could signal injuries or fatigue."
+- If a team has an injury_alert, warn about it and quote the drop: "Their net margin dropped X pts in the final 5 games â€” could signal injuries or fatigue."
 - For upset picks, favor teams that are RISING + opponent is FADING or has high volatility.
 - For safe/chalk picks, favor teams that are STEADY or RISING with LOW volatility.
-- Mention the matchup_risk_note when it exists — it's pre-computed analysis.
+- Mention the matchup_risk_note when it exists â€” it's pre-computed analysis.
 - Conference tourney results matter: a conf tourney champion has momentum, a first-round exit raises questions.
 
 ARCHETYPES: Each team has a named archetype (Juggernaut, Fortress, Glass Cannon, etc.) with historical matchup win rates. Use these for color and narrative.
@@ -269,29 +291,29 @@ HOW TO TALK:
 - NEVER say: "based on my analysis", "it's important to note", "it's worth noting", "let's dive in", "certainly", "I'd be happy to", "great question"
 - Use basketball language: "chalk pick", "live dog", "fade", "value play", "cinderella", "bracket buster", "trending up"
 - Lead with your pick, THEN explain. 2-4 short paragraphs max.
-- Bold team names when first mentioned. Don't over-format — no bullet point dumps.
+- Bold team names when first mentioned. Don't over-format â€” no bullet point dumps.
 - When data shows momentum/injury flags, weave them into the narrative naturally. Don't just list stats.
 
 EXAMPLES OF GOOD RESPONSES:
 
 Q: "Who wins Duke vs Vermont?"
-A: "**Duke** cruises. They're a Juggernaut archetype — elite on both ends — and they're trending up with a 9-1 last-10 record. Vermont's been fading down the stretch (margin dropped 5 pts in the final 5 games, possible injury concern). Duke by 15+, lock it in."
+A: "**Duke** cruises. They're a Juggernaut archetype â€” elite on both ends â€” and they're trending up with a 9-1 last-10 record. Vermont's been fading down the stretch (margin dropped 5 pts in the final 5 games, possible injury concern). Duke by 15+, lock it in."
 
 Q: "Best upset pick in the first round?"
-A: "Love **New Mexico** as a 10-seed over 7-seed Marquette. The Lobos are rising — 8-2 in their last 10, conference tourney champs, and their margin trend is +1.3 pts per game improvement. Marquette's a Glass Cannon with a volatility score of 78 — that inconsistency kills you in March. Model gives New Mexico 48%, but the momentum gap makes this closer to a coin flip I'd lean into for a big pool."
+A: "Love **New Mexico** as a 10-seed over 7-seed Marquette. The Lobos are rising â€” 8-2 in their last 10, conference tourney champs, and their margin trend is +1.3 pts per game improvement. Marquette's a Glass Cannon with a volatility score of 78 â€” that inconsistency kills you in March. Model gives New Mexico 48%, but the momentum gap makes this closer to a coin flip I'd lean into for a big pool."
 
 Q: "Is Houston safe to go deep?"
-A: "**Houston** is the safest bet in the bracket. Fortress archetype — elite defense, steady momentum, volatility score of just 22. Their home/away split is tight too, meaning they play the same everywhere. No injury alert. Conference tourney finalists. The only concern is their offense can stall against elite D, but that's a Sweet 16 problem, not a first weekend problem."
+A: "**Houston** is the safest bet in the bracket. Fortress archetype â€” elite defense, steady momentum, volatility score of just 22. Their home/away split is tight too, meaning they play the same everywhere. No injury alert. Conference tourney finalists. The only concern is their offense can stall against elite D, but that's a Sweet 16 problem, not a first weekend problem."
 
 CONFIDENCE TIERS:
-- 85%+ → "Lock it in"
-- 70-85% → "Solid pick"
-- 55-70% → "Slight lean"
-- 50-55% → "Coin flip — go with your gut"
+- 85%+ â†’ "Lock it in"
+- 70-85% â†’ "Solid pick"
+- 55-70% â†’ "Slight lean"
+- 50-55% â†’ "Coin flip â€” go with your gut"
 
 STRATEGY: ESPN scoring 10-20-40-80-160-320. Small pools = chalk. Big pools = need upsets in later rounds for max value.
 
-If you don't have data on a specific matchup, say so honestly — don't make up numbers.`;
+If you don't have data on a specific matchup, say so honestly â€” don't make up numbers.`;
 }
 
 function detectIntent(message) {
@@ -323,8 +345,8 @@ function parseTeamPairFromQuery(query) {
   const raw = String(query || '').replace(/[?]/g, ' ').trim();
   if (!raw) return null;
   const patterns = [
-    /([a-z0-9 .&'’-]+?)\s+(?:vs\.?|versus)\s+([a-z0-9 .&'’-]+)/i,
-    /who\s+would\s+win\s+if\s+([a-z0-9 .&'’-]+?)\s+played\s+([a-z0-9 .&'’-]+)/i,
+    /([a-z0-9 .&'â€™-]+?)\s+(?:vs\.?|versus)\s+([a-z0-9 .&'â€™-]+)/i,
+    /who\s+would\s+win\s+if\s+([a-z0-9 .&'â€™-]+?)\s+played\s+([a-z0-9 .&'â€™-]+)/i,
   ];
   for (const rx of patterns) {
     const m = raw.match(rx);
@@ -413,7 +435,7 @@ function findCtx(query, opts = {}) {
     }
   }
 
-  // V5: Momentum/trending queries — find teams that are rising or fading
+  // V5: Momentum/trending queries â€” find teams that are rising or fading
   if (/momentum|trending|hot|cold|streak|surge|slump|fading|rising|peaking|form/.test(lc)) {
     for (const p of (store.base?.predictions || [])) {
       const fr = p.form_and_risk || {};
@@ -681,7 +703,7 @@ function fmtCtx(ctx) {
 
       // Base prediction line
       let line = `[${item.model}] (${p.t1_seed})${p.t1_name} vs (${p.t2_seed})${p.t2_name}`;
-      line += ` → ${winner} ${(prob * 100).toFixed(0)}% ${p.confidence || ''}`;
+      line += ` â†’ ${winner} ${(prob * 100).toFixed(0)}% ${p.confidence || ''}`;
 
       if (p.upset_flag) line += ` ${p.upset_flag}`;
 
@@ -690,7 +712,7 @@ function fmtCtx(ctx) {
         line += ` | Archetypes: ${p.t1_archetype || '?'} vs ${p.t2_archetype || '?'}`;
       }
 
-      // V5: form_and_risk — this is the key upgrade
+      // V5: form_and_risk â€” this is the key upgrade
       const fr = p.form_and_risk;
       if (fr) {
         // Momentum
@@ -710,10 +732,10 @@ function fmtCtx(ctx) {
 
         // Injury alerts
         if (fr.t1_injury_alert) {
-          line += ` | ⚠️ INJURY ALERT ${p.t1_name}: ${fr.t1_injury_context || 'efficiency drop in final 5 games'}`;
+          line += ` | âš ï¸ INJURY ALERT ${p.t1_name}: ${fr.t1_injury_context || 'efficiency drop in final 5 games'}`;
         }
         if (fr.t2_injury_alert) {
-          line += ` | ⚠️ INJURY ALERT ${p.t2_name}: ${fr.t2_injury_context || 'efficiency drop in final 5 games'}`;
+          line += ` | âš ï¸ INJURY ALERT ${p.t2_name}: ${fr.t2_injury_context || 'efficiency drop in final 5 games'}`;
         }
 
         // Conference tourney results (if notable)
@@ -736,10 +758,10 @@ function fmtCtx(ctx) {
     if (item.type === 'bracket') {
       const g = item.data;
       const prob = g.winProb ? Math.max(g.winProb, 1 - g.winProb) : 0.5;
-      let line = `🏀 BRACKET ${g.round || ''}`;
+      let line = `ðŸ€ BRACKET ${g.round || ''}`;
       if (g.projected) line += ' (PROJECTED)';
       line += `: (${g.seed1})${g.team1} vs (${g.seed2})${g.team2}`;
-      if (g.predictedWinner) line += ` → ${g.predictedWinner} ${(prob * 100).toFixed(0)}%`;
+      if (g.predictedWinner) line += ` â†’ ${g.predictedWinner} ${(prob * 100).toFixed(0)}%`;
       if (g.region) line += ` [${g.region}]`;
       return line;
     }
@@ -755,7 +777,7 @@ function fmtCtx(ctx) {
 function normalizeTeamName(value) {
   return String(value || '')
     .normalize('NFKD')
-    .replace(/[’']/g, '')
+    .replace(/[â€™']/g, '')
     .replace(/\./g, '')
     .replace(/&/g, ' and ')
     .replace(/\bsaint\b/gi, 'st')
@@ -890,7 +912,7 @@ function buildProjectedPath(regionSeedLookup, row) {
   const s16 = s16Seeds.map((seed) => fmtSeedOpponent(regionSeedLookup, row.region, seed)).join(' vs ');
   const e8 = e8Seeds.map((seed) => fmtSeedOpponent(regionSeedLookup, row.region, seed)).join(' / ');
 
-  return `R2 vs ${r2} → S16 vs winner of ${s16} → E8 vs winner of ${e8}`;
+  return `R2 vs ${r2} â†’ S16 vs winner of ${s16} â†’ E8 vs winner of ${e8}`;
 }
 
 function buildBracketGroundingContext() {
@@ -1242,6 +1264,23 @@ app.get('/api/value-picks', (req, res) => {
   });
 });
 
+app.get('/api/pool-strategy', (req, res) => {
+  if (!store.poolStrategy) {
+    return res.status(404).json({ error: 'Pool strategy data not loaded. Upload pool_strategy_2025.json via admin.' });
+  }
+
+  const tier = String(req.query.tier || '').toLowerCase();
+  if (tier && store.poolStrategy.strategies?.[tier]) {
+    return res.json({
+      ...store.poolStrategy,
+      strategies: { [tier]: store.poolStrategy.strategies[tier] },
+      ev_tables: { [tier]: store.poolStrategy.ev_tables?.[tier] },
+    });
+  }
+
+  return res.json(store.poolStrategy);
+});
+
 app.post('/api/seed-bucket-analysis', async (req, res) => {
   try {
     if (!rateOk(req.ip || 'x')) return res.status(429).json({ error: 'Too many messages.' });
@@ -1345,6 +1384,7 @@ app.get('/value-picks', (req, res) => {
   });
 });
 
+app.use('/data', express.static(path.join(__dirname, 'data')));
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'), (err) => {
@@ -1359,3 +1399,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`BracketGPT on :${PORT} | ${cfg.provider} | key:${cfg.apiKey ? 'yes' : 'NO'} | data:${hasData ? 'yes' : 'NO'}`);
 });
+
