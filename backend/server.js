@@ -101,11 +101,12 @@ const store = {
   bracket2025: null,
   ev: null,
   poolStrategy: null,
+  seedMatchups: null,
 };
 const FILE_MAP = {
   teams: ['team_profiles_2025.json', 'team_profiles.json'],
   humanSummaries: ['team_human_summaries_2025.json', 'team_human_summaries.json'],
-  base: ['chatbot_predictions_base_2025.json', 'chatbot_predictions_base.json'],
+  base: ['chatbot_predictions_base_2025_historical.json', 'chatbot_predictions_base_2025.json', 'chatbot_predictions_base.json'],
   upset: ['chatbot_predictions_upset_2025.json', 'chatbot_predictions_upset.json'],
   floor: ['chatbot_predictions_floor_2025.json', 'chatbot_predictions_floor.json'],
   optimizer: ['bracket_optimizer_results_2025.json', 'bracket_optimizer_results.json'],
@@ -113,7 +114,17 @@ const FILE_MAP = {
   bracket2025: ['bracket_2025.json'],
   ev: ['bracket_ev_espn.json'],
   poolStrategy: ['pool_strategy_2025.json', 'pool_strategy.json'],
+  seedMatchups: ['historical/seed_matchup_all_rounds.json', 'seed_matchup_all_rounds.json'],
   context: ['context_2025.json', 'context.json'],
+};
+
+const historicalIndex = {
+  predictionsByTeam: new Map(),
+  predictionsBySeed: new Map(),
+  teamNames: [],
+  archetypeHistory: {},
+  seedMatchups: {},
+  contextCache: new Map(),
 };
 
 function firstExistingFile(candidates) {
@@ -142,6 +153,52 @@ function loadData() {
   return anyLoaded;
 }
 
+function pushToMapArray(map, key, value) {
+  if (!key) return;
+  if (!map.has(key)) map.set(key, []);
+  map.get(key).push(value);
+}
+
+function predictionFingerprint(pred) {
+  return [
+    normalizeTeamName(pred?.t1_name),
+    normalizeTeamName(pred?.t2_name),
+    Number(pred?.t1_seed || 0),
+    Number(pred?.t2_seed || 0),
+    String(pred?.season || ''),
+  ].join('|');
+}
+
+function clearContextCache() {
+  historicalIndex.contextCache.clear();
+}
+
+function buildHistoricalIndex() {
+  historicalIndex.predictionsByTeam = new Map();
+  historicalIndex.predictionsBySeed = new Map();
+  historicalIndex.teamNames = [];
+  historicalIndex.archetypeHistory = store.base?.archetype_history_lookup || {};
+  historicalIndex.seedMatchups = store.seedMatchups || {};
+  clearContextCache();
+
+  const predictions = store.base?.predictions || [];
+  for (const pred of predictions) {
+    const t1 = normalizeTeamName(pred.t1_name);
+    const t2 = normalizeTeamName(pred.t2_name);
+    pushToMapArray(historicalIndex.predictionsByTeam, t1, pred);
+    pushToMapArray(historicalIndex.predictionsByTeam, t2, pred);
+
+    const s1 = Number(pred.t1_seed);
+    const s2 = Number(pred.t2_seed);
+    if (Number.isFinite(s1) && s1 >= 1 && s1 <= 16) pushToMapArray(historicalIndex.predictionsBySeed, s1, pred);
+    if (Number.isFinite(s2) && s2 >= 1 && s2 <= 16) pushToMapArray(historicalIndex.predictionsBySeed, s2, pred);
+  }
+
+  historicalIndex.teamNames = Array.from(historicalIndex.predictionsByTeam.keys())
+    .filter((name) => name && name.length >= 4)
+    .sort((a, b) => b.length - a.length);
+}
+
 function getProfileMap() {
   const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
   const profileMap = {};
@@ -168,10 +225,12 @@ function enrichBracketWithPlayers() {
 
 let hasData = loadData();
 enrichBracketWithPlayers();
+buildHistoricalIndex();
 
 function reloadDataFromDisk(reason = 'reload') {
   const loaded = loadData();
   enrichBracketWithPlayers();
+  buildHistoricalIndex();
   hasData = loaded;
   console.log(`[data] ${reason} | loaded:${loaded ? 'yes' : 'no'}`);
 }
@@ -638,6 +697,194 @@ function findCtx(query, opts = {}) {
   }
 
   return optimizeCtx(deduped, query, { ...opts, cfg: c });
+}
+
+function classifyHistoricalQuery(message) {
+  const msg = String(message || '').toLowerCase();
+  const isFinalFour = /final\s*four|final\s*4|\bf4\b/.test(msg);
+  const isEliteEight = /elite\s*(eight|8)|\be8\b/.test(msg);
+  const isUpsets = /upset|cinderella|bust|sleeper|underdog/.test(msg);
+  const isChampion = /champion|win\s*it\s*all|title|natty|cut the nets/.test(msg);
+  const isCompare = /compare|rank|versus|\bvs\b|which/.test(msg);
+  const seedMatches = Array.from(msg.matchAll(/\b([1-9]|1[0-6])\s*-?\s*seed\b/g)).map((m) => Number(m[1]));
+  return { isFinalFour, isEliteEight, isUpsets, isChampion, isCompare, seedMatches };
+}
+
+function detectMentionedTeamsFromQuery(message) {
+  const normalized = normalizeTeamName(message);
+  const mentioned = [];
+  for (const teamName of historicalIndex.teamNames) {
+    if (normalized.includes(teamName)) mentioned.push(teamName);
+    if (mentioned.length >= 8) break;
+  }
+
+  const parsedPair = parseTeamPairFromQuery(message) || [];
+  for (const rawTeam of parsedPair) {
+    const norm = normalizeTeamName(rawTeam);
+    if (!norm) continue;
+    if (historicalIndex.predictionsByTeam.has(norm) && !mentioned.includes(norm)) {
+      mentioned.push(norm);
+      continue;
+    }
+    const fallback = historicalIndex.teamNames.find((name) => name.includes(norm) || norm.includes(name));
+    if (fallback && !mentioned.includes(fallback)) mentioned.push(fallback);
+  }
+
+  return mentioned.slice(0, 8);
+}
+
+function maxPredictionsForQuery(flags, mentionedTeams, userMessage) {
+  const parsedPair = parseTeamPairFromQuery(userMessage || '');
+  if (Array.isArray(parsedPair) && parsedPair.length >= 2) return 3;
+  if (mentionedTeams.length === 1) return 8;
+  if (flags.isUpsets) return 20;
+  if (flags.isChampion || flags.isFinalFour) return 25;
+  if (flags.isEliteEight) return 30;
+  return 20;
+}
+
+function slimHistoricalPrediction(pred) {
+  const slim = {
+    t1_name: pred.t1_name,
+    t1_seed: pred.t1_seed,
+    t2_name: pred.t2_name,
+    t2_seed: pred.t2_seed,
+    predicted_winner_name: pred.predicted_winner_name,
+    model_win_prob: pred.model_win_prob,
+    confidence: pred.confidence,
+    upset_flag: pred.upset_flag,
+    value_score: pred.value_score,
+  };
+
+  if (Array.isArray(pred.t1_archetypes)) slim.t1_archetypes = pred.t1_archetypes;
+  if (Array.isArray(pred.t2_archetypes)) slim.t2_archetypes = pred.t2_archetypes;
+  if (pred.t1_archetype) slim.t1_archetype = pred.t1_archetype;
+  if (pred.t2_archetype) slim.t2_archetype = pred.t2_archetype;
+  if (pred.t1_archetype_history) slim.t1_archetype_history = pred.t1_archetype_history;
+  if (pred.t2_archetype_history) slim.t2_archetype_history = pred.t2_archetype_history;
+  if (pred.historical_seed_matchup) slim.historical_seed_matchup = pred.historical_seed_matchup;
+  if (pred.t1_comp_context) slim.t1_comp_context = pred.t1_comp_context;
+  if (pred.t2_comp_context) slim.t2_comp_context = pred.t2_comp_context;
+  if (pred.t1_secondary_comp_context) slim.t1_secondary_comp_context = pred.t1_secondary_comp_context;
+  if (pred.t2_secondary_comp_context) slim.t2_secondary_comp_context = pred.t2_secondary_comp_context;
+  if (pred.historical_blurb) slim.historical_blurb = pred.historical_blurb;
+  if (pred.responses?.historical) slim.responses = { historical: pred.responses.historical };
+  if (pred.form_and_risk) slim.form_and_risk = pred.form_and_risk;
+  if (Array.isArray(pred.key_factors)) slim.key_factors = pred.key_factors.slice(0, 4);
+
+  return slim;
+}
+
+function buildSeedMatchupSubset(predictions) {
+  const rounds = ['R64', 'R32', 'S16', 'E8', 'F4', 'Championship'];
+  const out = {};
+  const seedMatchups = historicalIndex.seedMatchups || {};
+  for (const pred of predictions) {
+    const s1 = Number(pred.t1_seed);
+    const s2 = Number(pred.t2_seed);
+    if (!Number.isFinite(s1) || !Number.isFinite(s2)) continue;
+    const higher = Math.min(s1, s2);
+    const lower = Math.max(s1, s2);
+    const key = `${higher}v${lower}`;
+    for (const round of rounds) {
+      const row = seedMatchups?.[round]?.[key];
+      if (!row) continue;
+      if (!out[round]) out[round] = {};
+      out[round][key] = row;
+      break;
+    }
+  }
+  return out;
+}
+
+function getRelevantHistoricalContext(userMessage) {
+  const cacheKey = normalizeTeamName(userMessage || '');
+  if (cacheKey && historicalIndex.contextCache.has(cacheKey)) {
+    return historicalIndex.contextCache.get(cacheKey);
+  }
+
+  const flags = classifyHistoricalQuery(userMessage);
+  const mentionedTeams = detectMentionedTeamsFromQuery(userMessage);
+  const seen = new Set();
+  const relevantPreds = [];
+  const addPred = (pred) => {
+    const fp = predictionFingerprint(pred);
+    if (!fp || seen.has(fp)) return;
+    seen.add(fp);
+    relevantPreds.push(pred);
+  };
+
+  for (const team of mentionedTeams) {
+    for (const pred of (historicalIndex.predictionsByTeam.get(team) || [])) addPred(pred);
+  }
+
+  if (flags.isFinalFour || flags.isChampion) {
+    for (let seed = 1; seed <= 4; seed += 1) {
+      for (const pred of (historicalIndex.predictionsBySeed.get(seed) || [])) addPred(pred);
+    }
+  }
+
+  if (flags.isEliteEight) {
+    for (let seed = 1; seed <= 5; seed += 1) {
+      for (const pred of (historicalIndex.predictionsBySeed.get(seed) || [])) addPred(pred);
+    }
+  }
+
+  if (flags.isUpsets) {
+    for (let seed = 5; seed <= 16; seed += 1) {
+      for (const pred of (historicalIndex.predictionsBySeed.get(seed) || [])) addPred(pred);
+    }
+  }
+
+  for (const seedNum of flags.seedMatches) {
+    for (const pred of (historicalIndex.predictionsBySeed.get(seedNum) || [])) addPred(pred);
+  }
+
+  if (!relevantPreds.length) {
+    for (let seed = 1; seed <= 4; seed += 1) {
+      for (const pred of (historicalIndex.predictionsBySeed.get(seed) || [])) addPred(pred);
+    }
+  }
+
+  const maxPreds = maxPredictionsForQuery(flags, mentionedTeams, userMessage);
+  const cappedPreds = relevantPreds.slice(0, maxPreds);
+  const archetypes = new Set();
+  for (const pred of cappedPreds) {
+    const t1List = Array.isArray(pred.t1_archetypes) ? pred.t1_archetypes : [pred.t1_archetype];
+    const t2List = Array.isArray(pred.t2_archetypes) ? pred.t2_archetypes : [pred.t2_archetype];
+    for (const a of t1List) if (a) archetypes.add(String(a));
+    for (const a of t2List) if (a) archetypes.add(String(a));
+  }
+
+  const filteredArchetypes = {};
+  for (const archetype of archetypes) {
+    if (historicalIndex.archetypeHistory?.[archetype]) {
+      filteredArchetypes[archetype] = historicalIndex.archetypeHistory[archetype];
+    }
+  }
+
+  const context = {
+    predictions: cappedPreds.map(slimHistoricalPrediction),
+    archetype_history: filteredArchetypes,
+    seed_matchups: buildSeedMatchupSubset(cappedPreds),
+    query_type: {
+      mentionedTeams,
+      isFinalFour: flags.isFinalFour,
+      isEliteEight: flags.isEliteEight,
+      isUpsets: flags.isUpsets,
+      isChampion: flags.isChampion,
+      isCompare: flags.isCompare,
+    },
+  };
+
+  if (cacheKey) {
+    if (historicalIndex.contextCache.size >= 200) {
+      const firstKey = historicalIndex.contextCache.keys().next().value;
+      if (firstKey) historicalIndex.contextCache.delete(firstKey);
+    }
+    historicalIndex.contextCache.set(cacheKey, context);
+  }
+  return context;
 }
 
 function ctxFingerprint(item) {
@@ -1301,7 +1548,7 @@ app.get('/health', (req, res) => {
 app.get('/api/ready', (req, res) => {
   const loaded = Object.keys(FILE_MAP).reduce((acc, key) => {
     const d = store[key];
-    acc[key] = !!(d && (Array.isArray(d) ? d.length : d.predictions?.length || d.profiles?.length || d.results?.length));
+    acc[key] = hasContent(d);
     return acc;
   }, {});
   const ready = loaded.base || loaded.upset || loaded.floor;
@@ -1318,12 +1565,16 @@ app.post('/api/chat', async (req, res) => {
     const joined = msgs.map((m) => m.content).join(' ');
     const intent = detectIntent(joined);
     const ctx = findCtx(joined, { intent, messageCount: msgs.length });
+    const historicalCtx = getRelevantHistoricalContext(joined);
     const intentHint = intent === 'value'
       ? 'INTENT: VALUE. Lead with EV/value-edge vs public pick rates and bracket leverage.'
       : `INTENT: ${intent.toUpperCase()}.`;
     const bracketGrounding = buildBracketGroundingContext();
     return res.json({ reply: await callLLM(msgs, `${intentHint}
 ${bracketGrounding}
+RELEVANT_HISTORICAL_CONTEXT:
+${JSON.stringify(historicalCtx, null, 0)}
+CONTEXT_COUNTS: predictions=${historicalCtx.predictions.length}, archetypes=${Object.keys(historicalCtx.archetype_history || {}).length}
 ${fmtCtx(ctx)}`), intent });
   } catch (e) {
     console.error(e);
@@ -1413,6 +1664,7 @@ app.post('/admin/context-preview', auth, (req, res) => {
   const query = req.body?.query || '';
   const intent = detectIntent(query);
   const ctx = findCtx(query, { intent, messageCount: 1 });
+  const historicalCtx = getRelevantHistoricalContext(query);
   res.json({
     query,
     intent,
@@ -1420,6 +1672,12 @@ app.post('/admin/context-preview', auth, (req, res) => {
     contextCount: ctx.length,
     contextPreview: ctx,
     formattedContext: fmtCtx(ctx),
+    historicalContextCounts: {
+      predictions: historicalCtx.predictions.length,
+      archetypes: Object.keys(historicalCtx.archetype_history || {}).length,
+      seedRounds: Object.keys(historicalCtx.seed_matchups || {}).length,
+    },
+    historicalContextPreview: historicalCtx,
   });
 });
 
