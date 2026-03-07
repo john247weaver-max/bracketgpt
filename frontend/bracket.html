@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BracketGPT | Bracket</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface-2: #1c1c1c;
+      --green: #3fb950;
+      --orange: #ff6b00;
+      --text: #e6edf3;
+      --muted: #7d8590;
+      --blue: #58a6ff;
+      --yellow: #f2cc60;
+      --red: #ff7b72;
+      --border: rgba(255,255,255,0.11);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'DM Sans', sans-serif;
+      background: radial-gradient(circle at 10% 0%, rgba(63,185,80,0.14), transparent 28%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,10,10,0.94);
+      backdrop-filter: blur(8px);
+    }
+    .brand { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; letter-spacing: .04em; }
+    .nav-links { display: flex; gap: 8px; }
+    .nav-links a {
+      border: 1px solid var(--border);
+      padding: 7px 12px;
+      border-radius: 9px;
+      color: var(--muted);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .nav-links a.active { color: var(--text); border-color: var(--green); }
+
+    .container { max-width: 1500px; margin: 0 auto; padding: 14px 14px 88px; }
+    .topbar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .tophead { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .tophead h1 { margin: 0; font-family: 'Barlow Condensed', sans-serif; letter-spacing: .05em; font-size: 28px; }
+    .actions { display: flex; gap: 8px; }
+    .btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 8px;
+      font-size: 12px;
+      padding: 8px 10px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .btn:hover { border-color: var(--green); }
+    .progress-wrap { margin-top: 10px; }
+    .progress-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .progress {
+      margin-top: 6px;
+      height: 8px;
+      background: #222;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--green), #5be677);
+      transition: width .2s ease;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(240px, 1fr));
+      gap: 10px;
+    }
+    .region {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .region h2 {
+      margin: 0 0 8px;
+      font-family: 'Barlow Condensed', sans-serif;
+      letter-spacing: .08em;
+      font-size: 20px;
+      color: var(--green);
+    }
+    .round-col { margin-bottom: 10px; }
+    .round-title {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 6px;
+    }
+    .match {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      border-radius: 10px;
+      padding: 6px;
+      margin-bottom: 7px;
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+    }
+    .match.picked { border-color: var(--green); box-shadow: 0 0 0 1px rgba(63,185,80,0.2); }
+    .team-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 6px; align-items: center; margin-bottom: 4px; }
+    .team-row:last-child { margin-bottom: 0; }
+    .seed {
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 16px;
+      text-align: center;
+    }
+    .team-btn {
+      border: none;
+      text-align: left;
+      border-radius: 7px;
+      padding: 6px 8px;
+      background: rgba(255,255,255,0.03);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      transition: transform .12s ease, background .12s ease;
+    }
+    .team-btn:hover { transform: translateX(2px); }
+    .team-btn.winner { background: rgba(63,185,80,0.2); }
+    .team-btn:disabled { opacity: .5; cursor: default; }
+    .prob { font-size: 10px; color: var(--muted); min-width: 42px; text-align: right; }
+    .info {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .info:hover { color: var(--text); border-color: var(--blue); }
+
+    .finals {
+      margin-top: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .finals h2 { margin: 0 0 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; letter-spacing: .08em; color: var(--orange); }
+    .final-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+    .skeleton {
+      height: 70px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      background: linear-gradient(90deg, #171717 0%, #232323 50%, #171717 100%);
+      background-size: 240% 100%;
+      animation: pulse 1s infinite linear;
+    }
+    @keyframes pulse { from { background-position: 0 0; } to { background-position: 220% 0; } }
+
+    .error {
+      border: 1px solid rgba(255,123,114,0.4);
+      background: rgba(255,123,114,0.08);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.58);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 12px;
+    }
+    .overlay.open { display: flex; }
+    .card {
+      width: min(760px, 96vw);
+      max-height: 92vh;
+      overflow: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      animation: pop .16s ease;
+    }
+    @keyframes pop { from { opacity:0; transform: translateY(8px) scale(.98); } to { opacity:1; transform: translateY(0) scale(1); } }
+    .card-head { display:flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .badge { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; border-radius: 999px; padding: 4px 8px; border: 1px solid var(--border); }
+    .badge.chalk { background: rgba(125,133,144,0.2); }
+    .badge.upset_alert { background: rgba(255,107,0,0.2); border-color: rgba(255,107,0,0.45); }
+    .badge.leverage_play { background: rgba(88,166,255,0.2); border-color: rgba(88,166,255,0.45); }
+    .badge.toss_up { background: rgba(242,204,96,0.2); border-color: rgba(242,204,96,0.45); }
+    .close { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; }
+
+    .vs-row { display:grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .team-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--surface-2); }
+    .team-name { font-weight: 700; }
+    .tiny { font-size: 12px; color: var(--muted); }
+    .bar { margin-top: 6px; height: 7px; background: #252525; border-radius: 999px; overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--green), #78de89); }
+    .section { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+    .section h3 { margin: 0 0 6px; font-family: 'Barlow Condensed', sans-serif; letter-spacing: .07em; font-size: 16px; color: var(--muted); }
+    .pick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .pick-btn { border: 1px solid var(--green); background: rgba(63,185,80,0.15); color: var(--text); border-radius: 9px; padding: 11px 10px; cursor: pointer; font-weight: 700; }
+
+    .mobile-tabs {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(10,10,10,0.97);
+      border-top: 1px solid var(--border);
+      z-index: 120;
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .mobile-tabs a { text-align: center; padding: 10px 0; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .mobile-tabs a.active { color: var(--green); }
+
+    @media (max-width: 1200px) { .grid { grid-template-columns: repeat(2, minmax(250px,1fr)); } .final-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) {
+      .nav-links { display: none; }
+      .container { padding-bottom: 78px; }
+      .grid { grid-template-columns: 1fr; }
+      .mobile-tabs { display: grid; }
+      .card { width: 100%; max-height: 95vh; border-radius: 12px 12px 0 0; align-self: end; animation: slide .18s ease; }
+      @keyframes slide { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand">BracketGPT</div>
+    <div class="nav-links">
+      <a href="/bracket" class="active">Bracket</a>
+      <a href="/">Chat</a>
+      <a href="/value-picks">Picks</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="topbar">
+      <div class="tophead">
+        <h1>2025 Interactive Bracket</h1>
+        <div class="actions">
+          <button class="btn" onclick="resetBracket()">Reset Bracket</button>
+          <button class="btn" onclick="exportBracket()">Export Bracket</button>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span id="progress-text">0 / 63 picks</span><span id="completion-text">0%</span></div>
+        <div class="progress"><span id="progress-bar"></span></div>
+      </div>
+    </section>
+
+    <div id="error"></div>
+    <div id="loading" style="display:none"></div>
+
+    <section class="grid" id="regions"></section>
+
+    <section class="finals">
+      <h2>Final Four + Championship</h2>
+      <div class="final-grid" id="finals"></div>
+    </section>
+  </main>
+
+  <div class="overlay" id="overlay" onclick="if(event.target.id==='overlay') closeCard()">
+    <div class="card" id="card"></div>
+  </div>
+
+  <div class="mobile-tabs">
+    <a href="/bracket" class="active">Bracket</a>
+    <a href="/">Chat</a>
+    <a href="/value-picks">Picks</a>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'bracketgpt_state_v1';
+    const regions = ['South', 'East', 'Midwest', 'West'];
+    const roundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
+    const roundPoints = { R64: 1, R32: 2, S16: 4, E8: 8, F4: 16, NCG: 32 };
+
+    let baseMatchups = [];
+    let matchupById = new Map();
+    let nodesById = new Map();
+    let parentMap = new Map();
+    let regionRoundIds = {};
+    let finalIds = { F4: [], NCG: [] };
+    let matchupCache = new Map();
+
+    const bracketState = {
+      picks: {},
+      completion: { R64: 0, R32: 0, S16: 0, E8: 0, F4: 0, NCG: 0, total: 0 }
+    };
+
+    function normalizeName(v) {
+      return String(v || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function showLoading() {
+      const el = document.getElementById('loading');
+      el.style.display = 'block';
+      el.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+    }
+
+    function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+
+    function showError(msg) {
+      document.getElementById('error').innerHTML = '<div class="error">' + msg + ' <button class="btn" onclick="init()">Retry</button></div>';
+    }
+
+    function clearError() { document.getElementById('error').innerHTML = ''; }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(bracketState));
+      localStorage.setItem('bracketgpt_bracket_state', JSON.stringify(bracketState));
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.picks && typeof parsed.picks === 'object') bracketState.picks = parsed.picks;
+      } catch (e) {}
+    }
+
+    function makeNode(id, round, region, source, children) {
+      return { id, round, region, source: source || null, children: children || [] };
+    }
+
+    function linkParent(childId, parentId) {
+      if (!parentMap.has(childId)) parentMap.set(childId, []);
+      parentMap.get(childId).push(parentId);
+    }
+
+    function buildTree() {
+      nodesById = new Map();
+      parentMap = new Map();
+      regionRoundIds = {};
+      finalIds = { F4: [], NCG: [] };
+
+      for (const region of regions) {
+        const r64 = baseMatchups
+          .filter((m) => m.region === region)
+          .sort((a, b) => Number(a.game_number || 0) - Number(b.game_number || 0));
+        const ids = { R64: [], R32: [], S16: [], E8: [] };
+        for (const m of r64) {
+          const id = m.matchup_id;
+          nodesById.set(id, makeNode(id, 'R64', region, m, []));
+          ids.R64.push(id);
+        }
+        for (let i = 0; i < 4; i++) {
+          const c1 = ids.R64[i * 2];
+          const c2 = ids.R64[i * 2 + 1];
+          const id = `AUTO_R32_${region}_${i + 1}`;
+          nodesById.set(id, makeNode(id, 'R32', region, null, [c1, c2]));
+          ids.R32.push(id);
+          linkParent(c1, id); linkParent(c2, id);
+        }
+        for (let i = 0; i < 2; i++) {
+          const c1 = ids.R32[i * 2];
+          const c2 = ids.R32[i * 2 + 1];
+          const id = `AUTO_S16_${region}_${i + 1}`;
+          nodesById.set(id, makeNode(id, 'S16', region, null, [c1, c2]));
+          ids.S16.push(id);
+          linkParent(c1, id); linkParent(c2, id);
+        }
+        const e8id = `AUTO_E8_${region}_1`;
+        nodesById.set(e8id, makeNode(e8id, 'E8', region, null, [ids.S16[0], ids.S16[1]]));
+        ids.E8.push(e8id);
+        linkParent(ids.S16[0], e8id); linkParent(ids.S16[1], e8id);
+        regionRoundIds[region] = ids;
+      }
+
+      const f4a = 'AUTO_F4_SW';
+      const f4b = 'AUTO_F4_EM';
+      const ncg = 'AUTO_NCG_1';
+      const south = regionRoundIds.South.E8[0];
+      const west = regionRoundIds.West.E8[0];
+      const east = regionRoundIds.East.E8[0];
+      const midwest = regionRoundIds.Midwest.E8[0];
+      nodesById.set(f4a, makeNode(f4a, 'F4', 'Final Four', null, [south, west]));
+      nodesById.set(f4b, makeNode(f4b, 'F4', 'Final Four', null, [east, midwest]));
+      nodesById.set(ncg, makeNode(ncg, 'NCG', 'Final Four', null, [f4a, f4b]));
+      linkParent(south, f4a); linkParent(west, f4a);
+      linkParent(east, f4b); linkParent(midwest, f4b);
+      linkParent(f4a, ncg); linkParent(f4b, ncg);
+      finalIds.F4 = [f4a, f4b];
+      finalIds.NCG = [ncg];
+    }
+
+    function calcDownstreamExposure(round) {
+      const start = roundOrder.indexOf(round);
+      let total = 0;
+      for (let i = start; i < roundOrder.length; i++) total += roundPoints[roundOrder[i]];
+      return total;
+    }
+
+    function getMatchTeams(node) {
+      if (!node) return [null, null];
+      if (node.round === 'R64') return [node.source?.t1 || null, node.source?.t2 || null];
+      const t1 = getWinnerTeam(node.children[0]);
+      const t2 = getWinnerTeam(node.children[1]);
+      return [t1 || null, t2 || null];
+    }
+
+    function getWinnerTeam(matchId) {
+      const node = nodesById.get(matchId);
+      if (!node) return null;
+      const [t1, t2] = getMatchTeams(node);
+      const pick = bracketState.picks[matchId];
+      if (!pick) return null;
+      if (t1 && t1.name === pick) return t1;
+      if (t2 && t2.name === pick) return t2;
+      return null;
+    }
+
+    function clearDescendantPicks(matchId) {
+      const queue = [...(parentMap.get(matchId) || [])];
+      const seen = new Set();
+      while (queue.length) {
+        const id = queue.shift();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        delete bracketState.picks[id];
+        for (const p of (parentMap.get(id) || [])) queue.push(p);
+      }
+    }
+
+    function makePick(matchId, winnerName) {
+      const node = nodesById.get(matchId);
+      if (!node || !winnerName) return;
+      bracketState.picks[matchId] = winnerName;
+      clearDescendantPicks(matchId);
+      saveState();
+      renderAll();
+      closeCard();
+    }
+
+    function validPickForNode(node) {
+      const [t1, t2] = getMatchTeams(node);
+      const pick = bracketState.picks[node.id];
+      return !!pick && ((t1 && t1.name === pick) || (t2 && t2.name === pick));
+    }
+
+    function computeCompletion() {
+      const counts = { R64: 0, R32: 0, S16: 0, E8: 0, F4: 0, NCG: 0, total: 0 };
+      for (const node of nodesById.values()) {
+        const [t1, t2] = getMatchTeams(node);
+        if (!t1 || !t2) continue;
+        if (validPickForNode(node)) {
+          counts[node.round] += 1;
+          counts.total += 1;
+        }
+      }
+      bracketState.completion = counts;
+      return counts;
+    }
+
+    function teamRow(node, team, pick, prob) {
+      const disabled = !team ? 'disabled' : '';
+      const winner = team && pick === team.name ? 'winner' : '';
+      const color = team?.color_primary || '#3a3a3a';
+      return '<div class="team-row">' +
+        '<span class="seed">' + (team?.seed ?? '-') + '</span>' +
+        '<button class="team-btn ' + winner + '" style="border-left:3px solid ' + color + '" ' + disabled + ' onclick="makePick(\'' + node.id + '\',\'' + (team?.name || '').replace(/'/g, "\\'") + '\')">' + (team?.name || 'TBD') + '</button>' +
+        '<span class="prob">' + (Number.isFinite(prob) ? (prob * 100).toFixed(1) + '%' : '--') + '</span>' +
+        '<button class="info" onclick="openCard(\'' + node.id + '\')">i</button>' +
+      '</div>';
+    }
+
+    function renderMatch(node) {
+      const [t1, t2] = getMatchTeams(node);
+      const pick = bracketState.picks[node.id] || '';
+      const p1 = node.source?.t1?.win_probability ?? null;
+      const p2 = node.source?.t2?.win_probability ?? null;
+      const pickedClass = validPickForNode(node) ? 'picked' : '';
+      return '<div class="match ' + pickedClass + '">' +
+        teamRow(node, t1, pick, p1) +
+        teamRow(node, t2, pick, p2) +
+      '</div>';
+    }
+
+    function renderRegion(region) {
+      const ids = regionRoundIds[region];
+      if (!ids) return '';
+      return '<section class="region">' +
+        '<h2>' + region + '</h2>' +
+        '<div class="round-col"><div class="round-title">Round of 64</div>' + ids.R64.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+        '<div class="round-col"><div class="round-title">Round of 32</div>' + ids.R32.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+        '<div class="round-col"><div class="round-title">Sweet 16</div>' + ids.S16.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+        '<div class="round-col"><div class="round-title">Elite 8</div>' + ids.E8.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+      '</section>';
+    }
+
+    function renderFinals() {
+      const f4html = finalIds.F4.map((id) => renderMatch(nodesById.get(id))).join('');
+      const ncghtml = finalIds.NCG.map((id) => renderMatch(nodesById.get(id))).join('');
+      document.getElementById('finals').innerHTML =
+        '<div><div class="round-title">Final Four</div>' + f4html + '</div>' +
+        '<div><div class="round-title">Championship</div>' + ncghtml + '</div>' +
+        '<div><div class="round-title">Champion</div>' + championBlock() + '</div>';
+    }
+
+    function championBlock() {
+      const champId = finalIds.NCG[0];
+      const winner = getWinnerTeam(champId);
+      if (!winner) return '<div class="match"><div class="team-row"><span class="seed">-</span><button class="team-btn" disabled>TBD</button><span class="prob">--</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
+      return '<div class="match picked"><div class="team-row"><span class="seed">' + (winner.seed ?? '-') + '</span><button class="team-btn winner" style="border-left:3px solid ' + (winner.color_primary || '#3a3a3a') + '" onclick="openCard(\'' + champId + '\')">' + winner.name + ' Champion</button><span class="prob">100%</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
+    }
+
+    function renderProgress() {
+      const c = computeCompletion();
+      const pct = Math.round((c.total / 63) * 100);
+      document.getElementById('progress-text').textContent = c.total + ' / 63 picks';
+      document.getElementById('completion-text').textContent = pct + '%';
+      document.getElementById('progress-bar').style.width = pct + '%';
+    }
+
+    function renderAll() {
+      const regionsEl = document.getElementById('regions');
+      regionsEl.innerHTML = regions.map((region) => renderRegion(region)).join('');
+      renderFinals();
+      renderProgress();
+    }
+
+    function closeCard() {
+      document.getElementById('overlay').classList.remove('open');
+      document.getElementById('card').innerHTML = '';
+    }
+
+    function fallbackMeta(node) {
+      const [t1, t2] = getMatchTeams(node);
+      const fp = Number(node.source?.t1?.win_probability || 0.5);
+      return {
+        matchup_id: node.id,
+        round: node.round,
+        region: node.region,
+        t1: t1 || { name: 'TBD', seed: '-' },
+        t2: t2 || { name: 'TBD', seed: '-' },
+        matchup_meta: {
+          display_flag: 'toss_up',
+          confidence: node.round === 'R64' ? (node.source?.matchup_meta?.confidence || 'lean') : 'lean',
+          risk: { tier: 'medium', reason: 'historical data is limited here' },
+          chatbot_prompt: node.round === 'R64' ? (node.source?.matchup_meta?.chatbot_prompt || 'Who is the better pick here?') : 'How should this pick fit my bracket strategy?',
+          seed_matchup: node.source?.matchup_meta?.seed_matchup || null,
+          archetype_h2h: node.source?.matchup_meta?.archetype_h2h || null,
+          pool_meta: node.source?.matchup_meta?.pool_meta || { leverage_delta: 0 }
+        }
+      };
+    }
+
+    async function getCardData(node) {
+      if (node.round === 'R64' && node.source) return node.source;
+      const [t1, t2] = getMatchTeams(node);
+      if (!t1 || !t2) return fallbackMeta(node);
+      const key = normalizeName(t1.name) + '|' + normalizeName(t2.name);
+      if (matchupCache.has(key)) return matchupCache.get(key);
+      try {
+        const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(t1.name) + '/' + encodeURIComponent(t2.name));
+        if (r.ok) {
+          const data = await r.json();
+          matchupCache.set(key, data);
+          return data;
+        }
+      } catch (e) {}
+      return fallbackMeta(node);
+    }
+
+    function badgeClass(flag) {
+      const f = String(flag || 'chalk').toLowerCase();
+      if (f === 'upset_alert' || f === 'upset') return 'upset_alert';
+      if (f === 'leverage_play') return 'leverage_play';
+      if (f === 'toss_up') return 'toss_up';
+      return 'chalk';
+    }
+
+    function compLine(label, comp) {
+      if (!comp) return '<div class="tiny">' + label + ': historical data is limited here</div>';
+      return '<div class="tiny">' + label + ': ' + (comp.name || '-') + ' ' + (comp.season || '') + ' (' + (comp.result || '-') + ', ' + (((comp.similarity || 0) * 100).toFixed(1)) + '%)</div>';
+    }
+
+    function renderCard(data, node) {
+      const meta = data.matchup_meta || {};
+      const t1 = data.t1 || {};
+      const t2 = data.t2 || {};
+      const t1p = Number(t1.win_probability || 0);
+      const t2p = Number(t2.win_probability || 0);
+      const best = t1p >= t2p ? t1 : t2;
+      const prompt = meta.chatbot_prompt || 'How should I handle this matchup in my bracket?';
+      const askUrl = '/?q=' + encodeURIComponent(prompt);
+      const exposure = calcDownstreamExposure(node.round);
+      document.getElementById('card').innerHTML =
+        '<div class="card-head">' +
+          '<span class="badge ' + badgeClass(meta.display_flag) + '">' + (meta.display_flag || 'chalk') + '</span>' +
+          '<button class="close" onclick="closeCard()">x</button>' +
+        '</div>' +
+        '<div class="vs-row">' +
+          '<div class="team-card"><div class="team-name">(' + (t1.seed ?? '-') + ') ' + (t1.name || 'TBD') + '</div><div class="tiny">' + (t1p * 100).toFixed(1) + '%</div><div class="bar"><span style="width:' + (t1p * 100).toFixed(1) + '%"></span></div></div>' +
+          '<div class="tiny">VS</div>' +
+          '<div class="team-card"><div class="team-name">(' + (t2.seed ?? '-') + ') ' + (t2.name || 'TBD') + '</div><div class="tiny">' + (t2p * 100).toFixed(1) + '%</div><div class="bar"><span style="width:' + (t2p * 100).toFixed(1) + '%"></span></div></div>' +
+        '</div>' +
+        '<div class="section"><h3>Matchup Intel</h3>' +
+          '<div class="tiny">Confidence: ' + (meta.confidence || 'historical data is limited here') + '</div>' +
+          '<div class="tiny">Risk: ' + (meta.risk?.tier || 'medium') + ' - ' + (meta.risk?.reason || 'historical data is limited here') + '</div>' +
+          '<div class="tiny">Seed History: ' + (meta.seed_matchup?.trend || 'historical data is limited here') + '</div>' +
+        '</div>' +
+        '<div class="section"><h3>Archetype Matchup</h3>' +
+          '<div class="tiny">' + (meta.archetype_h2h?.label || 'historical data is limited here') + '</div>' +
+          '<div class="tiny">Edge: ' + (meta.archetype_h2h?.t1_archetype_win_pct != null ? ((meta.archetype_h2h.t1_archetype_win_pct * 100).toFixed(1) + '% to ' + (t1.name || 'Team 1')) : 'historical data is limited here') + '</div>' +
+        '</div>' +
+        '<div class="section"><h3>Pool Strategy</h3>' +
+          '<div class="tiny">Public pick: ' + ((t1.pool?.public_pick_pct != null) ? (t1.name + ' ' + (t1.pool.public_pick_pct * 100).toFixed(1) + '%') : 'historical data is limited here') + ' / ' + ((t2.pool?.public_pick_pct != null) ? (t2.name + ' ' + (t2.pool.public_pick_pct * 100).toFixed(1) + '%') : 'historical data is limited here') + '</div>' +
+          '<div class="tiny">Leverage delta: ' + (meta.pool_meta?.leverage_delta ?? 'historical data is limited here') + '</div>' +
+          '<div class="tiny">Downstream exposure if picked now: ' + exposure + ' points</div>' +
+        '</div>' +
+        '<div class="section"><h3>Quick Comps</h3>' +
+          compLine(t1.name || 'Team 1', t1.primary_comp) +
+          compLine(t2.name || 'Team 2', t2.primary_comp) +
+          '<div style="margin-top:8px"><a class="btn" href="' + askUrl + '">Ask BracketGPT</a></div>' +
+        '</div>' +
+        '<div class="pick-actions">' +
+          '<button class="pick-btn" onclick="makePick(\'' + node.id + '\',\'' + String(t1.name || '').replace(/'/g, "\\'") + '\')">Pick ' + (t1.name || 'Team 1') + '</button>' +
+          '<button class="pick-btn" onclick="makePick(\'' + node.id + '\',\'' + String(t2.name || '').replace(/'/g, "\\'") + '\')">Pick ' + (t2.name || 'Team 2') + '</button>' +
+        '</div>' +
+        '<div class="tiny" style="margin-top:8px">Model lean: ' + (best.name || 'TBD') + '</div>';
+    }
+
+    async function openCard(nodeId) {
+      const node = nodesById.get(nodeId);
+      if (!node) return;
+      document.getElementById('overlay').classList.add('open');
+      document.getElementById('card').innerHTML = '<div class="skeleton" style="height:80px"></div><div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:120px"></div>';
+      const data = await getCardData(node);
+      renderCard(data, node);
+    }
+
+    function resetBracket() {
+      if (!confirm('Clear all bracket picks?')) return;
+      bracketState.picks = {};
+      saveState();
+      renderAll();
+    }
+
+    async function exportBracket() {
+      const lines = [];
+      for (const node of nodesById.values()) {
+        if (!validPickForNode(node)) continue;
+        const pick = bracketState.picks[node.id];
+        const [t1, t2] = getMatchTeams(node);
+        const loser = t1?.name === pick ? t2?.name : t1?.name;
+        lines.push(node.round + ': ' + pick + ' over ' + (loser || 'TBD'));
+      }
+      const text = 'BracketGPT 2025 Picks\n' + lines.join('\n');
+      try { await navigator.clipboard.writeText(text); alert('Bracket copied to clipboard'); }
+      catch (e) { alert(text); }
+    }
+
+    async function init() {
+      showLoading();
+      clearError();
+      try {
+        const r = await fetch('/api/bracket');
+        if (!r.ok) throw new Error('Could not load bracket data');
+        const data = await r.json();
+        baseMatchups = Array.isArray(data.matchups) ? data.matchups : [];
+        matchupById = new Map(baseMatchups.map((m) => [m.matchup_id, m]));
+        loadState();
+        buildTree();
+        saveState();
+        renderAll();
+        const teamQ = new URLSearchParams(window.location.search).get('team');
+        if (teamQ) {
+          const target = normalizeName(teamQ);
+          for (const node of nodesById.values()) {
+            const [t1, t2] = getMatchTeams(node);
+            if (normalizeName(t1?.name) === target || normalizeName(t2?.name) === target) {
+              openCard(node.id);
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        showError("Couldn't load bracket data.");
+      } finally {
+        hideLoading();
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

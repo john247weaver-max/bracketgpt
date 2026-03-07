@@ -102,6 +102,7 @@ const store = {
   ev: null,
   poolStrategy: null,
   seedMatchups: null,
+  bracketMatchups: null,
 };
 const FILE_MAP = {
   teams: ['team_profiles_2025.json', 'team_profiles.json'],
@@ -115,6 +116,7 @@ const FILE_MAP = {
   ev: ['bracket_ev_espn.json'],
   poolStrategy: ['pool_strategy_2025.json', 'pool_strategy.json'],
   seedMatchups: ['historical/seed_matchup_all_rounds.json', 'seed_matchup_all_rounds.json'],
+  bracketMatchups: ['bracketgpt_matchups_2025_final.json'],
   context: ['context_2025.json', 'context.json'],
 };
 
@@ -125,6 +127,14 @@ const historicalIndex = {
   archetypeHistory: {},
   seedMatchups: {},
   contextCache: new Map(),
+};
+
+const bracketMatchupIndex = {
+  byId: new Map(),
+  byRegion: new Map(),
+  byTeam: new Map(),
+  regions: ['South', 'West', 'East', 'Midwest'],
+  season: 2025,
 };
 
 function firstExistingFile(candidates) {
@@ -199,6 +209,35 @@ function buildHistoricalIndex() {
     .sort((a, b) => b.length - a.length);
 }
 
+function addBracketByTeam(teamName, matchup) {
+  const key = normalizeTeamName(teamName);
+  if (!key) return;
+  if (!bracketMatchupIndex.byTeam.has(key)) bracketMatchupIndex.byTeam.set(key, []);
+  bracketMatchupIndex.byTeam.get(key).push(matchup);
+}
+
+function buildBracketMatchupIndex() {
+  bracketMatchupIndex.byId = new Map();
+  bracketMatchupIndex.byRegion = new Map();
+  bracketMatchupIndex.byTeam = new Map();
+  const rows = store.bracketMatchups?.matchups || [];
+  bracketMatchupIndex.season = Number(store.bracketMatchups?.season || cfg.activeSeason || 2025);
+  const regionSet = new Set();
+
+  for (const matchup of rows) {
+    const id = String(matchup?.matchup_id || '');
+    const region = String(matchup?.region || 'Unknown');
+    if (id) bracketMatchupIndex.byId.set(id, matchup);
+    regionSet.add(region);
+    if (!bracketMatchupIndex.byRegion.has(region)) bracketMatchupIndex.byRegion.set(region, []);
+    bracketMatchupIndex.byRegion.get(region).push(matchup);
+    addBracketByTeam(matchup?.t1?.name, matchup);
+    addBracketByTeam(matchup?.t2?.name, matchup);
+  }
+
+  bracketMatchupIndex.regions = regionSet.size ? Array.from(regionSet) : ['South', 'West', 'East', 'Midwest'];
+}
+
 function getProfileMap() {
   const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
   const profileMap = {};
@@ -226,11 +265,13 @@ function enrichBracketWithPlayers() {
 let hasData = loadData();
 enrichBracketWithPlayers();
 buildHistoricalIndex();
+buildBracketMatchupIndex();
 
 function reloadDataFromDisk(reason = 'reload') {
   const loaded = loadData();
   enrichBracketWithPlayers();
   buildHistoricalIndex();
+  buildBracketMatchupIndex();
   hasData = loaded;
   console.log(`[data] ${reason} | loaded:${loaded ? 'yes' : 'no'}`);
 }
@@ -511,6 +552,111 @@ function findPredictionForTeams(teamA, teamB) {
   return null;
 }
 
+function findBracketMatchupById(matchupId) {
+  return bracketMatchupIndex.byId.get(String(matchupId || '')) || null;
+}
+
+function fuzzyTeamKey(rawTeam) {
+  const target = normalizeTeamName(rawTeam);
+  if (!target) return '';
+  if (bracketMatchupIndex.byTeam.has(target)) return target;
+  let best = '';
+  for (const key of bracketMatchupIndex.byTeam.keys()) {
+    if (key.includes(target) || target.includes(key)) {
+      if (!best || key.length > best.length) best = key;
+    }
+  }
+  return best;
+}
+
+function findBracketMatchupByTeams(teamA, teamB) {
+  const aKey = fuzzyTeamKey(teamA);
+  const bKey = fuzzyTeamKey(teamB);
+  if (!aKey || !bKey) return null;
+  const aRows = bracketMatchupIndex.byTeam.get(aKey) || [];
+  const bSet = new Set((bracketMatchupIndex.byTeam.get(bKey) || []).map((m) => String(m.matchup_id)));
+  for (const row of aRows) {
+    if (bSet.has(String(row.matchup_id))) return row;
+  }
+  return null;
+}
+
+function slimMatchupForContext(matchup) {
+  if (!matchup) return null;
+  return {
+    matchup_id: matchup.matchup_id,
+    round: matchup.round,
+    region: matchup.region,
+    t1: {
+      name: matchup.t1?.name,
+      seed: matchup.t1?.seed,
+      win_probability: matchup.t1?.win_probability,
+      predicted_margin: matchup.t1?.predicted_margin,
+      archetypes: matchup.t1?.archetypes,
+    },
+    t2: {
+      name: matchup.t2?.name,
+      seed: matchup.t2?.seed,
+      win_probability: matchup.t2?.win_probability,
+      predicted_margin: matchup.t2?.predicted_margin,
+      archetypes: matchup.t2?.archetypes,
+    },
+    confidence: matchup.matchup_meta?.confidence,
+    upset_flag: matchup.matchup_meta?.upset_flag,
+    display_flag: matchup.matchup_meta?.display_flag,
+    risk: matchup.matchup_meta?.risk || null,
+    seed_matchup: matchup.matchup_meta?.seed_matchup || null,
+    archetype_h2h: matchup.matchup_meta?.archetype_h2h || null,
+    chatbot_prompt: matchup.matchup_meta?.chatbot_prompt || '',
+  };
+}
+
+function formatBracketStateContext(bracketState, focusMatchup) {
+  if (!bracketState || typeof bracketState !== 'object') return '';
+  const picks = bracketState.picks && typeof bracketState.picks === 'object' ? bracketState.picks : {};
+  const pickIds = Object.keys(picks);
+  const completed = Number(bracketState.completion?.total || pickIds.length || 0);
+  const completionPct = Math.round((completed / 63) * 100);
+  const pickedLines = [];
+  for (const matchupId of pickIds.slice(0, 24)) {
+    const winner = picks[matchupId];
+    const matchup = findBracketMatchupById(matchupId);
+    const loser = matchup?.t1?.name === winner ? matchup?.t2?.name : matchup?.t1?.name;
+    const round = matchup?.round || 'Round';
+    pickedLines.push(`- ${winner} over ${loser || 'opponent TBD'} (${round})`);
+  }
+  if (!pickedLines.length) pickedLines.push('- No picks submitted yet.');
+
+  const remainingLines = [];
+  for (const matchup of (store.bracketMatchups?.matchups || [])) {
+    if (matchup?.round !== 'R64') continue;
+    if (picks[matchup.matchup_id]) continue;
+    const favorite = (Number(matchup.t1?.win_probability || 0) >= Number(matchup.t2?.win_probability || 0)) ? matchup.t1 : matchup.t2;
+    const favPct = Number(favorite?.win_probability || 0) * 100;
+    remainingLines.push(`- ${matchup.t1?.name} vs ${matchup.t2?.name} (R64) - model says ${favorite?.name || 'favorite'} ${favPct.toFixed(1)}%`);
+    if (remainingLines.length >= 12) break;
+  }
+  if (!remainingLines.length) remainingLines.push('- None in R64.');
+
+  let focusBlock = '';
+  if (focusMatchup) {
+    const focus = findBracketMatchupById(focusMatchup) || null;
+    if (focus) {
+      focusBlock = `\nFOCUS_MATCHUP:\n${JSON.stringify(slimMatchupForContext(focus), null, 0)}\n`;
+    }
+  }
+
+  return `=== USER'S BRACKET STATUS ===
+Completion: ${completed}/63 picks (${completionPct}%)
+Current picks so far:
+${pickedLines.join('\n')}
+
+Remaining unpicked games in current view:
+${remainingLines.join('\n')}
+${focusBlock}
+When giving advice, reference existing picks and how new picks interact with this bracket strategy.`;
+}
+
 function findEvByTeamName(teamName) {
   const name = normalizeTeamName(teamName);
   const teams = store.ev?.teams || store.ev?.data || (Array.isArray(store.ev) ? store.ev : []);
@@ -554,6 +700,22 @@ function findCtx(query, opts = {}) {
 
   // Bracket games (if loaded)
   const bracketGames = store.bracket?.games || store.bracket?.predictions || [];
+  const bracketMatchups = store.bracketMatchups?.matchups || [];
+
+  const parsedPair = parseTeamPairFromQuery(query);
+  if (parsedPair) {
+    const pairMatchup = findBracketMatchupByTeams(parsedPair[0], parsedPair[1]);
+    if (pairMatchup) ctx.push({ type: 'matchup', data: pairMatchup });
+  }
+
+  // Matchup search in bracket pick-card data
+  for (const m of bracketMatchups) {
+    const t1 = normalizeTeamName(m?.t1?.name);
+    const t2 = normalizeTeamName(m?.t2?.name);
+    let hit = (t1 && lc.includes(t1)) || (t2 && lc.includes(t2));
+    if (!hit && t1 && t2) hit = lc.includes(`${t1} vs ${t2}`) || lc.includes(`${t2} vs ${t1}`);
+    if (hit) ctx.push({ type: 'matchup', data: m });
+  }
 
   // Prediction search across all models
   for (const model of ['base', 'upset', 'floor']) {
@@ -906,6 +1068,10 @@ function ctxFingerprint(item) {
     const o = item.data || {};
     return `opt:${normalizeTeamName(o.team || o.name || o.school)}:${o.seed || ''}:${o.round || ''}`;
   }
+  if (item.type === 'matchup') {
+    const m = item.data || {};
+    return `matchup:${m.matchup_id || ''}:${normalizeTeamName(m.t1?.name)}:${normalizeTeamName(m.t2?.name)}`;
+  }
   return JSON.stringify(item);
 }
 
@@ -914,6 +1080,7 @@ function scoreCtxItem(item, lc, intent) {
 
   if (item.type === 'pred') score += 5;
   if (item.type === 'bracket') score += 4;
+  if (item.type === 'matchup') score += 6;
   if (item.type === 'team') score += 3;
   if (item.type === 'opt') score += 2;
 
@@ -943,6 +1110,14 @@ function scoreCtxItem(item, lc, intent) {
   }
 
   if (item.type === 'opt' && /pool|strateg|espn|points|optimi|value/.test(lc)) score += 5;
+  if (item.type === 'matchup') {
+    const m = item.data || {};
+    const t1 = String(m.t1?.name || '').toLowerCase();
+    const t2 = String(m.t2?.name || '').toLowerCase();
+    if (t1 && lc.includes(t1)) score += 9;
+    if (t2 && lc.includes(t2)) score += 9;
+    if (/vs|versus|matchup|who wins|pick/.test(lc)) score += 6;
+  }
 
   if (intent === 'compare' && item.type === 'pred') score += 4;
   if (intent === 'upset' && (item.type === 'pred' || item.type === 'bracket')) score += 4;
@@ -984,12 +1159,13 @@ function optimizeCtx(ctx, query, opts = {}) {
 
   // Keep type diversity: avoid flooding with only one type.
   const typeCaps = {
+    matchup: Math.max(2, Math.floor(limit * 0.35)),
     pred: Math.max(4, Math.floor(limit * 0.65)),
     bracket: Math.max(2, Math.floor(limit * 0.4)),
     team: Math.max(2, Math.floor(limit * 0.35)),
     opt: Math.max(1, Math.floor(limit * 0.25)),
   };
-  const typeCount = { pred: 0, bracket: 0, team: 0, opt: 0 };
+  const typeCount = { matchup: 0, pred: 0, bracket: 0, team: 0, opt: 0 };
   const selected = [];
   const deferred = [];
 
@@ -1084,6 +1260,19 @@ function fmtCtx(ctx) {
         }
       }
 
+      return line;
+    }
+
+    if (item.type === 'matchup') {
+      const m = item.data || {};
+      const t1Win = Number(m.t1?.win_probability || 0) * 100;
+      const t2Win = Number(m.t2?.win_probability || 0) * 100;
+      const slim = slimMatchupForContext(m);
+      let line = `MATCHUP_CARD (${m.round || ''} ${m.region || ''}): (${m.t1?.seed})${m.t1?.name} ${t1Win.toFixed(1)}% vs (${m.t2?.seed})${m.t2?.name} ${t2Win.toFixed(1)}%`;
+      line += ` | confidence=${m.matchup_meta?.confidence || ''} upset_flag=${m.matchup_meta?.upset_flag || ''} display_flag=${m.matchup_meta?.display_flag || ''}`;
+      if (m.matchup_meta?.risk?.tier) line += ` | risk=${m.matchup_meta.risk.tier}: ${m.matchup_meta.risk.reason || ''}`;
+      if (m.matchup_meta?.chatbot_prompt) line += ` | prompt="${m.matchup_meta.chatbot_prompt}"`;
+      line += ` | DATA=${JSON.stringify(slim)}`;
       return line;
     }
 
@@ -1556,10 +1745,57 @@ app.get('/api/ready', (req, res) => {
   res.status(ready ? 200 : 503).json({ ready, loaded, provider: cfg.provider, hasApiKey: !!cfg.apiKey });
 });
 
-app.post('/api/chat', async (req, res) => {
+app.get('/api/bracket', (req, res) => {
+  const allMatchups = store.bracketMatchups?.matchups || [];
+  const matchups = allMatchups.filter((m) => String(m.round || '').toUpperCase() === 'R64');
+  res.json({
+    season: bracketMatchupIndex.season,
+    regions: bracketMatchupIndex.regions,
+    matchups,
+  });
+});
+
+app.get('/api/matchup/by-teams/:t1/:t2', (req, res) => {
+  const matchup = findBracketMatchupByTeams(req.params.t1, req.params.t2);
+  if (!matchup) return res.status(404).json({ error: 'Matchup not found.' });
+  return res.json(matchup);
+});
+
+app.get('/api/matchup/:matchupId', (req, res) => {
+  const matchup = findBracketMatchupById(req.params.matchupId);
+  if (!matchup) return res.status(404).json({ error: 'Matchup not found.' });
+  return res.json(matchup);
+});
+
+app.get('/api/bracket/region/:region', (req, res) => {
+  const target = String(req.params.region || '').trim().toLowerCase();
+  const regionKey = bracketMatchupIndex.regions.find((r) => String(r).toLowerCase() === target);
+  if (!regionKey) {
+    return res.status(400).json({ error: 'Invalid region. Valid regions: South, West, East, Midwest.' });
+  }
+  const matchups = bracketMatchupIndex.byRegion.get(regionKey) || [];
+  return res.json({ season: bracketMatchupIndex.season, region: regionKey, matchups });
+});
+
+app.get('/api/bracket/export', (req, res) => {
+  const raw = String(req.query.picks || '');
+  let picks = {};
+  try { if (raw) picks = JSON.parse(raw); } catch (e) { picks = {}; }
+  const lines = Object.entries(picks).map(([matchupId, winner]) => {
+    const m = findBracketMatchupById(matchupId);
+    const loser = m?.t1?.name === winner ? m?.t2?.name : m?.t1?.name;
+    return `${winner} over ${loser || 'TBD'} (${m?.round || 'Round'})`;
+  });
+  res.json({
+    season: bracketMatchupIndex.season,
+    picks: Object.keys(picks).length,
+    summary: lines,
+  });
+});
+
+async function handleChat(req, res, opts = {}) {
   try {
     if (!rateOk(req.ip || 'x')) return res.status(429).json({ error: 'Too many messages.' });
-
     const msgs = req.body?.messages;
     if (!Array.isArray(msgs) || !msgs.length) return res.status(400).json({ error: 'No message.' });
 
@@ -1571,16 +1807,31 @@ app.post('/api/chat', async (req, res) => {
       ? 'INTENT: VALUE. Lead with EV/value-edge vs public pick rates and bracket leverage.'
       : `INTENT: ${intent.toUpperCase()}.`;
     const bracketGrounding = buildBracketGroundingContext();
-    return res.json({ reply: await callLLM(msgs, `${intentHint}
+    const bracketState = req.body?.bracketState;
+    const focusMatchup = req.body?.focusMatchup;
+    const shouldIncludeBracket = opts.forceBracketContext || !!bracketState;
+    const bracketStateBlock = shouldIncludeBracket ? formatBracketStateContext(bracketState || {}, focusMatchup) : '';
+
+    const reply = await callLLM(msgs, `${intentHint}
 ${bracketGrounding}
 RELEVANT_HISTORICAL_CONTEXT:
 ${JSON.stringify(historicalCtx, null, 0)}
 CONTEXT_COUNTS: predictions=${historicalCtx.predictions.length}, archetypes=${Object.keys(historicalCtx.archetype_history || {}).length}
-${fmtCtx(ctx)}`), intent });
+${bracketStateBlock}
+${fmtCtx(ctx)}`);
+    return res.json({ reply, intent });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: 'Something broke.' });
   }
+}
+
+app.post('/api/chat', async (req, res) => {
+  return handleChat(req, res, { forceBracketContext: false });
+});
+
+app.post('/api/bracket-chat', async (req, res) => {
+  return handleChat(req, res, { forceBracketContext: true });
 });
 
 
@@ -1723,6 +1974,12 @@ app.get('/admin', (req, res) => {
 
 app.get('/value-picks', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'value-picks.html'), (err) => {
+    if (err && !res.headersSent) res.status(404).send('Not found');
+  });
+});
+
+app.get('/bracket', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'bracket.html'), (err) => {
     if (err && !res.headersSent) res.status(404).send('Not found');
   });
 });

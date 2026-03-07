@@ -126,6 +126,29 @@
       background: #fff;
     }
 
+    .hdr-nav {
+      margin-left: 10px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .hdr-nav a {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-family: var(--font-head);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hdr-nav a.active {
+      color: #fff;
+      border-color: var(--primary);
+    }
+
     .msgs {
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
@@ -518,6 +541,30 @@
       animation: ob-fade .22s ease;
     }
 
+    .mobile-tabs {
+      display: none;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1000;
+      grid-template-columns: repeat(3, 1fr);
+      background: rgba(8, 9, 13, 0.98);
+      border-top: 1px solid var(--border);
+    }
+
+    .mobile-tabs a {
+      text-align: center;
+      padding: 10px 0;
+      font-family: var(--font-head);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .mobile-tabs a.active { color: #fff; }
+
     .onboarding-overlay.hidden { display: none; }
 
     .onboarding-card {
@@ -666,6 +713,8 @@
       .onboarding-card { padding: 18px; }
       .ob-option { grid-template-columns: auto 1fr; }
       .ob-desc { grid-column: 2; white-space: normal; margin-top: -2px; }
+      .hdr-nav { display: none; }
+      .mobile-tabs { display: grid; }
     }
   </style>
 </head>
@@ -762,6 +811,11 @@
         <h1 id="an">BracketGPT</h1>
         <div class="sub" id="at">AI Bracket Advisor · 2025 Tournament</div>
       </div>
+      <div class="hdr-nav">
+        <a href="/bracket">Bracket</a>
+        <a href="/" class="active">Chat</a>
+        <a href="/value-picks">Picks</a>
+      </div>
       <span class="live" id="live-tag">Live</span>
     </div>
 
@@ -775,6 +829,7 @@
           <div class="cta">
             <button class="cta-btn primary" onclick="go('Build my bracket strategy for this season')">Build My Strategy</button>
             <button class="cta-btn" onclick="go('Analyze a matchup: Duke vs Houston')">Analyze Matchup</button>
+            <button class="cta-btn" onclick="window.location.href='/bracket'">Bracket</button>
             <button class="cta-btn" onclick="window.location.href='/value-picks'">Value Picks</button>
           </div>
 
@@ -814,6 +869,11 @@
       </div>
       <div class="hint">Model ensemble and matchup projections</div>
     </div>
+  </div>
+  <div class="mobile-tabs">
+    <a href="/bracket">Bracket</a>
+    <a href="/" class="active">Chat</a>
+    <a href="/value-picks">Picks</a>
   </div>
 
   <script>
@@ -1027,10 +1087,15 @@
       scroll();
 
       try {
+        let bracketState = null;
+        try {
+          const raw = localStorage.getItem('bracketgpt_bracket_state');
+          if (raw) bracketState = JSON.parse(raw);
+        } catch (e) {}
         const r = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: hist })
+          body: JSON.stringify({ messages: hist, bracketState })
         });
         const d = await r.json();
         typ.classList.remove('on');
