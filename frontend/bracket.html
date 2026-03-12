@@ -1494,7 +1494,14 @@
     async function applyStrategy(strategy) {
       const key = String(strategy || '').toLowerCase();
       if (!strategyKeys.includes(key)) return;
-      const strategyData = strategyMap[key];
+      let strategyData = strategyMap[key];
+      try {
+        const r = await fetch('/api/bracket-output/strategy/' + encodeURIComponent(key));
+        if (r.ok) {
+          strategyData = await r.json();
+          strategyMap[key] = strategyData;
+        }
+      } catch (e) {}
       if (!strategyData) return;
       activeStrategy = key;
       strategyBaselinePicks = {};
@@ -1548,7 +1555,7 @@
     function resetBracket() {
       if (!confirm('Clear all bracket picks?')) return;
       bracketState.picks = {};
-       activeStrategy = '';
+      activeStrategy = '';
       strategyBaselinePicks = {};
       strategyEpByNode = {};
       customOverrideNodes.clear();
@@ -1648,7 +1655,7 @@
         if (baseMatchups.length === 0) {
           document.getElementById('regions').innerHTML = '';
           document.getElementById('finals').innerHTML = '';
-          showError('No bracket data loaded. Upload matchup data via the Admin panel, or verify bracketgpt_matchups_2025_final.json exists in backend/data/.');
+          showError('No bracket data loaded. Upload matchup data via the Admin panel, or verify bracketgpt_matchups_2025_v2.json (or bracketgpt_matchups_2025_final.json) exists in backend/data/.');
           return;
         }
         matchupById = new Map(baseMatchups.map((m) => [m.matchup_id, m]));
