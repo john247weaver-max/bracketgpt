@@ -661,7 +661,83 @@
         if (!raw) return;
         const parsed = JSON.parse(raw);
         if (parsed && parsed.picks && typeof parsed.picks === 'object') bracketState.picks = parsed.picks;
+        if (parsed && typeof parsed.activeStrategy === 'string') bracketState.activeStrategy = parsed.activeStrategy;
       } catch (e) {}
+    }
+
+    function normalizePairing(v) {
+      return String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+
+    function getRoundTitle(roundKey) {
+      const names = { R64: 'Round of 64', R32: 'Round of 32', S16: 'Sweet 16', E8: 'Elite 8', F4: 'Final Four', NCG: 'Championship' };
+      return (names[roundKey] || roundKey) + ' (' + (roundPoints[roundKey] || 0) + ' pts)';
+    }
+
+    function safeNum(v, fallback) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (fallback || 0);
+    }
+
+    function roundEpClass(round, ep) {
+      const max = roundPoints[round] || 10;
+      if (ep >= max * 0.8) return 'ep-good';
+      if (ep >= max * 0.4) return 'ep-mid';
+      return 'ep-low';
+    }
+
+    function getConfidenceBadge(conf) {
+      const c = String(conf || '').toLowerCase();
+      const map = {
+        lock: { label: '&#128274; LOCK', color: '#00FF88' },
+        confident: { label: '&#9989; CONFIDENT', color: '#66CCFF' },
+        lean: { label: '&#128202; LEAN', color: '#FFD700' },
+        'toss-up': { label: '&#9878; TOSS-UP', color: '#FF8C00' },
+        toss_up: { label: '&#9878; TOSS-UP', color: '#FF8C00' },
+        underdog: { label: '&#128054; UNDERDOG', color: '#FF4444' },
+      };
+      if (map[c]) return map[c];
+      if (c === 'strong') return map.confident;
+      if (c === 'moderate') return map.lean;
+      return { label: 'PROJECTED', color: 'var(--muted)' };
+    }
+
+    function upsetBadge(flag) {
+      const key = String(flag || '').toLowerCase();
+      const map = {
+        chalk: { label: 'CHALK', color: '#888' },
+        mostly_chalk: { label: 'MOSTLY CHALK', color: '#AAA' },
+        closer_than_expected: { label: 'CLOSER THAN EXPECTED', color: '#FFD700' },
+        vulnerable_favorite: { label: '&#9888; VULNERABLE FAVORITE', color: '#FF8C00' },
+        slight_upset_pick: { label: '&#127919; SLIGHT UPSET PICK', color: '#FF6B6B' },
+        strong_upset_pick: { label: '&#128293; STRONG UPSET PICK', color: '#FF4444' },
+        toss_up: { label: '&#9878; TOSS-UP', color: '#FF8C00' },
+      };
+      return map[key] || map.chalk;
+    }
+
+    function riskBadge(tier) {
+      const key = String(tier || '').toLowerCase();
+      const map = {
+        very_low: { label: 'Very Low Risk', color: '#00FF88' },
+        low: { label: 'Low Risk', color: '#66CCFF' },
+        medium: { label: 'Medium Risk', color: '#FFD700' },
+        elevated: { label: 'Elevated Risk', color: '#FF8C00' },
+        high: { label: 'High Risk', color: '#FF4444' },
+      };
+      return map[key] || { label: 'Risk N/A', color: 'var(--muted)' };
+    }
+
+    function estimateEpFromTeam(round, teamName) {
+      const total = safeNum(teamEpRankings[teamName], 0);
+      const maxRound = roundPoints.NCG || 320;
+      return Math.min(roundPoints[round] || 0, total * ((roundPoints[round] || 0) / maxRound));
+    }
+
+    function getNodeEp(node, pickName) {
+      const baseline = strategyEpByNode[node.id];
+      if (baseline && strategyBaselinePicks[node.id] === pickName) return safeNum(baseline, 0);
+      return estimateEpFromTeam(node.round, pickName);
     }
 
     function makeNode(id, round, region, source, children) {
@@ -829,6 +905,7 @@
         if (seen.has(id)) continue;
         seen.add(id);
         delete bracketState.picks[id];
+        customOverrideNodes.delete(id);
         for (const p of (parentMap.get(id) || [])) queue.push(p);
       }
     }
@@ -837,6 +914,13 @@
       const node = nodesById.get(matchId);
       if (!node || !winnerName) return;
       bracketState.picks[matchId] = winnerName;
+      if (activeStrategy && strategyBaselinePicks[matchId] && strategyBaselinePicks[matchId] !== winnerName) {
+        customOverrideNodes.add(matchId);
+        activeStrategy = '';
+        bracketState.activeStrategy = 'custom';
+      } else if (strategyBaselinePicks[matchId] && strategyBaselinePicks[matchId] === winnerName) {
+        customOverrideNodes.delete(matchId);
+      }
       clearDescendantPicks(matchId);
       saveState();
       renderAll();
