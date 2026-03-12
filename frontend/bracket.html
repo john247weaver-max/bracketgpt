@@ -193,6 +193,28 @@
       padding: 14px;
       margin-bottom: 12px;
     }
+    .round-tabs {
+      display: none;
+      overflow-x: auto;
+      gap: 6px;
+      padding: 8px 0;
+      margin-bottom: 8px;
+    }
+    .round-tab {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .round-tab.active {
+      color: var(--text);
+      border-color: var(--green);
+      background: rgba(63,185,80,0.1);
+    }
 
     .overlay {
       position: fixed;
@@ -254,6 +276,9 @@
       .nav-links { display: none; }
       .container { padding-bottom: 78px; }
       .grid { grid-template-columns: 1fr; }
+      .round-tabs { display: flex; }
+      .round-col { display: none; }
+      .round-col.visible { display: block; }
       .mobile-tabs { display: grid; }
       .card { width: 100%; max-height: 95vh; border-radius: 12px 12px 0 0; align-self: end; animation: slide .18s ease; }
       @keyframes slide { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -276,6 +301,7 @@
         <h1>2025 Interactive Bracket</h1>
         <div class="actions">
           <button class="btn" onclick="resetBracket()">Reset Bracket</button>
+          <button class="btn" onclick="autoFill()" style="border-color: var(--green); color: var(--green);">Auto-Fill Model Picks</button>
           <button class="btn" onclick="exportBracket()">Export Bracket</button>
         </div>
       </div>
@@ -284,13 +310,20 @@
         <div class="progress"><span id="progress-bar"></span></div>
       </div>
     </section>
+    <div class="round-tabs" id="roundTabs">
+      <button class="round-tab active" data-round="R64">Rd 64</button>
+      <button class="round-tab" data-round="R32">Rd 32</button>
+      <button class="round-tab" data-round="S16">Sweet 16</button>
+      <button class="round-tab" data-round="E8">Elite 8</button>
+      <button class="round-tab" data-round="F4">Final 4</button>
+    </div>
 
     <div id="error"></div>
     <div id="loading" style="display:none"></div>
 
     <section class="grid" id="regions"></section>
 
-    <section class="finals">
+    <section class="finals" id="finals-section">
       <h2>Final Four + Championship</h2>
       <div class="final-grid" id="finals"></div>
     </section>
@@ -308,9 +341,15 @@
 
   <script>
     const STORAGE_KEY = 'bracketgpt_state_v1';
-    const regions = ['South', 'East', 'Midwest', 'West'];
+    let regions = ['South', 'East', 'Midwest', 'West'];
     const roundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
     const roundPoints = { R64: 1, R32: 2, S16: 4, E8: 8, F4: 16, NCG: 32 };
+    const seedColors = {
+      1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32', 4: '#58a6ff',
+      5: '#3fb950', 6: '#f2cc60', 7: '#ff6b00', 8: '#ff7b72',
+      9: '#bc8cff', 10: '#79c0ff', 11: '#56d364', 12: '#e3b341',
+      13: '#7d8590', 14: '#8b949e', 15: '#484f58', 16: '#30363d'
+    };
 
     let baseMatchups = [];
     let matchupById = new Map();
@@ -319,6 +358,8 @@
     let regionRoundIds = {};
     let finalIds = { F4: [], NCG: [] };
     let matchupCache = new Map();
+    let finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
+    let mobileRound = 'R64';
 
     const bracketState = {
       picks: {},
@@ -359,6 +400,21 @@
 
     function makeNode(id, round, region, source, children) {
       return { id, round, region, source: source || null, children: children || [] };
+    }
+
+    function matchupKey(nameA, nameB) {
+      return normalizeName(nameA) + '|' + normalizeName(nameB);
+    }
+
+    function setCachedMatchup(nameA, nameB, data) {
+      const key = matchupKey(nameA, nameB);
+      const rev = matchupKey(nameB, nameA);
+      matchupCache.set(key, data);
+      matchupCache.set(rev, data);
+    }
+
+    function getCachedMatchup(nameA, nameB) {
+      return matchupCache.get(matchupKey(nameA, nameB)) || null;
     }
 
     function linkParent(childId, parentId) {
@@ -405,18 +461,27 @@
         regionRoundIds[region] = ids;
       }
 
-      const f4a = 'AUTO_F4_SW';
-      const f4b = 'AUTO_F4_EM';
+      const pairings = Array.isArray(finalFourPairings) && finalFourPairings.length >= 2
+        ? finalFourPairings
+        : [['South', 'West'], ['East', 'Midwest']];
+      const p1 = pairings[0];
+      const p2 = pairings[1];
+      if (!p1 || !p2 || !regionRoundIds[p1[0]] || !regionRoundIds[p1[1]] || !regionRoundIds[p2[0]] || !regionRoundIds[p2[1]]) {
+        finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
+      }
+      const activePairs = finalFourPairings;
+      const f4a = 'AUTO_F4_' + activePairs[0][0].charAt(0) + activePairs[0][1].charAt(0);
+      const f4b = 'AUTO_F4_' + activePairs[1][0].charAt(0) + activePairs[1][1].charAt(0);
       const ncg = 'AUTO_NCG_1';
-      const south = regionRoundIds.South.E8[0];
-      const west = regionRoundIds.West.E8[0];
-      const east = regionRoundIds.East.E8[0];
-      const midwest = regionRoundIds.Midwest.E8[0];
-      nodesById.set(f4a, makeNode(f4a, 'F4', 'Final Four', null, [south, west]));
-      nodesById.set(f4b, makeNode(f4b, 'F4', 'Final Four', null, [east, midwest]));
+      const pair1a = regionRoundIds[activePairs[0][0]].E8[0];
+      const pair1b = regionRoundIds[activePairs[0][1]].E8[0];
+      const pair2a = regionRoundIds[activePairs[1][0]].E8[0];
+      const pair2b = regionRoundIds[activePairs[1][1]].E8[0];
+      nodesById.set(f4a, makeNode(f4a, 'F4', 'Final Four', null, [pair1a, pair1b]));
+      nodesById.set(f4b, makeNode(f4b, 'F4', 'Final Four', null, [pair2a, pair2b]));
       nodesById.set(ncg, makeNode(ncg, 'NCG', 'Final Four', null, [f4a, f4b]));
-      linkParent(south, f4a); linkParent(west, f4a);
-      linkParent(east, f4b); linkParent(midwest, f4b);
+      linkParent(pair1a, f4a); linkParent(pair1b, f4a);
+      linkParent(pair2a, f4b); linkParent(pair2b, f4b);
       linkParent(f4a, ncg); linkParent(f4b, ncg);
       finalIds.F4 = [f4a, f4b];
       finalIds.NCG = [ncg];
@@ -460,7 +525,7 @@
       }
     }
 
-    function makePick(matchId, winnerName) {
+    async function makePick(matchId, winnerName) {
       const node = nodesById.get(matchId);
       if (!node || !winnerName) return;
       bracketState.picks[matchId] = winnerName;
@@ -468,6 +533,20 @@
       saveState();
       renderAll();
       closeCard();
+      for (const parentId of (parentMap.get(matchId) || [])) {
+        const parentNode = nodesById.get(parentId);
+        if (!parentNode) continue;
+        const [pt1, pt2] = getMatchTeams(parentNode);
+        if (!pt1 || !pt2) continue;
+        if (getCachedMatchup(pt1.name, pt2.name)) continue;
+        try {
+          const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(pt1.name) + '/' + encodeURIComponent(pt2.name));
+          if (!r.ok) continue;
+          const data = await r.json();
+          setCachedMatchup(pt1.name, pt2.name, data);
+          renderAll();
+        } catch (e) {}
+      }
     }
 
     function validPickForNode(node) {
@@ -493,7 +572,7 @@
     function teamRow(node, team, pick, prob) {
       const disabled = !team ? 'disabled' : '';
       const winner = team && pick === team.name ? 'winner' : '';
-      const color = team?.color_primary || '#3a3a3a';
+      const color = team?.color_primary || seedColors[team?.seed] || '#3a3a3a';
       return '<div class="team-row">' +
         '<span class="seed">' + (team?.seed ?? '-') + '</span>' +
         '<button class="team-btn ' + winner + '" style="border-left:3px solid ' + color + '" ' + disabled + ' onclick="makePick(\'' + node.id + '\',\'' + (team?.name || '').replace(/'/g, "\\'") + '\')">' + (team?.name || 'TBD') + '</button>' +
@@ -505,8 +584,22 @@
     function renderMatch(node) {
       const [t1, t2] = getMatchTeams(node);
       const pick = bracketState.picks[node.id] || '';
-      const p1 = node.source?.t1?.win_probability ?? null;
-      const p2 = node.source?.t2?.win_probability ?? null;
+      let p1 = node.source?.t1?.win_probability ?? null;
+      let p2 = node.source?.t2?.win_probability ?? null;
+      if (p1 === null && t1 && t2) {
+        const cached = getCachedMatchup(t1.name, t2.name);
+        if (cached) {
+          const c1 = normalizeName(cached?.t1?.name);
+          const t1k = normalizeName(t1.name);
+          if (c1 === t1k) {
+            p1 = cached.t1?.win_probability ?? null;
+            p2 = cached.t2?.win_probability ?? null;
+          } else {
+            p1 = cached.t2?.win_probability ?? null;
+            p2 = cached.t1?.win_probability ?? null;
+          }
+        }
+      }
       const pickedClass = validPickForNode(node) ? 'picked' : '';
       return '<div class="match ' + pickedClass + '">' +
         teamRow(node, t1, pick, p1) +
@@ -519,10 +612,10 @@
       if (!ids) return '';
       return '<section class="region">' +
         '<h2>' + region + '</h2>' +
-        '<div class="round-col"><div class="round-title">Round of 64</div>' + ids.R64.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
-        '<div class="round-col"><div class="round-title">Round of 32</div>' + ids.R32.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
-        '<div class="round-col"><div class="round-title">Sweet 16</div>' + ids.S16.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
-        '<div class="round-col"><div class="round-title">Elite 8</div>' + ids.E8.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+        '<div class="round-col visible" data-round="R64"><div class="round-title">Round of 64</div>' + ids.R64.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+        '<div class="round-col" data-round="R32"><div class="round-title">Round of 32</div>' + ids.R32.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+        '<div class="round-col" data-round="S16"><div class="round-title">Sweet 16</div>' + ids.S16.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+        '<div class="round-col" data-round="E8"><div class="round-title">Elite 8</div>' + ids.E8.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
       '</section>';
     }
 
@@ -539,7 +632,8 @@
       const champId = finalIds.NCG[0];
       const winner = getWinnerTeam(champId);
       if (!winner) return '<div class="match"><div class="team-row"><span class="seed">-</span><button class="team-btn" disabled>TBD</button><span class="prob">--</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
-      return '<div class="match picked"><div class="team-row"><span class="seed">' + (winner.seed ?? '-') + '</span><button class="team-btn winner" style="border-left:3px solid ' + (winner.color_primary || '#3a3a3a') + '" onclick="openCard(\'' + champId + '\')">' + winner.name + ' Champion</button><span class="prob">100%</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
+      const color = winner.color_primary || seedColors[winner.seed] || '#3a3a3a';
+      return '<div class="match picked"><div class="team-row"><span class="seed">' + (winner.seed ?? '-') + '</span><button class="team-btn winner" style="border-left:3px solid ' + color + '" onclick="openCard(\'' + champId + '\')">' + winner.name + ' Champion</button><span class="prob">100%</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
     }
 
     function renderProgress() {
@@ -555,6 +649,7 @@
       regionsEl.innerHTML = regions.map((region) => renderRegion(region)).join('');
       renderFinals();
       renderProgress();
+      applyMobileRoundVisibility();
     }
 
     function closeCard() {
@@ -564,7 +659,13 @@
 
     function fallbackMeta(node) {
       const [t1, t2] = getMatchTeams(node);
-      const fp = Number(node.source?.t1?.win_probability || 0.5);
+      const roundLabel = {
+        R32: 'Round of 32',
+        S16: 'Sweet 16',
+        E8: 'Elite 8',
+        F4: 'Final Four',
+        NCG: 'Championship'
+      }[node.round] || node.round;
       return {
         matchup_id: node.id,
         round: node.round,
@@ -573,12 +674,14 @@
         t2: t2 || { name: 'TBD', seed: '-' },
         matchup_meta: {
           display_flag: 'toss_up',
-          confidence: node.round === 'R64' ? (node.source?.matchup_meta?.confidence || 'lean') : 'lean',
-          risk: { tier: 'medium', reason: 'historical data is limited here' },
-          chatbot_prompt: node.round === 'R64' ? (node.source?.matchup_meta?.chatbot_prompt || 'Who is the better pick here?') : 'How should this pick fit my bracket strategy?',
-          seed_matchup: node.source?.matchup_meta?.seed_matchup || null,
-          archetype_h2h: node.source?.matchup_meta?.archetype_h2h || null,
-          pool_meta: node.source?.matchup_meta?.pool_meta || { leverage_delta: 0 }
+          confidence: 'projected',
+          risk: { tier: 'medium', reason: roundLabel + ' matchup - model data available after both teams are picked' },
+          chatbot_prompt: t1 && t2
+            ? ('Compare ' + t1.name + ' vs ' + t2.name + ' in the ' + roundLabel)
+            : 'How should this pick fit my bracket strategy?',
+          seed_matchup: null,
+          archetype_h2h: null,
+          pool_meta: { leverage_delta: 0 }
         }
       };
     }
@@ -587,17 +690,33 @@
       if (node.round === 'R64' && node.source) return node.source;
       const [t1, t2] = getMatchTeams(node);
       if (!t1 || !t2) return fallbackMeta(node);
-      const key = normalizeName(t1.name) + '|' + normalizeName(t2.name);
-      if (matchupCache.has(key)) return matchupCache.get(key);
+      const cached = getCachedMatchup(t1.name, t2.name);
+      if (cached) return cached;
       try {
         const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(t1.name) + '/' + encodeURIComponent(t2.name));
         if (r.ok) {
           const data = await r.json();
-          matchupCache.set(key, data);
+          setCachedMatchup(t1.name, t2.name, data);
           return data;
         }
       } catch (e) {}
       return fallbackMeta(node);
+    }
+
+    function applyMobileRoundVisibility() {
+      const tabs = document.getElementById('roundTabs');
+      if (!tabs) return;
+      const round = mobileRound || 'R64';
+      document.querySelectorAll('.round-tab').forEach((t) => t.classList.toggle('active', t.dataset.round === round));
+      document.querySelectorAll('.round-col').forEach((col) => {
+        col.classList.toggle('visible', col.dataset.round === round);
+      });
+      const finalsEl = document.getElementById('finals-section');
+      if (window.innerWidth <= 760) {
+        finalsEl.style.display = round === 'F4' ? 'block' : 'none';
+      } else {
+        finalsEl.style.display = 'block';
+      }
     }
 
     function badgeClass(flag) {
@@ -675,6 +794,40 @@
       renderAll();
     }
 
+    async function autoFill() {
+      if (!confirm('Fill bracket with model-recommended picks? You can still change individual picks after.')) return;
+      for (const round of roundOrder) {
+        for (const node of nodesById.values()) {
+          if (node.round !== round) continue;
+          const [t1, t2] = getMatchTeams(node);
+          if (!t1 || !t2) continue;
+          if (node.source) {
+            const p1 = Number(node.source.t1?.win_probability || 0.5);
+            bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
+            continue;
+          }
+          try {
+            const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(t1.name) + '/' + encodeURIComponent(t2.name));
+            if (r.ok) {
+              const data = await r.json();
+              setCachedMatchup(t1.name, t2.name, data);
+              const d1key = normalizeName(data?.t1?.name);
+              const p1 = d1key === normalizeName(t1.name)
+                ? Number(data?.t1?.win_probability || 0.5)
+                : Number(data?.t2?.win_probability || 0.5);
+              bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
+            } else {
+              bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
+            }
+          } catch (e) {
+            bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
+          }
+        }
+      }
+      saveState();
+      renderAll();
+    }
+
     async function exportBracket() {
       const lines = [];
       for (const node of nodesById.values()) {
@@ -696,7 +849,19 @@
         const r = await fetch('/api/bracket');
         if (!r.ok) throw new Error('Could not load bracket data');
         const data = await r.json();
+        if (Array.isArray(data.regions) && data.regions.length) {
+          regions = data.regions.filter(Boolean);
+        }
+        finalFourPairings = Array.isArray(data.finalFourPairings) && data.finalFourPairings.length >= 2
+          ? data.finalFourPairings
+          : [['South', 'West'], ['East', 'Midwest']];
         baseMatchups = Array.isArray(data.matchups) ? data.matchups : [];
+        if (baseMatchups.length === 0) {
+          document.getElementById('regions').innerHTML = '';
+          document.getElementById('finals').innerHTML = '';
+          showError('No bracket data loaded. Upload matchup data via the Admin panel, or verify bracketgpt_matchups_2025_final.json exists in backend/data/.');
+          return;
+        }
         matchupById = new Map(baseMatchups.map((m) => [m.matchup_id, m]));
         loadState();
         buildTree();
@@ -719,6 +884,13 @@
         hideLoading();
       }
     }
+
+    document.getElementById('roundTabs').addEventListener('click', (e) => {
+      if (!e.target.classList.contains('round-tab')) return;
+      mobileRound = e.target.dataset.round || 'R64';
+      applyMobileRoundVisibility();
+    });
+    window.addEventListener('resize', applyMobileRoundVisibility);
 
     init();
   </script>

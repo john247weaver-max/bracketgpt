@@ -581,7 +581,27 @@ function fuzzyTeamKey(rawTeam) {
 }
 
 function resolveTeamKey(rawTeam) {
-  return fuzzyTeamKey(rawTeam);
+  const target = normalizeTeamName(rawTeam);
+  if (!target) return '';
+  const bracketKey = fuzzyTeamKey(target);
+  if (bracketKey) return bracketKey;
+  if (historicalIndex.predictionsByTeam.has(target)) return target;
+  let best = '';
+  let bestScore = 0;
+  const targetTokens = new Set(target.split(' ').filter(Boolean));
+  for (const key of historicalIndex.predictionsByTeam.keys()) {
+    let score = 0;
+    if (key.includes(target) || target.includes(key)) score += 4;
+    const keyTokens = String(key).split(' ').filter(Boolean);
+    for (const token of keyTokens) {
+      if (targetTokens.has(token)) score += 1;
+    }
+    if (score > bestScore || (score === bestScore && score > 0 && key.length > best.length)) {
+      best = key;
+      bestScore = score;
+    }
+  }
+  return bestScore > 0 ? best : '';
 }
 
 function teamFromProfileOrBracket(teamKey, seedFallback) {
@@ -622,8 +642,8 @@ function buildSyntheticMatchup(aKey, bKey) {
   const baseMargin = Number(pred.predicted_margin || 0);
   const aMargin = forward ? baseMargin : -baseMargin;
   const bMargin = -aMargin;
-  const t1 = teamFromProfileOrBracket(aKey, pred.t1_seed);
-  const t2 = teamFromProfileOrBracket(bKey, pred.t2_seed);
+  const t1 = teamFromProfileOrBracket(aKey, forward ? pred.t1_seed : pred.t2_seed);
+  const t2 = teamFromProfileOrBracket(bKey, forward ? pred.t2_seed : pred.t1_seed);
   t1.win_probability = aProb;
   t2.win_probability = bProb;
   t1.predicted_margin = Number.isFinite(aMargin) ? aMargin : null;
