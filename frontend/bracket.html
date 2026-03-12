@@ -200,6 +200,99 @@
       padding: 8px 0;
       margin-bottom: 8px;
     }
+    .strategy-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      overflow-x: auto;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #1a1a2e;
+    }
+    .strategy-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-size: 12px;
+      letter-spacing: .04em;
+    }
+    .strategy-pill.active[data-strategy="chalk"] { border-color: #FFD700; box-shadow: 0 0 0 1px rgba(255,215,0,0.3); }
+    .strategy-pill.active[data-strategy="balanced"] { border-color: #00CED1; box-shadow: 0 0 0 1px rgba(0,206,209,0.3); }
+    .strategy-pill.active[data-strategy="upset"] { border-color: #FF4444; box-shadow: 0 0 0 1px rgba(255,68,68,0.3); }
+    .strategy-pill .strategy-name { font-weight: 700; }
+    .strategy-pill .strategy-ep { color: var(--muted); font-size: 11px; }
+    .strategy-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .custom-ep-counter { font-size: 12px; color: var(--muted); }
+    .custom-ep-counter strong { color: var(--text); }
+    .round-summary {
+      margin-top: 6px;
+      margin-bottom: 8px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .pick-meta {
+      margin-top: 4px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      font-size: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .pick-meta.ep-good { background: rgba(63,185,80,0.15); color: #8cffb1; }
+    .pick-meta.ep-mid { background: rgba(242,204,96,0.15); color: var(--yellow); }
+    .pick-meta.ep-low { background: rgba(248,81,73,0.15); color: #ff9f98; }
+    .match.strategy-overridden { border-style: dotted; border-color: var(--yellow); }
+    .optimizer-toggle {
+      position: fixed;
+      right: 10px;
+      top: 86px;
+      z-index: 140;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .optimizer-panel {
+      position: fixed;
+      top: 126px;
+      right: 0;
+      width: min(360px, 95vw);
+      max-height: calc(100vh - 140px);
+      overflow: auto;
+      z-index: 130;
+      transform: translateX(100%);
+      transition: transform .2s ease;
+      border-left: 1px solid var(--border);
+      background: rgba(12,12,18,0.98);
+      padding: 12px;
+    }
+    .optimizer-panel.open { transform: translateX(0); }
+    .opt-title { font-family: 'Barlow Condensed', sans-serif; letter-spacing: .08em; font-size: 18px; margin-bottom: 10px; }
+    .opt-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; font-size: 12px; margin-bottom: 6px; align-items: center; }
+    .opt-row .muted { color: var(--muted); font-size: 11px; margin-left: 4px; }
+    .champ-bar { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 12px; margin-bottom: 6px; }
+    .champ-bar span:first-child::after { content: ''; display: inline-block; width: calc(var(--w, 0) * 1%); max-width: 160px; height: 8px; margin-left: 8px; border-radius: 99px; background: linear-gradient(90deg, #2ea043, #58a6ff); }
     .round-tab {
       border: 1px solid var(--border);
       background: transparent;
@@ -404,6 +497,18 @@
       .mobile-tabs { display: grid; }
       .card { width: 100%; max-height: 95vh; border-radius: 12px 12px 0 0; align-self: end; animation: slide .18s ease; }
       @keyframes slide { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      .strategy-right { margin-left: 0; }
+      .optimizer-toggle { top: auto; bottom: 88px; right: 10px; }
+      .optimizer-panel {
+        top: auto;
+        bottom: 46px;
+        width: 100%;
+        max-height: 52vh;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        transform: translateY(102%);
+      }
+      .optimizer-panel.open { transform: translateY(0); }
     }
   </style>
 </head>
@@ -422,7 +527,7 @@
       <div class="tophead">
         <h1>2025 Interactive Bracket</h1>
         <div class="actions">
-          <button class="btn" onclick="resetBracket()">Reset Bracket</button>
+          <button class="btn" onclick="resetBracket()">Clear All</button>
           <button class="btn" onclick="autoFill()" style="border-color: var(--green); color: var(--green);">Auto-Fill Model Picks</button>
           <button class="btn" onclick="exportBracket()">Export Bracket</button>
         </div>
@@ -430,6 +535,26 @@
       <div class="progress-wrap">
         <div class="progress-label"><span id="progress-text">0 / 63 picks</span><span id="completion-text">0%</span></div>
         <div class="progress"><span id="progress-bar"></span></div>
+      </div>
+    </section>
+    <section class="strategy-bar" id="strategyBar">
+      <button class="strategy-pill active" data-strategy="chalk" onclick="applyStrategy('chalk')">
+        <span class="strategy-icon">&#127919;</span>
+        <span class="strategy-name">CHALK</span>
+        <span class="strategy-ep" id="ep-chalk">-- EP</span>
+      </button>
+      <button class="strategy-pill" data-strategy="balanced" onclick="applyStrategy('balanced')">
+        <span class="strategy-icon">&#9878;</span>
+        <span class="strategy-name">BALANCED</span>
+        <span class="strategy-ep" id="ep-balanced">-- EP</span>
+      </button>
+      <button class="strategy-pill" data-strategy="upset" onclick="applyStrategy('upset')">
+        <span class="strategy-icon">&#128293;</span>
+        <span class="strategy-name">UPSET</span>
+        <span class="strategy-ep" id="ep-upset">-- EP</span>
+      </button>
+      <div class="strategy-right">
+        <div class="custom-ep-counter">Your Bracket: <strong id="custom-ep">0</strong> EP</div>
       </div>
     </section>
     <div class="round-tabs" id="roundTabs">
@@ -454,6 +579,13 @@
   <div class="overlay" id="overlay" onclick="if(event.target.id==='overlay') closeCard()">
     <div class="card" id="card"></div>
   </div>
+  <button class="optimizer-toggle" onclick="toggleOptimizer()">&#128202; Optimizer</button>
+  <aside class="optimizer-panel" id="optimizerPanel">
+    <div class="opt-title">&#128202; POINTS OPTIMIZER</div>
+    <div id="optimizerRankings"></div>
+    <div style="border-top:1px solid var(--border); margin:10px 0 8px; padding-top:8px; font-family:'Barlow Condensed',sans-serif; letter-spacing:.08em; font-size:15px">&#127942; Champion Probabilities</div>
+    <div id="optimizerChamps"></div>
+  </aside>
 
   <div class="mobile-tabs">
     <a href="/bracket" class="active">Bracket</a>
@@ -462,10 +594,12 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'bracketgpt_state_v1';
+    const STORAGE_KEY = 'bracketgpt_state_v2';
     let regions = ['South', 'East', 'Midwest', 'West'];
     const roundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
-    const roundPoints = { R64: 1, R32: 2, S16: 4, E8: 8, F4: 16, NCG: 32 };
+    const roundPoints = { R64: 10, R32: 20, S16: 40, E8: 80, F4: 160, NCG: 320 };
+    const strategyRoundMap = { R64: 'R64', R32: 'R32', S16: 'S16', E8: 'E8', F4: 'F4', NCG: 'Championship' };
+    const strategyKeys = ['chalk', 'balanced', 'upset'];
     const seedColors = {
       1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32', 4: '#58a6ff',
       5: '#3fb950', 6: '#f2cc60', 7: '#ff6b00', 8: '#ff7b72',
@@ -483,10 +617,19 @@
     const teamIndex = new Map();
     let finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
     let mobileRound = 'R64';
+    let bracketOutput = null;
+    let strategyMap = {};
+    let teamEpRankings = {};
+    let championProbs = {};
+    let activeStrategy = '';
+    let strategyBaselinePicks = {};
+    let strategyEpByNode = {};
+    let customOverrideNodes = new Set();
 
     const bracketState = {
       picks: {},
-      completion: { R64: 0, R32: 0, S16: 0, E8: 0, F4: 0, NCG: 0, total: 0 }
+      completion: { R64: 0, R32: 0, S16: 0, E8: 0, F4: 0, NCG: 0, total: 0 },
+      activeStrategy: ''
     };
 
     function normalizeName(v) {
