@@ -561,24 +561,109 @@ function fuzzyTeamKey(rawTeam) {
   if (!target) return '';
   if (bracketMatchupIndex.byTeam.has(target)) return target;
   let best = '';
+  let bestScore = 0;
+  const targetTokens = new Set(target.split(' ').filter(Boolean));
   for (const key of bracketMatchupIndex.byTeam.keys()) {
+    let score = 0;
     if (key.includes(target) || target.includes(key)) {
-      if (!best || key.length > best.length) best = key;
+      score += 4;
+    }
+    const keyTokens = String(key).split(' ').filter(Boolean);
+    for (const token of keyTokens) {
+      if (targetTokens.has(token)) score += 1;
+    }
+    if (score > bestScore || (score === bestScore && score > 0 && key.length > best.length)) {
+      best = key;
+      bestScore = score;
     }
   }
-  return best;
+  return bestScore > 0 ? best : '';
+}
+
+function resolveTeamKey(rawTeam) {
+  return fuzzyTeamKey(rawTeam);
+}
+
+function teamFromProfileOrBracket(teamKey, seedFallback) {
+  const profile = buildProfileLookup().get(teamKey) || null;
+  const rows = bracketMatchupIndex.byTeam.get(teamKey) || [];
+  let bracketTeam = null;
+  for (const row of rows) {
+    const t1Key = normalizeTeamName(row?.t1?.name);
+    const t2Key = normalizeTeamName(row?.t2?.name);
+    if (t1Key === teamKey) { bracketTeam = row.t1; break; }
+    if (t2Key === teamKey) { bracketTeam = row.t2; break; }
+  }
+  return {
+    team_id: profile?.team_id ?? profile?.teamId ?? bracketTeam?.team_id ?? null,
+    name: profile?.name || profile?.school || profile?.team || bracketTeam?.name || teamKey,
+    seed: Number(profile?.seed ?? bracketTeam?.seed ?? seedFallback ?? 0) || null,
+    abbreviation: profile?.abbreviation || profile?.abbr || bracketTeam?.abbreviation || null,
+    color_primary: profile?.color_primary || bracketTeam?.color_primary || null,
+    win_probability: null,
+    predicted_margin: null,
+    archetypes: profile?.archetypes || bracketTeam?.archetypes || null,
+    key_players: profile?.key_players || profile?.keyPlayers || bracketTeam?.key_players || bracketTeam?.keyPlayers || [],
+    primary_comp: profile?.primary_comp || profile?.primaryComp || bracketTeam?.primary_comp || null,
+    pool: profile?.pool || bracketTeam?.pool || null,
+  };
+}
+
+function buildSyntheticMatchup(aKey, bKey) {
+  if (!aKey || !bKey || aKey === bKey) return null;
+  const pred = findPredictionForTeams(aKey, bKey);
+  if (!pred) return null;
+
+  const predT1Key = normalizeTeamName(pred.t1_name);
+  const forward = predT1Key === aKey;
+  const modelProb = normProb(pred.model_win_prob);
+  const aProb = modelProb === null ? null : (forward ? modelProb : (1 - modelProb));
+  const bProb = aProb === null ? null : (1 - aProb);
+  const baseMargin = Number(pred.predicted_margin || 0);
+  const aMargin = forward ? baseMargin : -baseMargin;
+  const bMargin = -aMargin;
+  const t1 = teamFromProfileOrBracket(aKey, pred.t1_seed);
+  const t2 = teamFromProfileOrBracket(bKey, pred.t2_seed);
+  t1.win_probability = aProb;
+  t2.win_probability = bProb;
+  t1.predicted_margin = Number.isFinite(aMargin) ? aMargin : null;
+  t2.predicted_margin = Number.isFinite(bMargin) ? bMargin : null;
+
+  return {
+    matchup_id: `SYNTH_${aKey.replace(/\s+/g, '_')}_${bKey.replace(/\s+/g, '_')}`,
+    season: Number(pred.season || bracketMatchupIndex.season || cfg.activeSeason || 2025),
+    round: 'Projected',
+    region: 'Projected',
+    game_number: null,
+    t1,
+    t2,
+    matchup_meta: {
+      confidence: pred.confidence || 'projected',
+      upset_flag: pred.upset_flag || 'projected',
+      display_flag: pred.upset_flag || 'toss_up',
+      model_agrees_with_seed: pred.model_agrees_with_seed ?? null,
+      predicted_winner: (aProb ?? 0.5) >= 0.5 ? t1.name : t2.name,
+      seed_matchup: pred.historical_seed_matchup || null,
+      archetype_h2h: null,
+      pool_meta: { leverage_delta: Number(pred.value_score || 0) || 0 },
+      risk: {
+        tier: (aProb === null) ? 'medium' : ((Math.abs((aProb - 0.5)) >= 0.2) ? 'low' : 'medium'),
+        reason: 'Projected matchup generated from base model predictions.',
+      },
+      chatbot_prompt: `Compare ${t1.name} vs ${t2.name} in this projected matchup.`,
+    },
+  };
 }
 
 function findBracketMatchupByTeams(teamA, teamB) {
-  const aKey = fuzzyTeamKey(teamA);
-  const bKey = fuzzyTeamKey(teamB);
+  const aKey = resolveTeamKey(teamA);
+  const bKey = resolveTeamKey(teamB);
   if (!aKey || !bKey) return null;
   const aRows = bracketMatchupIndex.byTeam.get(aKey) || [];
   const bSet = new Set((bracketMatchupIndex.byTeam.get(bKey) || []).map((m) => String(m.matchup_id)));
-  for (const row of aRows) {
-    if (bSet.has(String(row.matchup_id))) return row;
-  }
-  return null;
+  const match = aRows.find((row) => bSet.has(String(row.matchup_id)));
+  if (match) return match;
+  return buildSyntheticMatchup(aKey, bKey);
 }
 
 function slimMatchupForContext(matchup) {
@@ -1748,10 +1833,17 @@ app.get('/api/ready', (req, res) => {
 app.get('/api/bracket', (req, res) => {
   const allMatchups = store.bracketMatchups?.matchups || [];
   const matchups = allMatchups.filter((m) => String(m.round || '').toUpperCase() === 'R64');
+  const pairings = (
+    Array.isArray(store.bracketMatchups?.finalFourPairings) &&
+    store.bracketMatchups.finalFourPairings.length >= 2
+  )
+    ? store.bracketMatchups.finalFourPairings
+    : [['South', 'West'], ['East', 'Midwest']];
   res.json({
     season: bracketMatchupIndex.season,
     regions: bracketMatchupIndex.regions,
     matchups,
+    finalFourPairings: pairings,
   });
 });
 
