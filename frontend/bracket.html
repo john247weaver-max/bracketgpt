@@ -1304,8 +1304,9 @@
       const t2p = Number(t2.win_probability || 0);
       const best = t1p >= t2p ? t1 : t2;
       const bestP = Math.max(t1p, t2p);
-      const conf = getConfidenceLabel(bestP);
-      const flag = getDisplayFlag(meta, t1p);
+      const conf = getConfidenceBadge(meta.confidence);
+      const upset = upsetBadge(meta.upset_flag || meta.display_flag);
+      const risk = riskBadge(meta.risk?.tier);
       const prompt = meta.chatbot_prompt || ('Compare ' + (t1.name || '') + ' vs ' + (t2.name || ''));
       const askUrl = '/?q=' + encodeURIComponent(prompt);
 
@@ -1324,9 +1325,11 @@
       const t2Color = t2.color_primary || seedColors[t2.seed] || '#3a3a3a';
       const t1FavClass = t1p >= t2p ? 'favorite' : 'underdog';
       const t2FavClass = t2p >= t1p ? 'favorite' : 'underdog';
-      const labelText = String(flag || 'chalk').replace(/_/g, ' ').toUpperCase();
-
-      const riskText = (meta.risk?.tier ? (meta.risk.tier + ' - ') : '') + (meta.risk?.reason || 'Not available');
+      const riskText = (meta.risk?.reason || 'Not available');
+      const momentumAdj = Number((t1p >= t2p ? t1.momentum_adjustment : t2.momentum_adjustment) || 0);
+      const momentumLine = momentumAdj === 0
+        ? ''
+        : ('<div class="data-row"><span class="data-label">Momentum</span><span class="data-value" style="color:' + (momentumAdj > 0 ? '#00FF88' : '#FF4444') + '">&#9889; ' + (momentumAdj > 0 ? 'Rising' : 'Fading') + ' (' + (momentumAdj * 100).toFixed(1) + '% adjustment)</span></div>');
       const seedHist = meta.seed_matchup?.trend
         || (meta.seed_matchup?.higher_seed_wins != null && meta.seed_matchup?.lower_seed_wins != null
           ? (meta.seed_matchup.label + ': higher seed wins ' +
@@ -1361,7 +1364,7 @@
 
       document.getElementById('card').innerHTML =
         '<div class="card-head">' +
-          '<span class="badge ' + badgeClass(flag) + '">' + labelText + '</span>' +
+          '<span class="badge" style="border-color:' + upset.color + ';color:' + upset.color + '">' + upset.label + '</span>' +
           '<button class="close" onclick="closeCard()">x</button>' +
         '</div>' +
         '<div class="vs-row">' +
@@ -1386,8 +1389,10 @@
           '<span class="model-pick-prob">' + (bestP * 100).toFixed(0) + '%</span>' +
         '</div>' +
         '<div class="section"><h3>Matchup Intel</h3>' +
-          '<div class="data-row"><span class="data-label">Confidence</span><span class="data-value" style="color:' + conf.color + '">' + conf.label + '</span></div>' +
-          '<div class="data-row"><span class="data-label">Risk</span><span class="data-value">' + riskText + '</span></div>' +
+          '<div class="data-row"><span class="data-label">Confidence</span><span class="data-value" style="color:' + conf.color + '">' + conf.label + (meta.confidence_v1 ? (' <span style="color:var(--muted)">(v1: ' + meta.confidence_v1 + ')</span>') : '') + '</span></div>' +
+          '<div class="data-row"><span class="data-label">Upset Flag</span><span class="data-value" style="color:' + upset.color + '">' + upset.label + '</span></div>' +
+          '<div class="data-row"><span class="data-label">Risk</span><span class="data-value" style="color:' + risk.color + '">' + risk.label + ' - ' + riskText + '</span></div>' +
+          momentumLine +
           '<div class="data-row"><span class="data-label">Seed Hist</span><span class="data-value">' + seedHist + '</span></div>' +
           '<div class="data-row"><span class="data-label">Archetype</span><span class="data-value">' + archLine + '</span></div>' +
           '<div class="data-row"><span class="data-label">History</span><span class="data-value">' + archEdge + '</span></div>' +
