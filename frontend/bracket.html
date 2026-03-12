@@ -1024,10 +1024,10 @@
       if (!ids) return '';
       return '<section class="region">' +
         '<h2>' + region + '</h2>' +
-        '<div class="round-col visible" data-round="R64"><div class="round-title">Round of 64</div>' + ids.R64.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
-        '<div class="round-col" data-round="R32"><div class="round-title">Round of 32</div>' + ids.R32.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
-        '<div class="round-col" data-round="S16"><div class="round-title">Sweet 16</div>' + ids.S16.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
-        '<div class="round-col" data-round="E8"><div class="round-title">Elite 8</div>' + ids.E8.map((id) => renderMatch(nodesById.get(id))).join('') + '</div>' +
+        '<div class="round-col visible" data-round="R64"><div class="round-title">' + getRoundTitle('R64') + '</div>' + ids.R64.map((id) => renderMatch(nodesById.get(id))).join('') + roundSummary(ids.R64, 'R64') + '</div>' +
+        '<div class="round-col" data-round="R32"><div class="round-title">' + getRoundTitle('R32') + '</div>' + ids.R32.map((id) => renderMatch(nodesById.get(id))).join('') + roundSummary(ids.R32, 'R32') + '</div>' +
+        '<div class="round-col" data-round="S16"><div class="round-title">' + getRoundTitle('S16') + '</div>' + ids.S16.map((id) => renderMatch(nodesById.get(id))).join('') + roundSummary(ids.S16, 'S16') + '</div>' +
+        '<div class="round-col" data-round="E8"><div class="round-title">' + getRoundTitle('E8') + '</div>' + ids.E8.map((id) => renderMatch(nodesById.get(id))).join('') + roundSummary(ids.E8, 'E8') + '</div>' +
       '</section>';
     }
 
@@ -1035,9 +1035,23 @@
       const f4html = finalIds.F4.map((id) => renderMatch(nodesById.get(id))).join('');
       const ncghtml = finalIds.NCG.map((id) => renderMatch(nodesById.get(id))).join('');
       document.getElementById('finals').innerHTML =
-        '<div><div class="round-title">Final Four</div>' + f4html + '</div>' +
-        '<div><div class="round-title">Championship</div>' + ncghtml + '</div>' +
+        '<div><div class="round-title">' + getRoundTitle('F4') + '</div>' + f4html + roundSummary(finalIds.F4, 'F4') + '</div>' +
+        '<div><div class="round-title">' + getRoundTitle('NCG') + '</div>' + ncghtml + roundSummary(finalIds.NCG, 'NCG') + '</div>' +
         '<div><div class="round-title">Champion</div>' + championBlock() + '</div>';
+    }
+
+    function roundSummary(ids, round) {
+      let ep = 0;
+      let picks = 0;
+      for (const id of (ids || [])) {
+        const node = nodesById.get(id);
+        const pick = bracketState.picks[id];
+        if (!node || !pick || !validPickForNode(node)) continue;
+        picks += 1;
+        ep += getNodeEp(node, pick);
+      }
+      const max = ((ids || []).length * (roundPoints[round] || 0));
+      return '<div class="round-summary">' + getRoundTitle(round) + '<br>Your picks: ' + ep.toFixed(1) + ' EP / ' + max.toFixed(0) + ' max</div>';
     }
 
     function championBlock() {
