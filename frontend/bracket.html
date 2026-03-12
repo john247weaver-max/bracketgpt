@@ -354,7 +354,7 @@
     .pick-btn { border: 1px solid var(--green); background: rgba(63,185,80,0.15); color: var(--text); border-radius: 9px; padding: 11px 10px; cursor: pointer; font-weight: 700; position: relative; }
     .pick-btn.recommended { border-color: var(--green); background: rgba(63,185,80,0.2); }
     .pick-btn.recommended::after {
-      content: '★ Model pick';
+      content: '* Model pick';
       position: absolute;
       top: -8px;
       right: 8px;
@@ -890,7 +890,7 @@
       if (!comp) return '<div class="comp-line"><span class="comp-team">' + teamName + '</span><span class="comp-detail" style="color:var(--muted)">No historical comp available</span></div>';
       return '<div class="comp-line">' +
         '<span class="comp-team">' + teamName + '</span>' +
-        '<span class="comp-arrow">→</span>' +
+        '<span class="comp-arrow">-></span>' +
         '<span class="comp-detail">' + comp.name + ' \'' + String(comp.season).slice(-2) +
         (comp.seed ? ' (#' + comp.seed + ')' : '') + ' - ' + comp.result + '</span>' +
         '<span class="comp-sim">' + (Number(comp.similarity || 0) * 100).toFixed(0) + '% match</span>' +
@@ -963,7 +963,7 @@
       document.getElementById('card').innerHTML =
         '<div class="card-head">' +
           '<span class="badge ' + badgeClass(flag) + '">' + labelText + '</span>' +
-          '<button class="close" onclick="closeCard()">×</button>' +
+          '<button class="close" onclick="closeCard()">x</button>' +
         '</div>' +
         '<div class="vs-row">' +
           '<div class="team-card" style="border-left:3px solid ' + t1Color + '">' +
@@ -982,27 +982,27 @@
         '</div>' +
         '<div class="model-pick">' +
           '<span class="model-pick-label">Model Pick</span>' +
-          '<span class="model-pick-team">🏀 ' + (recTeam || 'TBD') + '</span>' +
+          '<span class="model-pick-team">' + (recTeam || 'TBD') + '</span>' +
           '<span class="model-pick-conf" style="color:' + conf.color + '">' + conf.label + '</span>' +
           '<span class="model-pick-prob">' + (bestP * 100).toFixed(0) + '%</span>' +
         '</div>' +
-        '<div class="section"><h3>🧠 Matchup Intel</h3>' +
+        '<div class="section"><h3>Matchup Intel</h3>' +
           '<div class="data-row"><span class="data-label">Confidence</span><span class="data-value" style="color:' + conf.color + '">' + conf.label + '</span></div>' +
           '<div class="data-row"><span class="data-label">Risk</span><span class="data-value">' + riskText + '</span></div>' +
           '<div class="data-row"><span class="data-label">Seed Hist</span><span class="data-value">' + seedHist + '</span></div>' +
           '<div class="data-row"><span class="data-label">Archetype</span><span class="data-value">' + archLine + '</span></div>' +
           '<div class="data-row"><span class="data-label">History</span><span class="data-value">' + archEdge + '</span></div>' +
         '</div>' +
-        '<div class="section"><h3>⭐ Key Players</h3>' +
+        '<div class="section"><h3>Key Players</h3>' +
           playerBlock(t1, p1s) +
           playerBlock(t2, p2s) +
         '</div>' +
-        '<div class="section"><h3>📊 Pool Strategy</h3>' +
+        '<div class="section"><h3>Pool Strategy</h3>' +
           '<div class="data-row"><span class="data-label">Public</span><span class="data-value">' + (t1.name || 'Team 1') + ' ' + pub1 + '% / ' + (t2.name || 'Team 2') + ' ' + pub2 + '%' + estLabel + '</span></div>' +
           '<div class="data-row"><span class="data-label">Leverage</span><span class="data-value">' + leverageText(meta.pool_meta?.leverage_delta) + '</span></div>' +
           '<div class="data-row"><span class="data-label">Points</span><span class="data-value">' + exposureText(node.round, meta) + '</span></div>' +
         '</div>' +
-        '<div class="section"><h3>📚 Historical Comps</h3>' +
+        '<div class="section"><h3>Historical Comps</h3>' +
           compLine(t1.name || 'Team 1', t1.primary_comp) +
           compLine(t2.name || 'Team 2', t2.primary_comp) +
           '<a class="ask-btn" href="' + askUrl + '">Ask BracketGPT about this matchup</a>' +
