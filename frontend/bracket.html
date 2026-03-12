@@ -1001,9 +1001,21 @@
         p2 = 1 - p1;
       }
       const pickedClass = validPickForNode(node) ? 'picked' : '';
-      return '<div class="match ' + pickedClass + '">' +
+      const overrideClass = customOverrideNodes.has(node.id) ? 'strategy-overridden' : '';
+      let metaHtml = '';
+      if (validPickForNode(node)) {
+        const matchMeta = node.source?.matchup_meta || {};
+        const ep = getNodeEp(node, pick);
+        const conf = getConfidenceBadge(matchMeta.confidence);
+        metaHtml = '<div class="pick-meta ' + roundEpClass(node.round, ep) + '">' +
+          '<span>EP: ' + ep.toFixed(1) + '</span>' +
+          '<span style="color:' + conf.color + '">' + conf.label + '</span>' +
+        '</div>';
+      }
+      return '<div class="match ' + pickedClass + ' ' + overrideClass + '">' +
         teamRow(node, t1, pick, p1) +
         teamRow(node, t2, pick, p2) +
+        metaHtml +
       '</div>';
     }
 
