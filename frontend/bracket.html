@@ -480,6 +480,7 @@
     let regionRoundIds = {};
     let finalIds = { F4: [], NCG: [] };
     let matchupCache = new Map();
+    const teamIndex = new Map();
     let finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
     let mobileRound = 'R64';
 
@@ -537,6 +538,48 @@
 
     function getCachedMatchup(nameA, nameB) {
       return matchupCache.get(matchupKey(nameA, nameB)) || null;
+    }
+
+    function buildTeamIndex() {
+      const seedBaseline = {
+        1: 28, 2: 23, 3: 20, 4: 17, 5: 15, 6: 13, 7: 11, 8: 9,
+        9: 7, 10: 5, 11: 4, 12: 2, 13: -1, 14: -4, 15: -8, 16: -14
+      };
+      teamIndex.clear();
+      for (const m of baseMatchups) {
+        const t1 = m?.t1;
+        const t2 = m?.t2;
+        if (!t1?.name || !t2?.name) continue;
+        teamIndex.set(t1.name, {
+          ...t1,
+          region: m.region,
+          r64Opponent: t2.name,
+          r64Margin: Number.isFinite(Number(t1.predicted_margin)) ? Number(t1.predicted_margin) : 0
+        });
+        teamIndex.set(t2.name, {
+          ...t2,
+          region: m.region,
+          r64Opponent: t1.name,
+          r64Margin: Number.isFinite(Number(t2.predicted_margin)) ? Number(t2.predicted_margin) : 0
+        });
+      }
+      for (const team of teamIndex.values()) {
+        const opp = teamIndex.get(team.r64Opponent);
+        const oppSeed = Number(opp?.seed) || 16;
+        const oppBase = Number(seedBaseline[oppSeed] ?? -14);
+        const ownSeed = Number(team.seed) || 16;
+        const ownBase = Number(seedBaseline[ownSeed] ?? 0);
+        const marginPower = oppBase + Number(team.r64Margin || 0);
+        team.power = Number.isFinite(marginPower) ? marginPower : ownBase;
+      }
+    }
+
+    function estimateWinProb(teamAName, teamBName) {
+      const a = teamIndex.get(teamAName);
+      const b = teamIndex.get(teamBName);
+      if (!a || !b) return 0.5;
+      const diff = Number(a.power || 0) - Number(b.power || 0);
+      return 1 / (1 + Math.pow(10, -diff / 11));
     }
 
     function linkParent(childId, parentId) {
@@ -691,8 +734,23 @@
       return counts;
     }
 
+    function prerequisiteRound(node) {
+      if (!node?.children?.length) return node?.round || 'R64';
+      const childRound = nodesById.get(node.children[0])?.round || node.round;
+      return childRound;
+    }
+
     function teamRow(node, team, pick, prob) {
-      const disabled = !team ? 'disabled' : '';
+      if (!team) {
+        const prereq = prerequisiteRound(node);
+        return '<div class="team-row">' +
+          '<span class="seed">-</span>' +
+          '<button class="team-btn" disabled style="opacity:0.45;font-style:italic">Pick ' + prereq + ' to unlock</button>' +
+          '<span class="prob">--</span>' +
+          '<button class="info" disabled style="opacity:0.35">i</button>' +
+        '</div>';
+      }
+      const disabled = '';
       const winner = team && pick === team.name ? 'winner' : '';
       const color = team?.color_primary || seedColors[team?.seed] || '#3a3a3a';
       return '<div class="team-row">' +
@@ -706,21 +764,14 @@
     function renderMatch(node) {
       const [t1, t2] = getMatchTeams(node);
       const pick = bracketState.picks[node.id] || '';
-      let p1 = node.source?.t1?.win_probability ?? null;
-      let p2 = node.source?.t2?.win_probability ?? null;
-      if (p1 === null && t1 && t2) {
-        const cached = getCachedMatchup(t1.name, t2.name);
-        if (cached) {
-          const c1 = normalizeName(cached?.t1?.name);
-          const t1k = normalizeName(t1.name);
-          if (c1 === t1k) {
-            p1 = cached.t1?.win_probability ?? null;
-            p2 = cached.t2?.win_probability ?? null;
-          } else {
-            p1 = cached.t2?.win_probability ?? null;
-            p2 = cached.t1?.win_probability ?? null;
-          }
-        }
+      let p1 = null;
+      let p2 = null;
+      if (node.round === 'R64' && node.source) {
+        p1 = node.source.t1?.win_probability ?? null;
+        p2 = node.source.t2?.win_probability ?? null;
+      } else if (t1 && t2) {
+        p1 = estimateWinProb(t1.name, t2.name);
+        p2 = 1 - p1;
       }
       const pickedClass = validPickForNode(node) ? 'picked' : '';
       return '<div class="match ' + pickedClass + '">' +
@@ -808,21 +859,101 @@
       };
     }
 
+    function buildSyntheticMeta(t1, t2, prob, tA, tB, node) {
+      const bestP = Math.max(prob, 1 - prob);
+      const t1Favored = prob >= 0.5;
+      const bestTeam = t1Favored ? t1 : t2;
+      const bestData = t1Favored ? tA : tB;
+      const otherData = t1Favored ? tB : tA;
+      let confidence = 'toss_up';
+      if (bestP >= 0.95) confidence = 'lock';
+      else if (bestP >= 0.85) confidence = 'confident';
+      else if (bestP >= 0.70) confidence = 'lean';
+      else if (bestP >= 0.55) confidence = 'slight';
+      let displayFlag = 'chalk';
+      if (bestP < 0.60) displayFlag = 'toss_up';
+      else if (bestP < 0.70) displayFlag = 'competitive';
+      const roundLabel = { R32: 'Round of 32', S16: 'Sweet 16', E8: 'Elite 8', F4: 'Final Four', NCG: 'Championship' }[node.round] || node.round;
+      let archetype_h2h = null;
+      if (Array.isArray(tA?.archetypes) && Array.isArray(tB?.archetypes) && tA.archetypes[0] && tB.archetypes[0]) {
+        archetype_h2h = {
+          label: tA.archetypes[0] + ' vs ' + tB.archetypes[0],
+          t1_archetype_win_pct: null,
+          sample_size: null
+        };
+      }
+      const bestSeed = Number(bestTeam?.seed ?? 99);
+      const otherSeed = Number((t1Favored ? t2 : t1)?.seed ?? 99);
+      return {
+        confidence,
+        display_flag: displayFlag,
+        upset_flag: displayFlag,
+        model_agrees_with_seed: bestSeed <= otherSeed,
+        predicted_winner: bestTeam?.name || null,
+        seed_matchup: null,
+        archetype_h2h,
+        pool_meta: {
+          leverage_delta: null,
+          contrarian_flag: false,
+          points_this_round: roundPoints[node.round] || 1
+        },
+        risk: {
+          tier: bestP >= 0.75 ? 'low' : bestP >= 0.60 ? 'medium' : 'high',
+          reason: roundLabel + ' projected matchup' + (bestP >= 0.75 ? ' - strong favorite' : bestP >= 0.60 ? ' - moderate edge' : ' - toss-up territory')
+        },
+        chatbot_prompt: 'Compare ' + t1.name + ' vs ' + t2.name + ' in the ' + roundLabel,
+        responses: {
+          quick: (bestTeam?.name || 'Team') + ' is the model pick at ' + (bestP * 100).toFixed(0) + '%.'
+        },
+        winning_team_context: bestData?.archetypes?.[0] || null,
+        underdog_context: otherData?.archetypes?.[0] || null
+      };
+    }
+
     async function getCardData(node) {
       if (node.round === 'R64' && node.source) return node.source;
       const [t1, t2] = getMatchTeams(node);
       if (!t1 || !t2) return fallbackMeta(node);
-      const cached = getCachedMatchup(t1.name, t2.name);
-      if (cached) return cached;
-      try {
-        const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(t1.name) + '/' + encodeURIComponent(t2.name));
-        if (r.ok) {
-          const data = await r.json();
-          setCachedMatchup(t1.name, t2.name, data);
-          return data;
-        }
-      } catch (e) {}
-      return fallbackMeta(node);
+      const tA = teamIndex.get(t1.name) || {};
+      const tB = teamIndex.get(t2.name) || {};
+      const prob = estimateWinProb(t1.name, t2.name);
+      const pickPct1 = Number(tA.pool?.public_pick_pct);
+      const pickPct2 = Number(tB.pool?.public_pick_pct);
+      const synthetic = {
+        matchup_id: node.id,
+        round: node.round,
+        region: node.region,
+        t1: {
+          ...tA,
+          ...t1,
+          win_probability: prob,
+          archetypes: tA.archetypes || t1.archetypes || [],
+          archetype_icons: tA.archetype_icons || t1.archetype_icons || '',
+          key_players: tA.key_players || t1.key_players || [],
+          primary_comp: tA.primary_comp || t1.primary_comp || null,
+          pool: tA.pool || t1.pool || {
+            public_pick_pct: Number.isFinite(pickPct1) ? pickPct1 : null,
+            public_pick_pct_source: 'projected'
+          },
+          color_primary: tA.color_primary || t1.color_primary || '#3a3a3a'
+        },
+        t2: {
+          ...tB,
+          ...t2,
+          win_probability: 1 - prob,
+          archetypes: tB.archetypes || t2.archetypes || [],
+          archetype_icons: tB.archetype_icons || t2.archetype_icons || '',
+          key_players: tB.key_players || t2.key_players || [],
+          primary_comp: tB.primary_comp || t2.primary_comp || null,
+          pool: tB.pool || t2.pool || {
+            public_pick_pct: Number.isFinite(pickPct2) ? pickPct2 : null,
+            public_pick_pct_source: 'projected'
+          },
+          color_primary: tB.color_primary || t2.color_primary || '#3a3a3a'
+        },
+        matchup_meta: buildSyntheticMeta(t1, t2, prob, tA, tB, node)
+      };
+      return synthetic;
     }
 
     function applyMobileRoundVisibility() {
@@ -1016,8 +1147,31 @@
     async function openCard(nodeId) {
       const node = nodesById.get(nodeId);
       if (!node) return;
+      const [t1, t2] = getMatchTeams(node);
+      if (!t1 && !t2) return;
       document.getElementById('overlay').classList.add('open');
-      document.getElementById('card').innerHTML = '<div class="skeleton" style="height:80px"></div><div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:120px"></div>';
+      if (!t1 || !t2) {
+        const known = t1 || t2;
+        const knownData = teamIndex.get(known.name) || known;
+        const players = Array.isArray(knownData?.key_players) ? knownData.key_players : [];
+        document.getElementById('card').innerHTML =
+          '<div class="card-head">' +
+            '<span class="badge chalk">WAITING</span>' +
+            '<button class="close" onclick="closeCard()">x</button>' +
+          '</div>' +
+          '<div style="padding:12px;text-align:center">' +
+            '<div class="team-name" style="font-size:18px">(' + (known.seed || '-') + ') ' + known.name + '</div>' +
+            '<div class="tiny" style="margin:8px 0">Waiting for opponent - pick the other ' + prerequisiteRound(node) + ' game first</div>' +
+            (Array.isArray(knownData?.archetypes) && knownData.archetypes.length
+              ? '<div style="margin:8px 0">' + (knownData.archetype_icons || '') + ' ' + knownData.archetypes.join(' | ') + '</div>'
+              : '') +
+            (players.length
+              ? ('<div class="section"><h3>Key Players</h3>' + players.slice(0, 3).map((p) => '<div class="tiny">' + (p.name || 'Player') + (p.role ? ' (' + p.role + ')' : '') + (p.note ? ' - ' + p.note : '') + '</div>').join('') + '</div>')
+              : '') +
+          '</div>';
+        return;
+      }
+      document.getElementById('card').innerHTML = '<div class="skeleton" style="height:80px"></div><div class="skeleton" style="height:120px"></div>';
       const data = await getCardData(node);
       renderCard(data, node);
     }
@@ -1098,6 +1252,7 @@
           return;
         }
         matchupById = new Map(baseMatchups.map((m) => [m.matchup_id, m]));
+        buildTeamIndex();
         loadState();
         buildTree();
         saveState();
