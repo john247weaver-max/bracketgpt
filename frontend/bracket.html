@@ -1065,9 +1065,24 @@
     function renderProgress() {
       const c = computeCompletion();
       const pct = Math.round((c.total / 63) * 100);
+      let totalEp = 0;
+      for (const node of nodesById.values()) {
+        const pick = bracketState.picks[node.id];
+        if (!pick || !validPickForNode(node)) continue;
+        totalEp += getNodeEp(node, pick);
+      }
       document.getElementById('progress-text').textContent = c.total + ' / 63 picks';
       document.getElementById('completion-text').textContent = pct + '%';
       document.getElementById('progress-bar').style.width = pct + '%';
+      const epEl = document.getElementById('custom-ep');
+      if (epEl) epEl.textContent = totalEp.toFixed(0);
+      const pills = document.querySelectorAll('.strategy-pill');
+      pills.forEach((pill) => {
+        const key = pill.dataset.strategy;
+        pill.classList.toggle('active', !!activeStrategy && key === activeStrategy);
+      });
+      bracketState.activeStrategy = activeStrategy || 'custom';
+      saveState();
     }
 
     function renderAll() {
