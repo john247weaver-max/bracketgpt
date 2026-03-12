@@ -1559,6 +1559,11 @@
 
     async function autoFill() {
       if (!confirm('Fill bracket with model-recommended picks? You can still change individual picks after.')) return;
+      activeStrategy = '';
+      bracketState.activeStrategy = 'custom';
+      strategyBaselinePicks = {};
+      strategyEpByNode = {};
+      customOverrideNodes.clear();
       for (const round of roundOrder) {
         for (const node of nodesById.values()) {
           if (node.round !== round) continue;
