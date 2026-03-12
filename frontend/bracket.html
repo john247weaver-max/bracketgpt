@@ -1609,9 +1609,30 @@
       showLoading();
       clearError();
       try {
-        const r = await fetch('/api/bracket');
-        if (!r.ok) throw new Error('Could not load bracket data');
-        const data = await r.json();
+        const [rBracket, rOutput] = await Promise.all([
+          fetch('/api/bracket'),
+          fetch('/api/bracket-output').catch(() => null),
+        ]);
+        if (!rBracket.ok) throw new Error('Could not load bracket data');
+        const data = await rBracket.json();
+        if (rOutput && rOutput.ok) {
+          bracketOutput = await rOutput.json();
+          strategyMap = bracketOutput.strategies || {};
+          teamEpRankings = bracketOutput.team_ep_rankings || {};
+          championProbs = bracketOutput.bracket_structure?.champion_probs || {};
+          if (bracketOutput.metadata?.scoring) {
+            roundPoints.R64 = safeNum(bracketOutput.metadata.scoring.R64, roundPoints.R64);
+            roundPoints.R32 = safeNum(bracketOutput.metadata.scoring.R32, roundPoints.R32);
+            roundPoints.S16 = safeNum(bracketOutput.metadata.scoring.S16, roundPoints.S16);
+            roundPoints.E8 = safeNum(bracketOutput.metadata.scoring.E8, roundPoints.E8);
+            roundPoints.F4 = safeNum(bracketOutput.metadata.scoring.F4, roundPoints.F4);
+            roundPoints.NCG = safeNum(bracketOutput.metadata.scoring.Championship, roundPoints.NCG);
+          }
+        } else {
+          strategyMap = {};
+          teamEpRankings = {};
+          championProbs = {};
+        }
         if (Array.isArray(data.regions) && data.regions.length) {
           regions = data.regions.filter(Boolean);
         }
@@ -1629,6 +1650,11 @@
         buildTeamIndex();
         loadState();
         buildTree();
+        updateStrategyBar();
+        renderOptimizer();
+        if (strategyKeys.includes(String(bracketState.activeStrategy || '').toLowerCase()) && strategyMap[String(bracketState.activeStrategy || '').toLowerCase()]) {
+          await applyStrategy(String(bracketState.activeStrategy || '').toLowerCase());
+        }
         saveState();
         renderAll();
         const teamQ = new URLSearchParams(window.location.search).get('team');
