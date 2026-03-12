@@ -554,7 +554,7 @@
         <span class="strategy-ep" id="ep-upset">-- EP</span>
       </button>
       <div class="strategy-right">
-        <div class="custom-ep-counter">Your Bracket: <strong id="custom-ep">0</strong> EP</div>
+        <div class="custom-ep-counter"><span id="strategy-mode">Custom</span>: <strong id="custom-ep">0</strong> EP</div>
       </div>
     </section>
     <div class="round-tabs" id="roundTabs">
@@ -1076,6 +1076,8 @@
       document.getElementById('progress-bar').style.width = pct + '%';
       const epEl = document.getElementById('custom-ep');
       if (epEl) epEl.textContent = totalEp.toFixed(0);
+      const modeEl = document.getElementById('strategy-mode');
+      if (modeEl) modeEl.textContent = activeStrategy ? (activeStrategy.toUpperCase()) : 'Custom';
       const pills = document.querySelectorAll('.strategy-pill');
       pills.forEach((pill) => {
         const key = pill.dataset.strategy;
