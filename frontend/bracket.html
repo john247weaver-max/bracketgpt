@@ -1449,9 +1449,110 @@
       renderCard(data, node);
     }
 
+    function updateStrategyBar() {
+      for (const key of strategyKeys) {
+        const ep = safeNum(strategyMap[key]?.total_ep, 0);
+        const el = document.getElementById('ep-' + key);
+        if (el) el.textContent = (ep ? ep.toFixed(0) : '--') + ' EP';
+      }
+    }
+
+    function findStrategyNode(roundKey, entry, assigned) {
+      const pick = normalizeName(entry?.pick);
+      const opponent = normalizeName(entry?.opponent);
+      if (!pick) return null;
+      for (const node of nodesById.values()) {
+        if (node.round !== roundKey) continue;
+        if (assigned.has(node.id)) continue;
+        if (roundKey === 'F4') {
+          const childA = nodesById.get(node.children[0]);
+          const childB = nodesById.get(node.children[1]);
+          const regA = childA ? String(childA.region || '') : '';
+          const regB = childB ? String(childB.region || '') : '';
+          const pairing = normalizePairing(regA + ' vs ' + regB);
+          const reverse = normalizePairing(regB + ' vs ' + regA);
+          if (entry.pairing && pairing !== normalizePairing(entry.pairing) && reverse !== normalizePairing(entry.pairing)) continue;
+        }
+        if (roundKey === 'R64') {
+          if (String(node.region || '') !== String(entry.region || '')) continue;
+          const n1 = normalizeName(node.source?.t1?.name);
+          const n2 = normalizeName(node.source?.t2?.name);
+          if (![n1, n2].includes(pick)) continue;
+          if (opponent && ![n1, n2].includes(opponent)) continue;
+          return node;
+        }
+        if (roundKey === 'NCG') return node;
+        if (String(node.region || '') !== String(entry.region || '')) continue;
+        const [t1, t2] = getMatchTeams(node);
+        const n1 = normalizeName(t1?.name);
+        const n2 = normalizeName(t2?.name);
+        if ([n1, n2].includes(pick)) return node;
+      }
+      return null;
+    }
+
+    async function applyStrategy(strategy) {
+      const key = String(strategy || '').toLowerCase();
+      if (!strategyKeys.includes(key)) return;
+      const strategyData = strategyMap[key];
+      if (!strategyData) return;
+      activeStrategy = key;
+      strategyBaselinePicks = {};
+      strategyEpByNode = {};
+      customOverrideNodes.clear();
+      bracketState.picks = {};
+      const assigned = new Set();
+      const order = [
+        { json: 'R64', node: 'R64' },
+        { json: 'R32', node: 'R32' },
+        { json: 'S16', node: 'S16' },
+        { json: 'E8', node: 'E8' },
+        { json: 'F4', node: 'F4' },
+        { json: 'Championship', node: 'NCG' },
+      ];
+      for (const step of order) {
+        const picks = strategyData.rounds?.[step.json] || [];
+        for (const pick of picks) {
+          const node = findStrategyNode(step.node, pick, assigned);
+          if (!node) continue;
+          bracketState.picks[node.id] = pick.pick;
+          strategyBaselinePicks[node.id] = pick.pick;
+          strategyEpByNode[node.id] = safeNum(pick.ep, 0);
+          assigned.add(node.id);
+        }
+      }
+      bracketState.activeStrategy = key;
+      saveState();
+      renderAll();
+    }
+
+    function renderOptimizer() {
+      const rankEl = document.getElementById('optimizerRankings');
+      const champsEl = document.getElementById('optimizerChamps');
+      if (!rankEl || !champsEl) return;
+      const sortedEp = Object.entries(teamEpRankings || {}).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 20);
+      rankEl.innerHTML = sortedEp.map((row, i) =>
+        '<div class="opt-row"><span>' + (i + 1) + '</span><span>' + row[0] + '</span><span>' + Number(row[1]).toFixed(1) + '</span></div>'
+      ).join('') || '<div class="tiny">No EP data loaded.</div>';
+      const champs = Object.entries(championProbs || {}).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 10);
+      champsEl.innerHTML = champs.map((row) =>
+        '<div class="champ-bar" style="--w:' + (Number(row[1]) * 100).toFixed(1) + '"><span>' + row[0] + '</span><span>' + (Number(row[1]) * 100).toFixed(1) + '%</span></div>'
+      ).join('') || '<div class="tiny">No champion probability data loaded.</div>';
+    }
+
+    function toggleOptimizer() {
+      const panel = document.getElementById('optimizerPanel');
+      if (panel) panel.classList.toggle('open');
+    }
+
     function resetBracket() {
       if (!confirm('Clear all bracket picks?')) return;
       bracketState.picks = {};
+       activeStrategy = '';
+      strategyBaselinePicks = {};
+      strategyEpByNode = {};
+      customOverrideNodes.clear();
+      bracketState.activeStrategy = 'custom';
       saveState();
       renderAll();
     }
