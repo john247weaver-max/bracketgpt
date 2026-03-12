@@ -103,6 +103,7 @@ const store = {
   poolStrategy: null,
   seedMatchups: null,
   bracketMatchups: null,
+  bracketOutput: null,
 };
 const FILE_MAP = {
   teams: ['team_profiles_2025.json', 'team_profiles.json'],
@@ -116,7 +117,8 @@ const FILE_MAP = {
   ev: ['bracket_ev_espn.json'],
   poolStrategy: ['pool_strategy_2025.json', 'pool_strategy.json'],
   seedMatchups: ['historical/seed_matchup_all_rounds.json', 'seed_matchup_all_rounds.json'],
-  bracketMatchups: ['bracketgpt_matchups_2025_final.json'],
+  bracketMatchups: ['bracketgpt_matchups_2025_v2.json', 'bracketgpt_matchups_2025_final.json'],
+  bracketOutput: ['bracketgpt_bracket_output_2025.json'],
   context: ['context_2025.json', 'context.json'],
 };
 
@@ -266,6 +268,11 @@ let hasData = loadData();
 enrichBracketWithPlayers();
 buildHistoricalIndex();
 buildBracketMatchupIndex();
+if (store.bracketOutput?.strategies) {
+  console.log(`✅ Bracket output loaded: ${Object.keys(store.bracketOutput.strategies).length} strategies`);
+} else {
+  console.log('⚠️ No bracket output — EP features disabled');
+}
 
 function reloadDataFromDisk(reason = 'reload') {
   const loaded = loadData();
@@ -716,6 +723,63 @@ function slimMatchupForContext(matchup) {
   };
 }
 
+function bracketOutputRoundKeys() {
+  return ['R64', 'R32', 'S16', 'E8', 'F4', 'Championship'];
+}
+
+function getScoringMap() {
+  const fallback = { R64: 10, R32: 20, S16: 40, E8: 80, F4: 160, Championship: 320 };
+  const s = store.bracketOutput?.metadata?.scoring;
+  if (!s || typeof s !== 'object') return fallback;
+  return {
+    R64: Number(s.R64 || fallback.R64),
+    R32: Number(s.R32 || fallback.R32),
+    S16: Number(s.S16 || fallback.S16),
+    E8: Number(s.E8 || fallback.E8),
+    F4: Number(s.F4 || fallback.F4),
+    Championship: Number(s.Championship || fallback.Championship),
+  };
+}
+
+function buildTeamEpBreakdown(teamName) {
+  const out = { R64: 0, R32: 0, S16: 0, E8: 0, F4: 0, Championship: 0, total: 0 };
+  const normalized = normalizeTeamName(teamName);
+  if (!normalized || !store.bracketOutput?.strategies) return out;
+  for (const strategy of Object.values(store.bracketOutput.strategies || {})) {
+    for (const key of bracketOutputRoundKeys()) {
+      const picks = strategy?.rounds?.[key] || [];
+      for (const pick of picks) {
+        if (normalizeTeamName(pick?.pick) !== normalized) continue;
+        const ep = Number(pick?.ep || 0);
+        if (ep > out[key]) out[key] = ep;
+      }
+    }
+  }
+  out.total = Number((out.R64 + out.R32 + out.S16 + out.E8 + out.F4 + out.Championship).toFixed(2));
+  return out;
+}
+
+function formatExpectedPointsContext(bracketState) {
+  if (!store.bracketOutput) return '';
+  const picks = bracketState?.picks && typeof bracketState.picks === 'object' ? bracketState.picks : {};
+  const uniqueTeams = Array.from(new Set(Object.values(picks || {}).map((v) => String(v || '').trim()).filter(Boolean)));
+  const score = getScoringMap();
+  const lines = [];
+  lines.push('EXPECTED POINTS CONTEXT:');
+  lines.push(`Scoring: R64=${score.R64}, R32=${score.R32}, S16=${score.S16}, E8=${score.E8}, F4=${score.F4}, Championship=${score.Championship}`);
+  if (!uniqueTeams.length) {
+    lines.push('No user picks yet.');
+    return lines.join('\n');
+  }
+  const sampled = uniqueTeams.slice(0, 16);
+  for (const team of sampled) {
+    const ep = buildTeamEpBreakdown(team);
+    const champProb = Number(store.bracketOutput?.bracket_structure?.champion_probs?.[team] || 0);
+    lines.push(`${team} EP breakdown: R64=${ep.R64.toFixed(2)}, R32=${ep.R32.toFixed(2)}, S16=${ep.S16.toFixed(2)}, Total=${ep.total.toFixed(2)} | Champion probability: ${(champProb * 100).toFixed(2)}%`);
+  }
+  return lines.join('\n');
+}
+
 function formatBracketStateContext(bracketState, focusMatchup) {
   if (!bracketState || typeof bracketState !== 'object') return '';
   const picks = bracketState.picks && typeof bracketState.picks === 'object' ? bracketState.picks : {};
@@ -743,6 +807,10 @@ function formatBracketStateContext(bracketState, focusMatchup) {
   }
   if (!remainingLines.length) remainingLines.push('- None in R64.');
 
+  const activeStrategy = String(
+    bracketState.activeStrategy || bracketState.strategy || bracketState.selectedStrategy || ''
+  ).trim();
+
   let focusBlock = '';
   if (focusMatchup) {
     const focus = findBracketMatchupById(focusMatchup) || null;
@@ -751,14 +819,18 @@ function formatBracketStateContext(bracketState, focusMatchup) {
     }
   }
 
+  const epBlock = formatExpectedPointsContext(bracketState);
+
   return `=== USER'S BRACKET STATUS ===
 Completion: ${completed}/63 picks (${completionPct}%)
+Active strategy: ${activeStrategy || 'custom/manual'}
 Current picks so far:
 ${pickedLines.join('\n')}
 
 Remaining unpicked games in current view:
 ${remainingLines.join('\n')}
 ${focusBlock}
+${epBlock}
 When giving advice, reference existing picks and how new picks interact with this bracket strategy.`;
 }
 
@@ -1373,9 +1445,18 @@ function fmtCtx(ctx) {
       const t1Win = Number(m.t1?.win_probability || 0) * 100;
       const t2Win = Number(m.t2?.win_probability || 0) * 100;
       const slim = slimMatchupForContext(m);
+      const confV2 = m.matchup_meta?.confidence || '';
+      const confV1 = m.matchup_meta?.confidence_v1 || 'same';
+      const upset = m.matchup_meta?.upset_flag || '';
+      const riskTier = m.matchup_meta?.risk?.tier || '';
+      const riskReason = m.matchup_meta?.risk?.reason || '';
+      const t1Mom = Number(m.t1?.momentum_adjustment || 0);
+      const t2Mom = Number(m.t2?.momentum_adjustment || 0);
       let line = `MATCHUP_CARD (${m.round || ''} ${m.region || ''}): (${m.t1?.seed})${m.t1?.name} ${t1Win.toFixed(1)}% vs (${m.t2?.seed})${m.t2?.name} ${t2Win.toFixed(1)}%`;
-      line += ` | confidence=${m.matchup_meta?.confidence || ''} upset_flag=${m.matchup_meta?.upset_flag || ''} display_flag=${m.matchup_meta?.display_flag || ''}`;
-      if (m.matchup_meta?.risk?.tier) line += ` | risk=${m.matchup_meta.risk.tier}: ${m.matchup_meta.risk.reason || ''}`;
+      line += ` | Confidence: ${confV2} (v1 was: ${confV1})`;
+      line += ` | Upset Flag: ${upset}`;
+      line += ` | Risk: ${riskTier} - ${riskReason}`;
+      line += ` | Momentum: ${m.t1?.name || 't1'} ${t1Mom >= 0 ? '+' : ''}${(t1Mom * 100).toFixed(1)}%, ${m.t2?.name || 't2'} ${t2Mom >= 0 ? '+' : ''}${(t2Mom * 100).toFixed(1)}%`;
       if (m.matchup_meta?.chatbot_prompt) line += ` | prompt="${m.matchup_meta.chatbot_prompt}"`;
       line += ` | DATA=${JSON.stringify(slim)}`;
       return line;
@@ -1867,6 +1948,44 @@ app.get('/api/bracket', (req, res) => {
   });
 });
 
+app.get('/api/bracket-output', (req, res) => {
+  if (!store.bracketOutput) return res.status(404).json({ error: 'Bracket output data not loaded.' });
+  return res.json(store.bracketOutput);
+});
+
+app.get('/api/bracket-output/strategy/:strategy', (req, res) => {
+  if (!store.bracketOutput?.strategies) return res.status(404).json({ error: 'Bracket output data not loaded.' });
+  const key = String(req.params.strategy || '').toLowerCase().trim();
+  const strategy = store.bracketOutput.strategies[key];
+  if (!strategy) {
+    return res.status(400).json({ error: 'Invalid strategy. Use chalk, balanced, or upset.' });
+  }
+  return res.json({
+    strategy: key,
+    scoring: getScoringMap(),
+    total_ep: Number(strategy.total_ep || 0),
+    rounds: strategy.rounds || {},
+    mc_validation: strategy.mc_validation || null,
+  });
+});
+
+app.get('/api/bracket-output/ep-rankings', (req, res) => {
+  if (!store.bracketOutput?.team_ep_rankings) return res.status(404).json({ error: 'EP rankings unavailable.' });
+  return res.json({
+    count: Object.keys(store.bracketOutput.team_ep_rankings).length,
+    rankings: store.bracketOutput.team_ep_rankings,
+  });
+});
+
+app.get('/api/bracket-output/champion-probs', (req, res) => {
+  if (!store.bracketOutput?.bracket_structure?.champion_probs) {
+    return res.status(404).json({ error: 'Champion probabilities unavailable.' });
+  }
+  return res.json({
+    champion_probs: store.bracketOutput.bracket_structure.champion_probs,
+  });
+});
+
 app.get('/api/matchup/by-teams/:t1/:t2', (req, res) => {
   const matchup = findBracketMatchupByTeams(req.params.t1, req.params.t2);
   if (!matchup) return res.status(404).json({ error: 'Matchup not found.' });
@@ -1948,18 +2067,84 @@ app.post('/api/bracket-chat', async (req, res) => {
 
 
 app.get('/api/value-picks', (req, res) => {
+  const rows = store.bracketMatchups?.matchups || [];
+  const r64 = rows.filter((m) => String(m?.round || '').toUpperCase() === 'R64');
+  const epMap = store.bracketOutput?.team_ep_rankings || {};
+
+  if (r64.length) {
+    const teams = [];
+    for (const m of r64) {
+      for (const side of ['t1', 't2']) {
+        const t = m?.[side] || {};
+        const model = Number(t.win_probability || 0);
+        let pub = t?.pool?.public_pick_pct;
+        pub = Number(pub);
+        if (!Number.isFinite(pub)) pub = null;
+        if (pub != null && pub > 1) pub = pub / 100;
+        const edge = (model - (pub || 0));
+        teams.push({
+          team: t.name,
+          seed: Number(t.seed || 0) || null,
+          region: m.region || null,
+          round: m.round || 'R64',
+          model_probability: model,
+          public_pick_pct: pub,
+          edge,
+          confidence: m.matchup_meta?.confidence || null,
+          upset_flag: m.matchup_meta?.upset_flag || null,
+          risk_tier: m.matchup_meta?.risk?.tier || null,
+          ep_total: Number(epMap[t.name] || 0),
+          matchup_id: m.matchup_id,
+          opponent: side === 't1' ? m?.t2?.name : m?.t1?.name,
+        });
+      }
+    }
+
+    const hiddenGems = teams.filter((t) =>
+      t.public_pick_pct != null
+      && (t.model_probability - t.public_pick_pct) > 0.15
+      && (t.upset_flag === 'slight_upset_pick' || t.upset_flag === 'vulnerable_favorite')
+    );
+
+    const fadeThese = teams.filter((t) =>
+      t.public_pick_pct != null
+      && (t.public_pick_pct - t.model_probability) > 0.15
+      && (t.confidence === 'toss-up' || t.confidence === 'lean')
+    );
+
+    const leaderboard = teams
+      .slice()
+      .sort((a, b) => {
+        const byEdge = Number(b.edge || 0) - Number(a.edge || 0);
+        if (Math.abs(byEdge) > 0.0001) return byEdge;
+        return Number(b.ep_total || 0) - Number(a.ep_total || 0);
+      });
+
+    return res.json({
+      source: 'matchups_v2',
+      count: leaderboard.length,
+      leaderboard,
+      hiddenGems,
+      fadeThese,
+      ep_rankings: epMap,
+    });
+  }
+
   const teams = store.ev?.teams || store.ev?.data || (Array.isArray(store.ev) ? store.ev : []);
   const normalized = teams.map((team) => ({
     ...team,
     championEdge: Number(team.rounds?.Champion?.value_edge || 0),
     finalFourEdge: Number(team.rounds?.['Final Four']?.value_edge || 0),
     round32Edge: Number(team.rounds?.['Round of 32']?.value_edge || 0),
+    ep_total: Number(epMap[team.name] || 0),
   }));
-  res.json({
+  return res.json({
+    source: 'legacy_ev',
     count: normalized.length,
     leaderboard: normalized.sort((a, b) => Number(b.championEdge || 0) - Number(a.championEdge || 0)),
     hiddenGems: normalized.filter((t) => t.championEdge >= 10 || t.finalFourEdge >= 10 || t.round32Edge >= 10),
     fadeThese: normalized.filter((t) => t.championEdge <= -10 || t.finalFourEdge <= -10 || t.round32Edge <= -10),
+    ep_rankings: epMap,
   });
 });
 
