@@ -1786,159 +1786,122 @@
       '</div>';
     }
 
+    function upsetBadgeClass(flag) {
+      const v = String(flag || '').toLowerCase();
+      if (v.includes('strong')) return 'strong';
+      if (v.includes('slight')) return 'slight';
+      if (v.includes('vulnerable')) return 'vulnerable';
+      return 'chalk';
+    }
+
     function renderCard(data, node) {
+      const card = document.getElementById('card');
+      if (!card) return;
       const meta = data.matchup_meta || {};
       const t1 = data.t1 || {};
       const t2 = data.t2 || {};
       const t1p = Number(t1.win_probability || 0);
       const t2p = Number(t2.win_probability || 0);
-      const best = t1p >= t2p ? t1 : t2;
-      const bestP = Math.max(t1p, t2p);
-      const conf = getConfidenceBadge(meta.confidence);
-      const upset = upsetBadge(meta.upset_flag || meta.display_flag);
-      const risk = riskBadge(meta.risk?.tier);
-      const prompt = meta.chatbot_prompt || ('Compare ' + (t1.name || '') + ' vs ' + (t2.name || ''));
-      const askUrl = '/?q=' + encodeURIComponent(prompt);
-
-      const rawP1 = Number(t1.pool?.public_pick_pct || 0);
-      const rawP2 = Number(t2.pool?.public_pick_pct || 0);
-      const pubTotal = rawP1 + rawP2;
-      const pub1 = pubTotal > 0 ? ((rawP1 / pubTotal) * 100).toFixed(1) : '?';
-      const pub2 = pubTotal > 0 ? ((rawP2 / pubTotal) * 100).toFixed(1) : '?';
-      const isEst = (t1.pool?.public_pick_pct_source === 'seed_baseline' || t2.pool?.public_pick_pct_source === 'seed_baseline');
-      const estLabel = isEst ? ' (est.)' : '';
-
-      const p1s = Array.isArray(t1.key_players) ? t1.key_players : [];
-      const p2s = Array.isArray(t2.key_players) ? t2.key_players : [];
-
-      const t1Color = seedColors[t1.seed] || 'var(--text-label)';
-      const t2Color = seedColors[t2.seed] || 'var(--text-label)';
-      const t1FavClass = t1p >= t2p ? 'favorite' : 'underdog';
-      const t2FavClass = t2p >= t1p ? 'favorite' : 'underdog';
-      const riskText = (meta.risk?.reason || 'Not available');
-      const momentumAdj = Number((t1p >= t2p ? t1.momentum_adjustment : t2.momentum_adjustment) || 0);
-      const momentumLine = momentumAdj === 0
-        ? ''
-        : ('<div class="data-row"><span class="data-label">Momentum</span><span class="data-value" style="color:' + (momentumAdj > 0 ? 'var(--accent)' : 'var(--accent-hot)') + '">' + (momentumAdj > 0 ? 'Rising' : 'Fading') + ' (' + (momentumAdj * 100).toFixed(1) + '% adjustment)</span></div>');
-      const seedHist = meta.seed_matchup?.trend
-        || (meta.seed_matchup?.higher_seed_wins != null && meta.seed_matchup?.lower_seed_wins != null
-          ? (meta.seed_matchup.label + ': higher seed wins ' +
-            (((Number(meta.seed_matchup.higher_seed_wins) / Math.max(1, Number(meta.seed_matchup.higher_seed_wins) + Number(meta.seed_matchup.lower_seed_wins))) * 100).toFixed(1)) +
-            '% (' + meta.seed_matchup.higher_seed_wins + '-' + meta.seed_matchup.lower_seed_wins + ')')
-          : 'Historical seed data is limited here');
-
-      const archLine = meta.archetype_h2h?.label || 'Archetype data is limited here';
-      const archEdge = (meta.archetype_h2h?.t1_archetype_win_pct != null && meta.archetype_h2h?.sample_size != null)
-        ? ('Historically, ' + String(archLine).split(' vs ')[0] + ' win ' + (Number(meta.archetype_h2h.t1_archetype_win_pct) * 100).toFixed(1) +
-           '% vs ' + (String(archLine).split(' vs ')[1] || 'opponents') + ' (' + meta.archetype_h2h.sample_size + ' games)')
-        : 'Historical archetype edge is limited here';
-      const t1ArchetypeText = Array.isArray(t1.archetypes) && t1.archetypes.length ? t1.archetypes.join(' | ') : '';
-      const t2ArchetypeText = Array.isArray(t2.archetypes) && t2.archetypes.length ? t2.archetypes.join(' | ') : '';
-
-      const recTeam = best?.name || 'TBD';
-      const pick1Class = recTeam && t1.name === recTeam ? 'pick-btn recommended' : 'pick-btn';
-      const pick2Class = recTeam && t2.name === recTeam ? 'pick-btn recommended' : 'pick-btn';
-      const pick1Disabled = t1.name ? '' : 'disabled';
-      const pick2Disabled = t2.name ? '' : 'disabled';
-
-      const playerBlock = (team, players) => {
-        if (!players.length) {
-          return '<div class="player-row"><span class="player-name">' + (team.name || 'Team') + ':</span><span class="player-note">No key player data</span></div>';
-        }
-        return players.slice(0, 2).map((p) =>
-          '<div class="player-row">' +
-            '<span class="player-name">' + (team.name || 'Team') + ': ' + (p.name || 'Unknown') + '</span>' +
-            '<span class="player-role">' + (p.role ? '(' + p.role + ')' : '') + '</span>' +
-            '<span class="player-note">' + (p.note || '') + '</span>' +
-          '</div>'
-        ).join('');
-      };
-
-      document.getElementById('card').innerHTML =
+      const modelTeam = t1p >= t2p ? t1 : t2;
+      const modelName = modelTeam?.name || 'TBD';
+      const modelIsT1 = modelName && modelName === t1.name;
+      const upset = String(meta.upset_flag || meta.display_flag || 'chalk').replace(/_/g, ' ').toUpperCase();
+      const badgeClass = upsetBadgeClass(meta.upset_flag || meta.display_flag || 'chalk');
+      card.innerHTML =
         '<div class="card-head">' +
-          '<span class="badge" style="border-color:' + upset.color + ';color:' + upset.color + '">' + upset.label + '</span>' +
-          '<button class="close" onclick="closeCard()">&times;</button>' +
+          '<span class="guided-label">' + roundBannerLabel(node.round, node.region) + '</span>' +
+          '<button class="close" onclick="closeCard(true, true)">&times;</button>' +
         '</div>' +
-        '<div class="vs-row">' +
-          '<div class="team-card" style="border-left:3px solid ' + t1Color + '">' +
-            '<div class="team-name">(' + (t1.seed ?? '-') + ') ' + (t1.name || 'TBD') + '</div>' +
-            '<div class="archetype-icons">' + t1ArchetypeText + '</div>' +
-            '<div class="prob-big">' + (t1p * 100).toFixed(1) + '%</div>' +
-            '<div class="bar ' + t1FavClass + '"><span style="width:' + (t1p * 100).toFixed(1) + '%"></span></div>' +
+        '<div class="guided-matchup">' +
+          '<div class="guided-team-row ' + (modelIsT1 ? 'model' : '') + '">' +
+            '<span class="guided-team-seed">' + (t1.seed ?? '-') + '</span>' +
+            '<span class="guided-team-name">' + (t1.name || 'TBD') + '</span>' +
+            '<span class="guided-team-prob">' + ((t1p * 100).toFixed(1)) + '%</span>' +
           '</div>' +
-          '<div class="tiny">VS</div>' +
-          '<div class="team-card" style="border-left:3px solid ' + t2Color + '">' +
-            '<div class="team-name">(' + (t2.seed ?? '-') + ') ' + (t2.name || 'TBD') + '</div>' +
-            '<div class="archetype-icons">' + t2ArchetypeText + '</div>' +
-            '<div class="prob-big">' + (t2p * 100).toFixed(1) + '%</div>' +
-            '<div class="bar ' + t2FavClass + '"><span style="width:' + (t2p * 100).toFixed(1) + '%"></span></div>' +
+          '<div class="guided-divider"></div>' +
+          '<div class="guided-team-row ' + (!modelIsT1 ? 'model' : '') + '">' +
+            '<span class="guided-team-seed">' + (t2.seed ?? '-') + '</span>' +
+            '<span class="guided-team-name">' + (t2.name || 'TBD') + '</span>' +
+            '<span class="guided-team-prob">' + ((t2p * 100).toFixed(1)) + '%</span>' +
           '</div>' +
         '</div>' +
-        '<div class="model-pick">' +
-          '<span class="model-pick-label">Model Pick</span>' +
-          '<span class="model-pick-team">' + (recTeam || 'TBD') + '</span>' +
-          '<span class="model-pick-conf" style="color:' + conf.color + '">' + conf.label + '</span>' +
-          '<span class="model-pick-prob">' + (bestP * 100).toFixed(0) + '%</span>' +
+        '<div class="guided-model">' +
+          '<span class="guided-model-pick">Model Pick: ' + modelName + '</span>' +
+          '<span class="guided-badge ' + badgeClass + '">' + upset + '</span>' +
         '</div>' +
-        '<div class="section"><h3>Matchup Intel</h3>' +
-          '<div class="data-row"><span class="data-label">Confidence</span><span class="data-value" style="color:' + conf.color + '">' + conf.label + (meta.confidence_v1 ? (' <span style="color:var(--muted)">(v1: ' + meta.confidence_v1 + ')</span>') : '') + '</span></div>' +
-          '<div class="data-row"><span class="data-label">Upset Flag</span><span class="data-value" style="color:' + upset.color + '">' + upset.label + '</span></div>' +
-          '<div class="data-row"><span class="data-label">Risk</span><span class="data-value" style="color:' + risk.color + '">' + risk.label + ' - ' + riskText + '</span></div>' +
-          momentumLine +
-          '<div class="data-row"><span class="data-label">Seed Hist</span><span class="data-value">' + seedHist + '</span></div>' +
-          '<div class="data-row"><span class="data-label">Archetype</span><span class="data-value">' + archLine + '</span></div>' +
-          '<div class="data-row"><span class="data-label">History</span><span class="data-value">' + archEdge + '</span></div>' +
-        '</div>' +
-        '<div class="section"><h3>Key Players</h3>' +
-          playerBlock(t1, p1s) +
-          playerBlock(t2, p2s) +
-        '</div>' +
-        '<div class="section"><h3>Pool Strategy</h3>' +
-          '<div class="data-row"><span class="data-label">Public</span><span class="data-value">' + (t1.name || 'Team 1') + ' ' + pub1 + '% / ' + (t2.name || 'Team 2') + ' ' + pub2 + '%' + estLabel + '</span></div>' +
-          '<div class="data-row"><span class="data-label">Leverage</span><span class="data-value">' + leverageText(meta.pool_meta?.leverage_delta) + '</span></div>' +
-          '<div class="data-row"><span class="data-label">Points</span><span class="data-value">' + exposureText(node.round, meta) + '</span></div>' +
-        '</div>' +
-        '<div class="section"><h3>Historical Comps</h3>' +
-          compLine(t1.name || 'Team 1', t1.primary_comp) +
-          compLine(t2.name || 'Team 2', t2.primary_comp) +
-          '<a class="ask-btn" href="' + askUrl + '">Ask BracketGPT about this matchup</a>' +
-        '</div>' +
-        '<div class="pick-actions">' +
-          '<button class="' + pick1Class + '" ' + pick1Disabled + ' onclick="makePick(\'' + node.id + '\',\'' + String(t1.name || '').replace(/'/g, "\\'") + '\')">Pick ' + (t1.name || 'Team 1') + '</button>' +
-          '<button class="' + pick2Class + '" ' + pick2Disabled + ' onclick="makePick(\'' + node.id + '\',\'' + String(t2.name || '').replace(/'/g, "\\'") + '\')">Pick ' + (t2.name || 'Team 2') + '</button>' +
-        '</div>';
+        '<div class="guided-analysis loading" id="guided-analysis">Loading model analysis...</div>' +
+        '<button class="guided-pick-btn" id="guided-pick-btn" onclick="guidedPickCurrent()">Pick ' + modelName + '</button>';
+      fetchAnalysis(node, t1, t2);
     }
 
-    async function openCard(nodeId) {
+    async function fetchAnalysis(node, t1, t2) {
+      const token = ++analysisToken;
+      const el = document.getElementById('guided-analysis');
+      if (!el) return;
+      const prompt = '2-3 sentence analysis of ' + (t1.seed || '-') + ' ' + (t1.name || 'Team A') +
+        ' vs ' + (t2.seed || '-') + ' ' + (t2.name || 'Team B') + ', ' +
+        getRoundTitle(node.round).split(' (')[0] + ', ' + node.region + ' region. Who wins and why?';
+      try {
+        const r = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+        if (!r.ok) throw new Error('analysis failed');
+        const payload = await r.json();
+        if (token !== analysisToken) return;
+        el.classList.remove('loading');
+        el.textContent = String(payload.reply || 'Model data unavailable.');
+      } catch (e) {
+        if (token !== analysisToken) return;
+        el.classList.remove('loading');
+        el.style.color = 'var(--text-muted)';
+        el.textContent = 'Model data unavailable.';
+      }
+    }
+
+    async function openCard(nodeId, opts = {}) {
+      if (flowLocked) return;
       const node = nodesById.get(nodeId);
       if (!node) return;
       const [t1, t2] = getMatchTeams(node);
-      if (!t1 && !t2) return;
-      document.getElementById('overlay').classList.add('open');
-      if (!t1 || !t2) {
-        const known = t1 || t2;
-        const knownData = teamIndex.get(known.name) || known;
-        const players = Array.isArray(knownData?.key_players) ? knownData.key_players : [];
-        document.getElementById('card').innerHTML =
-          '<div class="card-head">' +
-            '<span class="badge chalk">WAITING</span>' +
-            '<button class="close" onclick="closeCard()">&times;</button>' +
-          '</div>' +
-          '<div style="padding:12px;text-align:center">' +
-            '<div class="team-name" style="font-size:18px">(' + (known.seed || '-') + ') ' + known.name + '</div>' +
-            '<div class="tiny" style="margin:8px 0">Waiting for opponent - pick the other ' + prerequisiteRound(node) + ' game first</div>' +
-            (Array.isArray(knownData?.archetypes) && knownData.archetypes.length
-              ? '<div style="margin:8px 0">' + knownData.archetypes.join(' | ') + '</div>'
-              : '') +
-            (players.length
-              ? ('<div class="section"><h3>Key Players</h3>' + players.slice(0, 3).map((p) => '<div class="tiny">' + (p.name || 'Player') + (p.role ? ' (' + p.role + ')' : '') + (p.note ? ' - ' + p.note : '') + '</div>').join('') + '</div>')
-              : '') +
-          '</div>';
-        return;
-      }
-      document.getElementById('card').innerHTML = '<div class="skeleton" style="height:80px"></div><div class="skeleton" style="height:120px"></div>';
-      const data = await getCardData(node);
+      if (!t1 || !t2) return;
+      if (opts.autoResume !== false) autoAdvanceEnabled = true;
+      guidedNodeId = node.id;
+      const overlay = document.getElementById('overlay');
+      if (!overlay) return;
+      overlay.classList.add('open');
+      overlay.classList.remove('instant');
+      let data = await getCardData(node);
+      try {
+        const q = '/api/matchup?t1=' + encodeURIComponent(t1.name) + '&t2=' + encodeURIComponent(t2.name);
+        const r = await fetch(q);
+        if (r.ok) {
+          const m = await r.json();
+          data = {
+            ...data,
+            t1: { ...(data.t1 || t1), name: t1.name, seed: m.t1_seed ?? t1.seed, win_probability: Number(m.t1_prob || 0) },
+            t2: { ...(data.t2 || t2), name: t2.name, seed: m.t2_seed ?? t2.seed, win_probability: Number(m.t2_prob || 0) },
+            matchup_meta: {
+              ...(data.matchup_meta || {}),
+              predicted_winner: m.predicted_winner,
+              upset_flag: m.upset_flag || data?.matchup_meta?.upset_flag || 'chalk',
+              display_flag: m.upset_flag || data?.matchup_meta?.display_flag || 'chalk'
+            }
+          };
+        }
+      } catch (e) {}
+      if (guidedNodeId !== node.id) return;
       renderCard(data, node);
+    }
+
+    function resumeAutoFlow(afterNodeId) {
+      if (!autoAdvanceEnabled || flowLocked) return;
+      const next = findNextFlowTarget(afterNodeId);
+      if (!next) return;
+      openCard(next.id, { autoResume: true, manualResume: false });
     }
 
     function updateStrategyBar() {
@@ -2162,16 +2125,19 @@
         saveState();
         renderAll();
         const teamQ = new URLSearchParams(window.location.search).get('team');
+        let openedFromQuery = false;
         if (teamQ) {
           const target = normalizeName(teamQ);
           for (const node of nodesById.values()) {
             const [t1, t2] = getMatchTeams(node);
             if (normalizeName(t1?.name) === target || normalizeName(t2?.name) === target) {
               openCard(node.id);
+              openedFromQuery = true;
               break;
             }
           }
         }
+        if (!openedFromQuery) resumeAutoFlow();
       } catch (e) {
         showError("Couldn't load bracket data.");
       } finally {
