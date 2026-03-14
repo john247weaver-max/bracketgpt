@@ -255,6 +255,16 @@ function parseUploadedJson(rawInput) {
     .trim();
   pushCandidate('cleaned', cleaned);
 
+  // 5) Tolerate common non-JSON literals from notebook exports.
+  const normalizedLiterals = cleaned
+    .replace(/\bNone\b/g, 'null')
+    .replace(/\bTrue\b/g, 'true')
+    .replace(/\bFalse\b/g, 'false')
+    .replace(/\bNaN\b/g, 'null')
+    .replace(/\b-?Infinity\b/g, 'null')
+    .trim();
+  pushCandidate('normalized_literals', normalizedLiterals);
+
   let lastErr = null;
   for (const a of attempts) {
     try {
@@ -2628,6 +2638,11 @@ app.post('/admin/upload', auth, (req, res) => {
       archetype_history: 'archetype_history.json',
     };
     const typeAliases = {
+      base: 'predictions',
+      teams: 'team_profiles',
+      upset: 'seed_matchups',
+      floor: 'archetype_summary',
+      optimizer: 'archetype_history',
       teamProfiles: 'team_profiles',
       seedMatchups: 'seed_matchups',
       archetypeSummary: 'archetype_summary',

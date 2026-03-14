@@ -191,6 +191,34 @@
     </div>
 
     <div class="card">
+      <div class="title" style="font-size:14px;margin-bottom:8px;">Legacy Upload (Compatibility)</div>
+      <div class="sub" style="margin-bottom:10px;">Use this if file naming/type mapping is inconsistent. Supports old keys and new keys.</div>
+      <div class="row">
+        <div class="field">
+          <label>Type</label>
+          <select id="legacy-upload-type">
+            <option value="predictions">predictions</option>
+            <option value="team_profiles">team_profiles</option>
+            <option value="seed_matchups">seed_matchups</option>
+            <option value="archetype_summary">archetype_summary</option>
+            <option value="archetype_history">archetype_history</option>
+            <option value="base">base (old)</option>
+            <option value="teams">teams (old)</option>
+            <option value="upset">upset (old)</option>
+            <option value="floor">floor (old)</option>
+            <option value="optimizer">optimizer (old)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>File</label>
+          <input type="file" id="legacy-upload-file" accept=".json,.txt" />
+        </div>
+      </div>
+      <button class="btn" onclick="uploadLegacy()">Upload (Compatibility)</button>
+      <span id="legacy-upload-status" class="sub" style="margin-left:8px;"></span>
+    </div>
+
+    <div class="card">
       <div class="title" style="font-size:14px;margin-bottom:8px;color:var(--orange);">Security</div>
       <div class="row">
         <div class="field"><label>Old Password</label><input type="password" id="op" /></div>
@@ -448,6 +476,40 @@
       allStatus.textContent = `✅ ${ok} uploaded${fail > 0 ? `, ❌ ${fail} failed` : ''}`;
       await loadDataStatus();
       await initUploadStatus();
+    }
+
+    async function uploadLegacy() {
+      const type = $('legacy-upload-type').value;
+      const file = $('legacy-upload-file').files[0];
+      const status = $('legacy-upload-status');
+      if (!file) {
+        status.textContent = '❌ Select a file';
+        return;
+      }
+      status.textContent = '⏳ Uploading...';
+      const formData = new FormData();
+      formData.append('type', type);
+      formData.append('file', file);
+      try {
+        const res = await fetch('/admin/upload', {
+          method: 'POST',
+          headers: { 'x-admin-password': pw },
+          body: formData
+        });
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch (e) { data = { success: false, error: text || `HTTP ${res.status}` }; }
+        if (data.success) {
+          status.textContent = `✅ Saved as ${data.savedAs} (${data.size})`;
+          $('legacy-upload-file').value = '';
+          await loadDataStatus();
+          await initUploadStatus();
+        } else {
+          status.textContent = `❌ ${data.error || 'Upload failed'}`;
+        }
+      } catch (e) {
+        status.textContent = `❌ Upload error: ${e.message}`;
+      }
     }
 
     async function initUploadStatus() {
