@@ -8,10 +8,11 @@ const compression = require('compression');
 const app = express();
 app.use(cors());
 app.use(compression());
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 const DATA_DIR = path.join(__dirname, 'data');
 const TMP_DIR = path.join(DATA_DIR, 'tmp');
+const UPLOAD_TMP_DIR = path.join(DATA_DIR, '.tmp');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 const ENV_FILE = path.join(__dirname, '..', '.env');
 
@@ -37,6 +38,7 @@ loadDotEnv(ENV_FILE);
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
+if (!fs.existsSync(UPLOAD_TMP_DIR)) fs.mkdirSync(UPLOAD_TMP_DIR, { recursive: true });
 
 let savedConfig = {};
 try {
@@ -2502,8 +2504,11 @@ app.post('/admin/password', auth, (req, res) => {
   return res.json({ ok: true });
 });
 
-const up = multer({ dest: TMP_DIR });
-app.post('/admin/upload', auth, up.single('file'), (req, res) => {
+const upload = multer({
+  dest: UPLOAD_TMP_DIR,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+app.post('/admin/upload', auth, upload.single('file'), (req, res) => {
   const t = req.body.type;
   const allowed = {
     predictions: 'chatbot_predictions_v5.json',
@@ -2524,14 +2529,16 @@ app.post('/admin/upload', auth, up.single('file'), (req, res) => {
     fs.unlinkSync(req.file.path);
     dataStore[t] = JSON.parse(raw);
     reloadDataFromDisk('admin-upload');
+    const sizeMB = (Buffer.byteLength(raw) / 1024 / 1024).toFixed(1);
+    console.log(`  [upload] ${allowed[t]} uploaded and reloaded (${sizeMB}MB)`);
     return res.json({
       success: true,
       savedAs: allowed[t],
-      size: `${(Buffer.byteLength(raw) / 1024 / 1024).toFixed(1)}MB`,
+      size: `${sizeMB}MB`,
     });
   } catch (e) {
     if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    return res.status(400).json({ error: `Invalid JSON or write failed: ${e.message}` });
+    return res.status(400).json({ error: `Invalid JSON or write failed: ${e.message}`, success: false });
   }
 });
 

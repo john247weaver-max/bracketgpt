@@ -125,20 +125,68 @@
     </div>
 
     <div class="card">
-      <div class="title" style="font-size:14px;margin-bottom:8px;">Upload Data Files</div>
-      <div class="sub" style="margin-bottom:10px;">Upload new model outputs from Colab. Files are validated as JSON before saving.</div>
-      <div class="field"><label>Main Predictions (22MB)</label>
-        <select id="upload-type">
-          <option value="predictions">chatbot_predictions_v5.json</option>
-          <option value="bracketCache">bracket_cache_2025.json</option>
-          <option value="teamProfiles">team_profiles_2025.json</option>
-          <option value="seedMatchups">seed_matchup_all_rounds.json</option>
-          <option value="archetypeSummary">archetype_summary_v5.json</option>
-        </select>
+      <div class="title" style="font-size:14px;margin-bottom:8px;">📁 Upload Model Data (from Colab)</div>
+      <p style="color:#888; margin-bottom:16px;">
+        Run <code>model_v5_3.py</code> in Colab, download the output files, then upload them here.<br>
+        Upload order doesn't matter. All files validated as JSON before saving.
+      </p>
+
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-predictions" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">chatbot_predictions_v5.json</div>
+            <div style="font-size:12px; color:#888;">2,278 matchups — powers chat + /api/matchup (~22MB)</div>
+          </div>
+          <input type="file" id="file-predictions" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('predictions', 'file-predictions')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-bracketCache" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">bracket_cache_2025.json</div>
+            <div style="font-size:12px; color:#888;">~400 realistic matchups — frontend bracket loads once (~2-4MB)</div>
+          </div>
+          <input type="file" id="file-bracketCache" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('bracketCache', 'file-bracketCache')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-teamProfiles" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">team_profiles_2025.json</div>
+            <div style="font-size:12px; color:#888;">68 team profiles — powers "tell me about Duke" (~160KB)</div>
+          </div>
+          <input type="file" id="file-teamProfiles" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('teamProfiles', 'file-teamProfiles')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-seedMatchups" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">seed_matchup_all_rounds.json</div>
+            <div style="font-size:12px; color:#888;">Historical seed-vs-seed records R64→Championship (~18KB)</div>
+          </div>
+          <input type="file" id="file-seedMatchups" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('seedMatchups', 'file-seedMatchups')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-archetypeSummary" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">archetype_summary_v5.json</div>
+            <div style="font-size:12px; color:#888;">Archetype descriptions + matchup matrix (~50KB)</div>
+          </div>
+          <input type="file" id="file-archetypeSummary" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('archetypeSummary', 'file-archetypeSummary')">Upload</button>
+        </div>
       </div>
-      <div class="field"><label>File</label><input type="file" id="upload-file" accept=".json" /></div>
-      <button class="btn" onclick="uploadFile()">Upload</button>
-      <span id="upload-status" class="sub" style="margin-left:8px;"></span>
+
+      <div style="margin-top:16px; padding-top:16px; border-top:1px solid #333;">
+        <button class="btn" onclick="uploadAll()" style="padding:10px 24px; font-size:15px; font-weight:600;">🚀 Upload All Selected Files</button>
+        <span id="upload-all-status" style="margin-left:12px; color:#888;"></span>
+      </div>
     </div>
 
     <div class="card">
@@ -158,6 +206,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let pw = '';
+    let adminPassword = '';
 
     function toast(msg) {
       const t = $('toast');
@@ -174,12 +223,14 @@
 
     async function doAuth() {
       pw = $('lpw').value;
+      adminPassword = pw;
       try {
         const c = await getConfig();
         $('login').style.display = 'none';
         $('panel').style.display = 'block';
         fill(c);
         await loadDataStatus();
+        await initUploadStatus();
         $('tag').textContent = 'Connected';
         $('tag').style.color = '#3fb950';
       } catch (e) {
@@ -227,6 +278,7 @@
       try {
         fill(await getConfig());
         await loadDataStatus();
+        await initUploadStatus();
       } catch (e) {}
     }
 
@@ -335,33 +387,67 @@
       }
     }
 
-    async function uploadFile() {
-      const type = $('upload-type').value;
-      const file = $('upload-file').files[0];
-      const status = $('upload-status');
-      if (!file) { status.textContent = '❌ Select a file'; return; }
-      status.textContent = '⏳ Uploading...';
-
+    async function uploadSingle(type, inputId) {
+      const fileInput = $(inputId);
+      const statusEl = $('status-' + type);
+      const file = fileInput?.files?.[0];
+      if (!file) { statusEl.textContent = '❌'; return; }
+      statusEl.textContent = '⏳';
       const formData = new FormData();
       formData.append('type', type);
       formData.append('file', file);
-
       try {
         const res = await fetch('/admin/upload', {
           method: 'POST',
-          headers: { 'x-admin-password': pw },
+          headers: { 'x-admin-password': adminPassword },
           body: formData,
         });
         const data = await res.json();
-        if (data.success) {
-          status.textContent = `✅ Saved as ${data.savedAs} (${data.size})`;
-          $('upload-file').value = '';
-          await loadDataStatus();
-        } else {
-          status.textContent = `❌ ${data.error}`;
-        }
+        statusEl.textContent = data.success ? '✅' : '❌';
+        if (!data.success) alert('Upload failed: ' + (data.error || 'Unknown'));
+        await loadDataStatus();
+        await initUploadStatus();
       } catch (e) {
-        status.textContent = `❌ Upload failed: ${e.message}`;
+        statusEl.textContent = '❌';
+        alert('Upload error: ' + e.message);
+      }
+    }
+
+    async function uploadAll() {
+      const allStatus = $('upload-all-status');
+      const types = ['predictions', 'bracketCache', 'teamProfiles', 'seedMatchups', 'archetypeSummary'];
+      let ok = 0; let fail = 0;
+      allStatus.textContent = '⏳ Uploading...';
+
+      for (const type of types) {
+        const input = $('file-' + type);
+        if (input?.files?.length > 0) {
+          try {
+            await uploadSingle(type, 'file-' + type);
+            ok += 1;
+          } catch (e) {
+            fail += 1;
+          }
+        }
+      }
+      allStatus.textContent = `✅ ${ok} uploaded${fail > 0 ? `, ❌ ${fail} failed` : ''}`;
+      await loadDataStatus();
+      await initUploadStatus();
+    }
+
+    async function initUploadStatus() {
+      try {
+        const res = await fetch('/api/admin/data-status', {
+          headers: { 'x-admin-password': adminPassword }
+        });
+        const s = await res.json();
+        $('status-predictions').textContent = s.predictions?.loaded ? '✅' : '❌';
+        $('status-bracketCache').textContent = s.bracketCache?.loaded ? '✅' : '❌';
+        $('status-teamProfiles').textContent = s.teamProfiles?.loaded ? '✅' : '❌';
+        $('status-seedMatchups').textContent = s.seedMatchups?.loaded ? '✅' : '❌';
+        $('status-archetypeSummary').textContent = s.archetypeSummary?.loaded ? '✅' : '❌';
+      } catch (e) {
+        console.error('Status check failed:', e);
       }
     }
 

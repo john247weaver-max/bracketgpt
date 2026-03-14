@@ -910,12 +910,14 @@
     };
 
     let baseMatchups = [];
+    let bracketData = null;
     let matchupById = new Map();
     let nodesById = new Map();
     let parentMap = new Map();
     let regionRoundIds = {};
     let finalIds = { F4: [], NCG: [] };
     let matchupCache = new Map();
+    const bracketTeamIdByName = new Map();
     const teamIndex = new Map();
     let finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
     let mobileRound = 'R64';
@@ -1189,6 +1191,93 @@
       return matchupCache.get(matchupKey(nameA, nameB)) || null;
     }
 
+    function indexBracketTeamDirectory() {
+      bracketTeamIdByName.clear();
+      const dir = bracketData?.team_directory || {};
+      for (const [id, team] of Object.entries(dir)) {
+        const key = normalizeName(team?.name);
+        if (key && !bracketTeamIdByName.has(key)) {
+          bracketTeamIdByName.set(key, String(id));
+        }
+      }
+    }
+
+    async function loadBracketData() {
+      try {
+        const res = await fetch('/api/bracket-cache');
+        if (!res.ok) return null;
+        bracketData = await res.json();
+        indexBracketTeamDirectory();
+        return bracketData;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function getTeam(teamId) {
+      return bracketData?.team_directory?.[String(teamId)] || null;
+    }
+
+    async function getMatchup(t1Id, t2Id) {
+      const t1 = String(t1Id);
+      const t2 = String(t2Id);
+      const lookup = bracketData?.bracket_lookup || {};
+      const idx = lookup[t1]?.[t2] ?? lookup[t2]?.[t1];
+      if (idx !== undefined && Array.isArray(bracketData?.predictions)) {
+        return bracketData.predictions[idx];
+      }
+      const res = await fetch('/api/matchup?t1=' + encodeURIComponent(t1) + '&t2=' + encodeURIComponent(t2));
+      return res.ok ? await res.json() : null;
+    }
+
+    function toLegacyMatchupShape(prediction, teamAName, teamBName) {
+      if (!prediction) return null;
+      const pT1 = Number(prediction.model_win_prob);
+      const modelProb = Number.isFinite(pT1) ? pT1 : 0.5;
+      const predT1 = String(prediction.t1_name || '');
+      const predT2 = String(prediction.t2_name || '');
+      const wantsA = normalizeName(teamAName);
+      const aligned = normalizeName(predT1) === wantsA || (wantsA && normalizeName(predT2) !== wantsA);
+      const aSeed = aligned ? prediction.t1_seed : prediction.t2_seed;
+      const bSeed = aligned ? prediction.t2_seed : prediction.t1_seed;
+      const aProb = aligned ? modelProb : (1 - modelProb);
+      const bProb = 1 - aProb;
+      return {
+        t1: { name: teamAName, seed: aSeed, win_probability: aProb },
+        t2: { name: teamBName, seed: bSeed, win_probability: bProb },
+        matchup_meta: {
+          predicted_winner: prediction.predicted_winner_name || '',
+          upset_flag: prediction.upset_flag || 'chalk',
+          display_flag: prediction.upset_flag || 'chalk',
+          confidence: prediction.confidence || null
+        }
+      };
+    }
+
+    async function getMatchupForTeams(teamAName, teamBName) {
+      const cached = getCachedMatchup(teamAName, teamBName);
+      if (cached) return cached;
+      const idA = bracketTeamIdByName.get(normalizeName(teamAName));
+      const idB = bracketTeamIdByName.get(normalizeName(teamBName));
+      if (idA && idB) {
+        const pred = await getMatchup(idA, idB);
+        const shaped = toLegacyMatchupShape(pred, teamAName, teamBName);
+        if (shaped) {
+          setCachedMatchup(teamAName, teamBName, shaped);
+          return shaped;
+        }
+      }
+      try {
+        const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(teamAName) + '/' + encodeURIComponent(teamBName));
+        if (!r.ok) return null;
+        const data = await r.json();
+        setCachedMatchup(teamAName, teamBName, data);
+        return data;
+      } catch (e) {
+        return null;
+      }
+    }
+
     function buildTeamIndex() {
       const seedBaseline = {
         1: 28, 2: 23, 3: 20, 4: 17, 5: 15, 6: 13, 7: 11, 8: 9,
@@ -1362,10 +1451,8 @@
         if (!pt1 || !pt2) continue;
         if (getCachedMatchup(pt1.name, pt2.name)) continue;
         try {
-          const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(pt1.name) + '/' + encodeURIComponent(pt2.name));
-          if (!r.ok) continue;
-          const data = await r.json();
-          setCachedMatchup(pt1.name, pt2.name, data);
+          const data = await getMatchupForTeams(pt1.name, pt2.name);
+          if (!data) continue;
           renderAll();
         } catch (e) {}
       }
@@ -1884,19 +1971,18 @@
       overlay.classList.remove('instant');
       let data = await getCardData(node);
       try {
-        const q = '/api/matchup?t1=' + encodeURIComponent(t1.name) + '&t2=' + encodeURIComponent(t2.name);
-        const r = await fetch(q);
-        if (r.ok) {
-          const m = await r.json();
+        const m = await getMatchupForTeams(t1.name, t2.name);
+        if (m) {
           data = {
             ...data,
-            t1: { ...(data.t1 || t1), name: t1.name, seed: m.t1_seed ?? t1.seed, win_probability: Number(m.t1_prob || 0) },
-            t2: { ...(data.t2 || t2), name: t2.name, seed: m.t2_seed ?? t2.seed, win_probability: Number(m.t2_prob || 0) },
+            t1: { ...(data.t1 || t1), name: t1.name, seed: m?.t1?.seed ?? t1.seed, win_probability: Number(m?.t1?.win_probability ?? 0) },
+            t2: { ...(data.t2 || t2), name: t2.name, seed: m?.t2?.seed ?? t2.seed, win_probability: Number(m?.t2?.win_probability ?? 0) },
             matchup_meta: {
               ...(data.matchup_meta || {}),
-              predicted_winner: m.predicted_winner,
-              upset_flag: m.upset_flag || data?.matchup_meta?.upset_flag || 'chalk',
-              display_flag: m.upset_flag || data?.matchup_meta?.display_flag || 'chalk'
+              predicted_winner: m?.matchup_meta?.predicted_winner || data?.matchup_meta?.predicted_winner || '',
+              upset_flag: m?.matchup_meta?.upset_flag || data?.matchup_meta?.upset_flag || 'chalk',
+              display_flag: m?.matchup_meta?.display_flag || data?.matchup_meta?.display_flag || 'chalk',
+              confidence: m?.matchup_meta?.confidence || data?.matchup_meta?.confidence || null
             }
           };
         }
@@ -2045,10 +2131,8 @@
             continue;
           }
           try {
-            const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(t1.name) + '/' + encodeURIComponent(t2.name));
-            if (r.ok) {
-              const data = await r.json();
-              setCachedMatchup(t1.name, t2.name, data);
+            const data = await getMatchupForTeams(t1.name, t2.name);
+            if (data) {
               const d1key = normalizeName(data?.t1?.name);
               const p1 = d1key === normalizeName(t1.name)
                 ? Number(data?.t1?.win_probability || 0.5)
@@ -2084,6 +2168,7 @@
       showLoading();
       clearError();
       try {
+        await loadBracketData();
         const [rBracket, rOutput] = await Promise.all([
           fetch('/api/bracket'),
           fetch('/api/bracket-output').catch(() => null),
