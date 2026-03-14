@@ -206,6 +206,54 @@ function loadDataFiles() {
   console.log('Data loading complete.');
 }
 
+function parseUploadedJson(rawInput) {
+  const raw = String(rawInput || '');
+  const attempts = [];
+
+  function pushCandidate(label, text) {
+    const candidate = String(text || '').trim();
+    if (!candidate) return;
+    attempts.push({ label, text: candidate });
+  }
+
+  // 1) Raw content (with BOM removed)
+  const noBom = raw.replace(/^\uFEFF/, '').trim();
+  pushCandidate('raw', noBom);
+
+  // 2) Markdown code fence content (```json ... ```)
+  const fence = noBom.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence?.[1]) pushCandidate('code_fence', fence[1]);
+
+  // 3) Extract likely JSON block from wrapper text
+  const firstObj = noBom.indexOf('{');
+  const firstArr = noBom.indexOf('[');
+  let first = -1;
+  if (firstObj >= 0 && firstArr >= 0) first = Math.min(firstObj, firstArr);
+  else first = Math.max(firstObj, firstArr);
+  const lastObj = noBom.lastIndexOf('}');
+  const lastArr = noBom.lastIndexOf(']');
+  const last = Math.max(lastObj, lastArr);
+  if (first >= 0 && last > first) pushCandidate('slice', noBom.slice(first, last + 1));
+
+  // 4) Lenient cleanup for comments and trailing commas
+  const cleaned = noBom
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/,\s*([}\]])/g, '$1')
+    .trim();
+  pushCandidate('cleaned', cleaned);
+
+  let lastErr = null;
+  for (const a of attempts) {
+    try {
+      return { parsed: JSON.parse(a.text), normalized: a.text, mode: a.label };
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('Invalid JSON');
+}
+
 function findMatchup(t1Id, t2Id) {
   const lookup = dataStore.predictions?.bracket_lookup || {};
   const t1 = String(t1Id);
@@ -2536,16 +2584,14 @@ app.post('/admin/upload', auth, (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, error: 'File required' });
 
     try {
-      let raw = fs.readFileSync(req.file.path, 'utf8');
-      // Normalize UTF-8 BOM if present.
-      raw = raw.replace(/^\uFEFF/, '');
-      const parsed = JSON.parse(raw);
-      fs.writeFileSync(path.join(DATA_DIR, allowed[t]), raw);
+      const raw = fs.readFileSync(req.file.path, 'utf8');
+      const { parsed, normalized, mode } = parseUploadedJson(raw);
+      fs.writeFileSync(path.join(DATA_DIR, allowed[t]), normalized);
       fs.unlinkSync(req.file.path);
       dataStore[t] = parsed;
       reloadDataFromDisk('admin-upload');
-      const sizeMB = (Buffer.byteLength(raw) / 1024 / 1024).toFixed(1);
-      console.log(`  [upload] ${allowed[t]} uploaded and reloaded (${sizeMB}MB)`);
+      const sizeMB = (Buffer.byteLength(normalized) / 1024 / 1024).toFixed(1);
+      console.log(`  [upload] ${allowed[t]} uploaded and reloaded (${sizeMB}MB, parse:${mode})`);
       return res.json({
         success: true,
         savedAs: allowed[t],
