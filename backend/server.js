@@ -1992,6 +1992,51 @@ app.get('/api/matchup/by-teams/:t1/:t2', (req, res) => {
   return res.json(matchup);
 });
 
+app.get('/api/matchup', (req, res) => {
+  const t1 = String(req.query.t1 || '').trim();
+  const t2 = String(req.query.t2 || '').trim();
+  if (!t1 || !t2) return res.status(400).json({ error: 't1 and t2 are required.' });
+  const matchup = findBracketMatchupByTeams(t1, t2);
+  if (!matchup) return res.status(404).json({ error: 'not found' });
+
+  const q1 = normalizeTeamName(t1);
+  const q2 = normalizeTeamName(t2);
+  const m1 = normalizeTeamName(matchup?.t1?.name);
+  const m2 = normalizeTeamName(matchup?.t2?.name);
+  const flipped = m1 === q2 && m2 === q1;
+  const side1 = flipped ? matchup.t2 : matchup.t1;
+  const side2 = flipped ? matchup.t1 : matchup.t2;
+
+  let t1Prob = normProb(side1?.win_probability);
+  let t2Prob = normProb(side2?.win_probability);
+  if (t1Prob === null && t2Prob !== null) t1Prob = 1 - t2Prob;
+  if (t2Prob === null && t1Prob !== null) t2Prob = 1 - t1Prob;
+  if (t1Prob === null) t1Prob = 0.5;
+  if (t2Prob === null) t2Prob = 1 - t1Prob;
+
+  const predictedWinner = matchup?.matchup_meta?.predicted_winner
+    || (t1Prob >= t2Prob ? side1?.name : side2?.name)
+    || side1?.name
+    || side2?.name
+    || '';
+  const predictedWinnerSeed = normalizeTeamName(predictedWinner) === normalizeTeamName(side1?.name)
+    ? Number(side1?.seed || 0) || null
+    : (normalizeTeamName(predictedWinner) === normalizeTeamName(side2?.name)
+      ? Number(side2?.seed || 0) || null
+      : null);
+  const upsetFlag = String(matchup?.matchup_meta?.upset_flag || matchup?.matchup_meta?.display_flag || 'chalk').toLowerCase();
+
+  return res.json({
+    t1_prob: t1Prob,
+    t2_prob: t2Prob,
+    predicted_winner: predictedWinner,
+    predicted_winner_seed: predictedWinnerSeed,
+    upset_flag: upsetFlag,
+    t1_seed: Number(side1?.seed || 0) || null,
+    t2_seed: Number(side2?.seed || 0) || null,
+  });
+});
+
 app.get('/api/matchup/:matchupId', (req, res) => {
   const matchup = findBracketMatchupById(req.params.matchupId);
   if (!matchup) return res.status(404).json({ error: 'Matchup not found.' });

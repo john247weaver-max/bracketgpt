@@ -1546,7 +1546,15 @@
       const overlay = document.getElementById('overlay');
       const card = document.getElementById('card');
       if (!overlay || !card) return;
-      if (cancelAuto) autoAdvanceEnabled = false;
+      if (cancelAuto) {
+        autoAdvanceEnabled = false;
+        clearPreviewTimers();
+        setInteractionLock(false);
+        const container = document.querySelector('.container');
+        if (container) container.style.transform = 'scale(1)';
+        const banner = document.getElementById('flowBanner');
+        if (banner) banner.classList.remove('show');
+      }
       guidedNodeId = '';
       analysisToken += 1;
       if (instant) overlay.classList.add('instant');
