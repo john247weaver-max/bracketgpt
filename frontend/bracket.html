@@ -1217,6 +1217,108 @@
       }
     }
 
+    function normalizeRoundToken(v) {
+      return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function isR64Round(v) {
+      const key = normalizeRoundToken(v);
+      return key === 'r64' || key === 'round64' || key === 'roundof64' || key === 'firstround' || key === '1stround';
+    }
+
+    function toProb(v, fallback) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return fallback;
+      if (n <= 0) return 0;
+      if (n <= 1) return n;
+      if (n <= 100) return n / 100;
+      return fallback;
+    }
+
+    function fallbackPairings(regionsList) {
+      const names = Array.isArray(regionsList) ? regionsList : [];
+      const has = (r) => names.includes(r);
+      if (has('South') && has('West') && has('East') && has('Midwest')) {
+        return [['South', 'West'], ['East', 'Midwest']];
+      }
+      if (names.length >= 4) return [[names[0], names[1]], [names[2], names[3]]];
+      return [['South', 'West'], ['East', 'Midwest']];
+    }
+
+    async function loadBracketFromUploadedJson() {
+      try {
+        const res = await fetch('/data/bracket_2025.json');
+        if (!res.ok) return null;
+        const raw = await res.json();
+        const games = Array.isArray(raw?.bracketGames) ? raw.bracketGames : (Array.isArray(raw?.games) ? raw.games : []);
+        if (!games.length) return null;
+        const r64 = games.filter((g) => isR64Round(g?.round));
+        if (!r64.length) return null;
+
+        const regionCounts = new Map();
+        const matchups = [];
+        for (const g of r64) {
+          const region = String(g?.region || 'Unknown').trim() || 'Unknown';
+          const gameNo = (regionCounts.get(region) || 0) + 1;
+          regionCounts.set(region, gameNo);
+
+          const t1Name = String(g?.team1 || g?.team1Name || 'TBD');
+          const t2Name = String(g?.team2 || g?.team2Name || 'TBD');
+          let p1 = toProb(g?.winProb, 0.5);
+          if (!Number.isFinite(p1)) p1 = 0.5;
+          const p2 = 1 - p1;
+
+          const t1Seed = Number(g?.seed1 ?? g?.team1Seed);
+          const t2Seed = Number(g?.seed2 ?? g?.team2Seed);
+          const winner = String(g?.predictedWinner || (p1 >= p2 ? t1Name : t2Name));
+          const winnerNorm = normalizeName(winner);
+          const t1Win = winnerNorm === normalizeName(t1Name);
+          const t2Win = winnerNorm === normalizeName(t2Name);
+          let upsetFlag = 'chalk';
+          if (t1Win && Number.isFinite(t1Seed) && Number.isFinite(t2Seed) && t1Seed > t2Seed) upsetFlag = 'slight_upset_pick';
+          if (t2Win && Number.isFinite(t1Seed) && Number.isFinite(t2Seed) && t2Seed > t1Seed) upsetFlag = 'slight_upset_pick';
+
+          matchups.push({
+            matchup_id: 'FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo,
+            season: Number(raw?.season || 2025),
+            round: 'R64',
+            region,
+            game_number: gameNo,
+            t1: {
+              team_id: g?.team1Id ?? g?.team1_id ?? null,
+              name: t1Name,
+              seed: Number.isFinite(t1Seed) ? t1Seed : null,
+              win_probability: p1,
+              predicted_margin: null
+            },
+            t2: {
+              team_id: g?.team2Id ?? g?.team2_id ?? null,
+              name: t2Name,
+              seed: Number.isFinite(t2Seed) ? t2Seed : null,
+              win_probability: p2,
+              predicted_margin: null
+            },
+            matchup_meta: {
+              predicted_winner: winner,
+              upset_flag: upsetFlag,
+              display_flag: upsetFlag,
+              confidence: String(g?.confidence || '').toLowerCase() || 'projected'
+            }
+          });
+        }
+
+        const regionsList = Array.from(new Set(matchups.map((m) => String(m.region || '').trim()).filter(Boolean)));
+        return {
+          season: Number(raw?.season || 2025),
+          regions: regionsList,
+          matchups,
+          finalFourPairings: fallbackPairings(regionsList)
+        };
+      } catch (e) {
+        return null;
+      }
+    }
+
     function getTeam(teamId) {
       return bracketData?.team_directory?.[String(teamId)] || null;
     }
@@ -2191,8 +2293,14 @@
           fetch('/api/bracket'),
           fetch('/api/bracket-output').catch(() => null),
         ]);
-        if (!rBracket.ok) throw new Error('Could not load bracket data');
-        const data = await rBracket.json();
+        let data = rBracket && rBracket.ok ? await rBracket.json() : null;
+        if (!Array.isArray(data?.matchups) || data.matchups.length === 0) {
+          const fallbackData = await loadBracketFromUploadedJson();
+          if (fallbackData) data = fallbackData;
+        }
+        if (!data || !Array.isArray(data.matchups)) {
+          throw new Error('Could not load bracket data');
+        }
         if (rOutput && rOutput.ok) {
           bracketOutput = await rOutput.json();
           strategyMap = bracketOutput.strategies || {};
@@ -2226,7 +2334,7 @@
         if (baseMatchups.length === 0) {
           document.getElementById('regions').innerHTML = '';
           document.getElementById('finals').innerHTML = '';
-          showError('No bracket data loaded. Upload matchup data via the Admin panel, or verify bracketgpt_matchups_2025_v2.json (or bracketgpt_matchups_2025_final.json) exists in backend/data/.');
+          showError('No bracket data loaded from API or uploaded bracket JSON. Verify backend/data/bracket_2025.json and backend/data/chatbot_predictions_v5.json are present.');
           return;
         }
         matchupById = new Map(baseMatchups.map((m) => [m.matchup_id, m]));
