@@ -403,7 +403,13 @@
           headers: { 'x-admin-password': adminPassword },
           body: formData,
         });
-        const data = await res.json();
+        const bodyText = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(bodyText);
+        } catch (e) {
+          data = { success: false, error: bodyText || `HTTP ${res.status}` };
+        }
         statusEl.textContent = data.success ? '✅' : '❌';
         if (!data.success) alert('Upload failed: ' + (data.error || 'Unknown'));
         await loadDataStatus();
