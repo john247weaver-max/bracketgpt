@@ -137,50 +137,50 @@
           <span id="status-predictions" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">chatbot_predictions_v5.json</div>
-            <div style="font-size:12px; color:#888;">2,278 matchups — powers chat + /api/matchup (~22MB)</div>
+            <div style="font-size:12px; color:#888;">2,278 matchup predictions — the main data file (~2-4MB)</div>
           </div>
-          <input type="file" id="file-predictions" accept=".json" style="max-width:200px;" />
+          <input type="file" id="file-predictions" data-type="predictions" accept=".json" style="max-width:200px;" />
           <button class="btn" onclick="uploadSingle('predictions', 'file-predictions')">Upload</button>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-bracketCache" style="font-size:20px;">⏳</span>
-          <div style="flex:1; min-width:0;">
-            <div style="font-weight:600;">bracket_cache_2025.json</div>
-            <div style="font-size:12px; color:#888;">~400 realistic matchups — frontend bracket loads once (~2-4MB)</div>
-          </div>
-          <input type="file" id="file-bracketCache" accept=".json" style="max-width:200px;" />
-          <button class="btn" onclick="uploadSingle('bracketCache', 'file-bracketCache')">Upload</button>
-        </div>
-
-        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-teamProfiles" style="font-size:20px;">⏳</span>
+          <span id="status-team_profiles" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">team_profiles_2025.json</div>
             <div style="font-size:12px; color:#888;">68 team profiles — powers "tell me about Duke" (~160KB)</div>
           </div>
-          <input type="file" id="file-teamProfiles" accept=".json" style="max-width:200px;" />
-          <button class="btn" onclick="uploadSingle('teamProfiles', 'file-teamProfiles')">Upload</button>
+          <input type="file" id="file-team_profiles" data-type="team_profiles" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('team_profiles', 'file-team_profiles')">Upload</button>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-seedMatchups" style="font-size:20px;">⏳</span>
+          <span id="status-seed_matchups" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">seed_matchup_all_rounds.json</div>
             <div style="font-size:12px; color:#888;">Historical seed-vs-seed records R64→Championship (~18KB)</div>
           </div>
-          <input type="file" id="file-seedMatchups" accept=".json" style="max-width:200px;" />
-          <button class="btn" onclick="uploadSingle('seedMatchups', 'file-seedMatchups')">Upload</button>
+          <input type="file" id="file-seed_matchups" data-type="seed_matchups" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('seed_matchups', 'file-seed_matchups')">Upload</button>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-archetypeSummary" style="font-size:20px;">⏳</span>
+          <span id="status-archetype_summary" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">archetype_summary_v5.json</div>
             <div style="font-size:12px; color:#888;">Archetype descriptions + matchup matrix (~50KB)</div>
           </div>
-          <input type="file" id="file-archetypeSummary" accept=".json" style="max-width:200px;" />
-          <button class="btn" onclick="uploadSingle('archetypeSummary', 'file-archetypeSummary')">Upload</button>
+          <input type="file" id="file-archetype_summary" data-type="archetype_summary" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('archetype_summary', 'file-archetype_summary')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-archetype_history" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">archetype_history.json</div>
+            <div style="font-size:12px; color:#888;">Per-archetype tournament performance stats (~30KB)</div>
+          </div>
+          <input type="file" id="file-archetype_history" data-type="archetype_history" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('archetype_history', 'file-archetype_history')">Upload</button>
         </div>
       </div>
 
@@ -334,41 +334,47 @@
       try {
         const res = await fetch('/api/admin/data-status', { headers: { 'x-admin-password': pw } });
         const status = await res.json();
+        const files = status.files || {};
         const rows = [
           {
             file: 'chatbot_predictions_v5.json',
-            loaded: status.predictions?.loaded,
-            detail: status.predictions?.loaded
-              ? `${status.predictions.matchups} matchups · ${status.predictions.teams} teams · ${status.predictions.version}`
-              : 'Not loaded',
-          },
-          {
-            file: 'bracket_cache_2025.json',
-            loaded: status.bracketCache?.loaded,
-            detail: status.bracketCache?.loaded
-              ? `${status.bracketCache.matchups} cached of ${status.bracketCache.totalAllPairs} total`
+            loaded: files.predictions?.loaded,
+            detail: files.predictions?.loaded
+              ? `${status.predictions} predictions · ${status.teams} teams · ${files.predictions.version || 'v5.3'}`
               : 'Not loaded',
           },
           {
             file: 'team_profiles_2025.json',
-            loaded: status.teamProfiles?.loaded,
-            detail: status.teamProfiles?.loaded
-              ? `${status.teamProfiles.teams} team profiles`
+            loaded: files.team_profiles?.loaded,
+            detail: files.team_profiles?.loaded
+              ? `${status.profiles} team profiles`
               : 'Not loaded',
           },
           {
             file: 'seed_matchup_all_rounds.json',
-            loaded: status.seedMatchups?.loaded,
-            detail: status.seedMatchups?.loaded
-              ? `${status.seedMatchups.rounds} rounds loaded`
+            loaded: files.seed_matchups?.loaded,
+            detail: files.seed_matchups?.loaded
+              ? `${status.seed_rounds} rounds loaded`
               : 'Not loaded',
           },
           {
             file: 'archetype_summary_v5.json',
-            loaded: status.archetypeSummary?.loaded,
-            detail: status.archetypeSummary?.loaded
-              ? `${status.archetypeSummary.archetypes} archetypes`
+            loaded: files.archetype_summary?.loaded,
+            detail: files.archetype_summary?.loaded
+              ? `${status.archetypes} archetypes`
               : 'Not loaded',
+          },
+          {
+            file: 'archetype_history.json',
+            loaded: files.archetype_history?.loaded,
+            detail: files.archetype_history?.loaded
+              ? `${files.archetype_history.entries} historical entries`
+              : 'Not loaded',
+          },
+          {
+            file: 'bracket_lookup',
+            loaded: !!status.bracket_lookup,
+            detail: status.bracket_lookup ? 'Populated' : 'Missing',
           },
         ];
 
@@ -424,7 +430,7 @@
 
     async function uploadAll() {
       const allStatus = $('upload-all-status');
-      const types = ['predictions', 'bracketCache', 'teamProfiles', 'seedMatchups', 'archetypeSummary'];
+      const types = ['predictions', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
       let ok = 0; let fail = 0;
       allStatus.textContent = '⏳ Uploading...';
 
@@ -450,11 +456,12 @@
           headers: { 'x-admin-password': pw }
         });
         const s = await res.json();
-        $('status-predictions').textContent = s.predictions?.loaded ? '✅' : '❌';
-        $('status-bracketCache').textContent = s.bracketCache?.loaded ? '✅' : '❌';
-        $('status-teamProfiles').textContent = s.teamProfiles?.loaded ? '✅' : '❌';
-        $('status-seedMatchups').textContent = s.seedMatchups?.loaded ? '✅' : '❌';
-        $('status-archetypeSummary').textContent = s.archetypeSummary?.loaded ? '✅' : '❌';
+        const files = s.files || {};
+        $('status-predictions').textContent = files.predictions?.loaded ? '✅' : '❌';
+        $('status-team_profiles').textContent = files.team_profiles?.loaded ? '✅' : '❌';
+        $('status-seed_matchups').textContent = files.seed_matchups?.loaded ? '✅' : '❌';
+        $('status-archetype_summary').textContent = files.archetype_summary?.loaded ? '✅' : '❌';
+        $('status-archetype_history').textContent = files.archetype_history?.loaded ? '✅' : '❌';
       } catch (e) {
         console.error('Status check failed:', e);
       }

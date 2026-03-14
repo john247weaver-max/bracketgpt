@@ -73,8 +73,8 @@ const cfg = {
   temperature: parseFloat(process.env.LLM_TEMPERATURE || savedConfig.temperature || 0.7),
   maxTokens: parseInt(process.env.LLM_MAX_TOKENS || savedConfig.maxTokens || 1200, 10),
   brandName: savedConfig.brandName || 'BracketGPT',
-  tagline: savedConfig.tagline || 'AI Bracket Advisor',
-  activeSeason: savedConfig.activeSeason || '2025',
+  tagline: savedConfig.tagline || 'v5.3 ENSEMBLE · 2,278 ALL-PAIRS PREDICTIONS · KENPOM + ARCHETYPES',
+  activeSeason: savedConfig.activeSeason || 2025,
   messagesPerMinute: parseInt(savedConfig.messagesPerMinute || 30, 10),
   weights: savedConfig.weights || { baseWeight: 0.6, upsetWeight: 0.25, floorWeight: 0.15 },
   features: savedConfig.features || {
@@ -115,12 +115,12 @@ const store = {
   bracketOutput: null,
 };
 const FILE_MAP = {
-  teams: ['team_profiles_2025.json', 'team_profiles.json'],
+  teams: ['team_profiles_2025.json'],
   humanSummaries: ['team_human_summaries_2025.json', 'team_human_summaries.json'],
-  base: ['chatbot_predictions_base_2025_historical.json', 'chatbot_predictions_base_2025.json', 'chatbot_predictions_base.json'],
-  upset: ['chatbot_predictions_upset_2025.json', 'chatbot_predictions_upset.json'],
-  floor: ['chatbot_predictions_floor_2025.json', 'chatbot_predictions_floor.json'],
-  optimizer: ['bracket_optimizer_results_2025.json', 'bracket_optimizer_results.json'],
+  base: ['chatbot_predictions_v5.json'],
+  upset: ['chatbot_predictions_v5.json'],
+  floor: ['chatbot_predictions_v5.json'],
+  optimizer: ['archetype_history.json'],
   bracket: ['bracket_predictions_2025.json', 'bracket_predictions.json'],
   bracket2025: ['bracket_2025.json'],
   ev: ['bracket_ev_espn.json'],
@@ -133,10 +133,10 @@ const FILE_MAP = {
 
 const DATA_FILES = {
   predictions: 'chatbot_predictions_v5.json',
-  bracketCache: 'bracket_cache_2025.json',
-  teamProfiles: 'team_profiles_2025.json',
-  seedMatchups: 'seed_matchup_all_rounds.json',
-  archetypeSummary: 'archetype_summary_v5.json',
+  team_profiles: 'team_profiles_2025.json',
+  seed_matchups: 'seed_matchup_all_rounds.json',
+  archetype_summary: 'archetype_summary_v5.json',
+  archetype_history: 'archetype_history.json',
 };
 
 const dataStore = {};
@@ -181,10 +181,19 @@ function loadData() {
       store[key] = null;
     }
   }
-  return anyLoaded;
+  const v53Loaded = loadDataFiles();
+  return anyLoaded || v53Loaded;
+}
+
+function syncDataStoreAliases() {
+  dataStore.teamProfiles = dataStore.team_profiles || null;
+  dataStore.seedMatchups = dataStore.seed_matchups || null;
+  dataStore.archetypeSummary = dataStore.archetype_summary || null;
+  dataStore.archetypeHistory = dataStore.archetype_history || null;
 }
 
 function loadDataFiles() {
+  let anyLoaded = false;
   console.log('Loading data files...');
   for (const [key, filename] of Object.entries(DATA_FILES)) {
     const filepath = path.join(DATA_DIR, filename);
@@ -194,6 +203,7 @@ function loadDataFiles() {
         dataStore[key] = JSON.parse(raw);
         const size = (Buffer.byteLength(raw) / 1024 / 1024).toFixed(1);
         console.log(`  [ok] ${filename} loaded (${size}MB)`);
+        anyLoaded = true;
       } else {
         console.log(`  [warn] ${filename} not found - skipping`);
         dataStore[key] = null;
@@ -203,7 +213,9 @@ function loadDataFiles() {
       dataStore[key] = null;
     }
   }
+  syncDataStoreAliases();
   console.log('Data loading complete.');
+  return anyLoaded;
 }
 
 function parseUploadedJson(rawInput) {
@@ -304,92 +316,109 @@ function extractTeamNames(message) {
   return found;
 }
 
-function buildChatContext(userMessage) {
-  const context = {};
-  const teamsFound = extractTeamNames(userMessage);
+function findRelevantContext(userMessage) {
+  const lc = String(userMessage || '').toLowerCase();
+  const context = [];
+  const seen = new Set();
 
-  if (teamsFound.length >= 2) {
-    const matchup = findMatchup(teamsFound[0].id, teamsFound[1].id);
-    if (matchup) {
-      context.matchup = {
-        t1: matchup.t1_name,
-        t2: matchup.t2_name,
-        t1_seed: matchup.t1_seed,
-        t2_seed: matchup.t2_seed,
-        model_win_prob: matchup.model_win_prob,
-        predicted_margin: matchup.predicted_margin,
-        confidence: matchup.confidence,
-        upset_flag: matchup.upset_flag,
-        predicted_winner: matchup.predicted_winner_name,
-        t1_archetype: matchup.t1_archetype,
-        t2_archetype: matchup.t2_archetype,
-        archetype_matchup: matchup.archetype_matchup,
-        key_factors: matchup.key_factors,
-        kenpom: matchup.kenpom,
-        t1_profile: matchup.t1_profile,
-        t2_profile: matchup.t2_profile,
-        t1_comp: matchup.t1_topComp,
-        t2_comp: matchup.t2_topComp,
-        form_and_risk: matchup.form_and_risk,
-        chatbot_responses: matchup.chatbot_responses,
-      };
+  const predictions = dataStore.predictions?.predictions || [];
+  const teamDir = dataStore.predictions?.team_directory || {};
+  const lookup = dataStore.predictions?.bracket_lookup || {};
+  const profiles = dataStore.team_profiles?.teams || {};
+  const seedMatchups = dataStore.seed_matchups || {};
+  const archDescriptions = dataStore.archetype_summary?.archetype_descriptions || {};
+
+  const mentionedTeams = [];
+  for (const [tid, team] of Object.entries(teamDir)) {
+    const name = String(team.name || '').toLowerCase();
+    if (name && name.length > 3 && lc.includes(name)) {
+      mentionedTeams.push({ id: tid, ...team });
     }
   }
 
-  if (teamsFound.length === 1) {
-    const teamId = String(teamsFound[0].id);
-    const profile = dataStore.teamProfiles?.teams?.[teamId] || teamsFound[0];
-    context.team = profile;
+  if (mentionedTeams.length >= 2) {
+    const t1 = mentionedTeams[0].id;
+    const t2 = mentionedTeams[1].id;
+    const idx = lookup[t1]?.[t2];
+    if (idx !== undefined) {
+      context.push({ type: 'matchup', item: predictions[idx] });
+    }
   }
 
-  if (/upset|cinderella|underdog|seed|sleeper|bust|chalk/i.test(userMessage)) {
-    context.seedHistory = dataStore.seedMatchups || {};
-    const upsets = (dataStore.predictions?.predictions || [])
-      .filter((p) => p.upset_flag && p.upset_flag.length > 0)
-      .slice(0, 10)
-      .map((p) => ({
-        matchup: `${p.t1_name} vs ${p.t2_name}`,
-        prob: p.model_win_prob,
-        upset_flag: p.upset_flag,
-        confidence: p.confidence,
-      }));
-    if (upsets.length > 0) context.upsetPicks = upsets;
+  for (const team of mentionedTeams) {
+    const profile = profiles[team.id];
+    if (profile) context.push({ type: 'team_profile', item: profile });
   }
 
-  if (/bracket|strategy|pool|espn|points|optimize/i.test(userMessage)) {
-    context.espnScoring = dataStore.predictions?.espn_scoring;
+  if (lc.includes('upset') || lc.includes('cinderella') || lc.includes('underdog')) {
+    const upsets = predictions.filter((p) => p.upset_flag && String(p.upset_flag).includes('UPSET'));
+    for (const u of upsets.slice(0, 10)) {
+      context.push({ type: 'upset_pick', item: u });
+    }
   }
 
-  if (/archetype|style|type|matchup.*history/i.test(userMessage)) {
-    context.archetypeSummary = dataStore.archetypeSummary?.archetype_descriptions;
+  const seedMatch = lc.match(/(\d+)\s*(?:seed|vs|versus)/);
+  if (seedMatch) {
+    const seed = parseInt(seedMatch[1], 10);
+    const seedPreds = predictions.filter((p) => p.t1_seed === seed || p.t2_seed === seed);
+    for (const sp of seedPreds.slice(0, 8)) {
+      context.push({ type: 'seed_matchup', item: sp });
+    }
   }
 
-  return context;
+  if (lc.includes('bracket') || lc.includes('strategy') || lc.includes('pool') || lc.includes('chalk')) {
+    const valuePicks = [...predictions]
+      .sort((a, b) => Math.abs(Number(b.value_score || 0)) - Math.abs(Number(a.value_score || 0)))
+      .slice(0, 8);
+    for (const vp of valuePicks) {
+      context.push({ type: 'value_pick', item: vp });
+    }
+  }
+
+  if (lc.includes('archetype') || lc.includes('style') || lc.includes('type of team')) {
+    context.push({ type: 'archetype_info', item: archDescriptions });
+  }
+
+  for (const [round, roundData] of Object.entries(seedMatchups)) {
+    if (lc.includes(String(round).toLowerCase())) {
+      context.push({ type: 'seed_history', item: { round, data: roundData } });
+    }
+  }
+
+  return context.filter((c) => {
+    const key = JSON.stringify(c).substring(0, 200);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 15);
+}
+
+function buildChatContext(userMessage) {
+  return findRelevantContext(userMessage);
 }
 
 function getSystemPrompt() {
-  const season = dataStore.predictions?.backtest_season || 2025;
-  const nMatchups = dataStore.predictions?.predictions?.length || 0;
-  const nTeams = Object.keys(dataStore.predictions?.team_directory || {}).length;
+  const systemPrompt = `You are BracketGPT, an elite AI March Madness bracket advisor powered by a 3-model ensemble (XGBoost + LightGBM + CatBoost) trained on 20+ years of NCAA tournament data with KenPom advanced metrics.
 
-  return `You are BracketGPT, an AI March Madness bracket advisor powered by a 3-model ensemble (XGBoost + LightGBM + CatBoost) trained on 20+ years of NCAA tournament data with KenPom advanced metrics.
+You have access to:
+- 2,278 all-pairs predictions (every possible matchup between 68 tournament teams)
+- Team archetypes (Juggernaut, Sharpshooter, Glass Cannon, Fortress, All-Arounder, Scorer, etc.)
+- Historical archetype performance (upset rates, deep run rates by seed tier)
+- Seed matchup history across all rounds (R64 through Championship)
+- KenPom ratings (ORtg, DRtg, NetRtg, Tempo, SOS)
+- Team momentum (last 10 games, margin trend, volatility)
+- Per-team strengths and weaknesses
+- Historical team comparisons (statistically similar past teams and their tournament outcomes)
 
-Season: ${season}
-Data: ${nMatchups} all-pairs predictions across ${nTeams} tournament teams.
-
-When context data is provided in the system message, ALWAYS:
-- Lead with the model win probability and confidence tier (e.g. "Model has Duke at 97% - LOCK")
-- Reference the archetype matchup (e.g. "Juggernaut vs Underdog: historically 78% win rate over 23 matchups")
-- Cite team strengths and weaknesses from the profile data
-- Mention momentum (rising/steady/fading) and injury flags from form_and_risk
-- For upset questions, reference historical seed win rates (e.g. "12-seeds beat 5-seeds 38.5% of the time")
-- Reference the historical comp when notable (e.g. "This Duke squad comps to 2015 Duke - Champion")
-- Use ESPN scoring context when discussing bracket strategy:
-  R64: 10pts, R32: 20, S16: 40, E8: 80, F4: 160, Championship: 320
-- Keep responses concise, confident, and data-driven
-- If context data is missing for a question, say so clearly
-
-Never make up statistics. Only cite numbers that appear in the provided context data.`;
+When answering:
+- Always cite the model win probability and confidence tier (LOCK/STRONG/LEAN/TOSS-UP)
+- Reference the team archetype and what it means for the matchup
+- Mention momentum and injury flags when relevant
+- For upset picks, cite historical seed matchup win rates
+- Use ESPN scoring (10-20-40-80-160-320) when discussing bracket strategy
+- Be specific with numbers - don't say "likely," say "72% win probability"
+- When comparing teams, reference KenPom efficiency ratings and four factors`;
+  return systemPrompt;
 }
 
 function pushToMapArray(map, key, value) {
@@ -492,7 +521,6 @@ function enrichBracketWithPlayers() {
 }
 
 let hasData = loadData();
-loadDataFiles();
 enrichBracketWithPlayers();
 buildHistoricalIndex();
 buildBracketMatchupIndex();
@@ -504,7 +532,6 @@ if (store.bracketOutput?.strategies) {
 
 function reloadDataFromDisk(reason = 'reload') {
   const loaded = loadData();
-  loadDataFiles();
   enrichBracketWithPlayers();
   buildHistoricalIndex();
   buildBracketMatchupIndex();
@@ -2145,6 +2172,17 @@ app.get('/api/config', (req, res) => {
   res.json({ brandName: cfg.brandName, tagline: cfg.tagline, activeSeason: cfg.activeSeason, dataLoaded: hasData });
 });
 
+app.get('/api/data-status', (req, res) => {
+  res.json({
+    predictions: dataStore.predictions?.predictions?.length || 0,
+    teams: Object.keys(dataStore.predictions?.team_directory || {}).length,
+    profiles: Object.keys(dataStore.team_profiles?.teams || {}).length,
+    archetypes: Object.keys(dataStore.archetype_summary?.archetype_descriptions || {}).length,
+    bracket_lookup: Object.keys(dataStore.predictions?.bracket_lookup || {}).length > 0,
+    seed_rounds: Object.keys(dataStore.seed_matchups || {}).length,
+  });
+});
+
 
 app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'bracketgpt', season: cfg.activeSeason, dataLoaded: hasData });
@@ -2243,7 +2281,7 @@ app.get('/api/matchup', (req, res) => {
 app.get('/api/team/:id', (req, res) => {
   const teamId = String(req.params.id || '');
   const fromDir = dataStore.predictions?.team_directory?.[teamId];
-  const fromProfiles = dataStore.teamProfiles?.teams?.[teamId];
+  const fromProfiles = dataStore.team_profiles?.teams?.[teamId];
   const team = fromDir || fromProfiles;
   if (!team) {
     return res.status(404).json({ error: `Team ${teamId} not found` });
@@ -2253,7 +2291,7 @@ app.get('/api/team/:id', (req, res) => {
 
 app.get('/api/seed-history/:round', (req, res) => {
   const round = String(req.params.round || '');
-  const data = dataStore.seedMatchups?.[round];
+  const data = dataStore.seed_matchups?.[round];
   if (!data) {
     return res.status(404).json({ error: `No seed data for round ${round}` });
   }
@@ -2468,30 +2506,41 @@ app.post('/api/seed-bucket-analysis', async (req, res) => {
 });
 
 app.get('/api/admin/data-status', auth, (req, res) => {
+  const summary = {
+    predictions: dataStore.predictions?.predictions?.length || 0,
+    teams: Object.keys(dataStore.predictions?.team_directory || {}).length,
+    profiles: Object.keys(dataStore.team_profiles?.teams || {}).length,
+    archetypes: Object.keys(dataStore.archetype_summary?.archetype_descriptions || {}).length,
+    bracket_lookup: Object.keys(dataStore.predictions?.bracket_lookup || {}).length > 0,
+    seed_rounds: Object.keys(dataStore.seed_matchups || {}).length,
+  };
+
   return res.json({
-    predictions: {
+    ...summary,
+    files: {
+      predictions: {
       loaded: !!dataStore.predictions,
       matchups: dataStore.predictions?.predictions?.length ?? 0,
       version: dataStore.predictions?.model_version ?? null,
       season: dataStore.predictions?.backtest_season ?? null,
       teams: Object.keys(dataStore.predictions?.team_directory ?? {}).length,
-    },
-    bracketCache: {
-      loaded: !!dataStore.bracketCache,
-      matchups: dataStore.bracketCache?.total_matchups ?? 0,
-      totalAllPairs: dataStore.bracketCache?.total_all_pairs ?? 0,
-    },
-    teamProfiles: {
-      loaded: !!dataStore.teamProfiles,
-      teams: Object.keys(dataStore.teamProfiles?.teams ?? {}).length,
-    },
-    seedMatchups: {
-      loaded: !!dataStore.seedMatchups,
-      rounds: Object.keys(dataStore.seedMatchups ?? {}).length,
-    },
-    archetypeSummary: {
-      loaded: !!dataStore.archetypeSummary,
-      archetypes: Object.keys(dataStore.archetypeSummary?.archetype_descriptions ?? {}).length,
+      },
+      team_profiles: {
+        loaded: !!dataStore.team_profiles,
+        teams: Object.keys(dataStore.team_profiles?.teams ?? {}).length,
+      },
+      seed_matchups: {
+        loaded: !!dataStore.seed_matchups,
+        rounds: Object.keys(dataStore.seed_matchups ?? {}).length,
+      },
+      archetype_summary: {
+        loaded: !!dataStore.archetype_summary,
+        archetypes: Object.keys(dataStore.archetype_summary?.archetype_descriptions ?? {}).length,
+      },
+      archetype_history: {
+        loaded: !!dataStore.archetype_history,
+        entries: Object.keys(dataStore.archetype_history ?? {}).length,
+      },
     },
   });
 });
@@ -2571,12 +2620,18 @@ app.post('/admin/upload', auth, (req, res) => {
     }
 
     const t = String(req.body.type || '').trim();
-    const allowed = {
+    const uploadTypeMap = {
       predictions: 'chatbot_predictions_v5.json',
-      bracketCache: 'bracket_cache_2025.json',
-      teamProfiles: 'team_profiles_2025.json',
-      seedMatchups: 'seed_matchup_all_rounds.json',
-      archetypeSummary: 'archetype_summary_v5.json',
+      team_profiles: 'team_profiles_2025.json',
+      seed_matchups: 'seed_matchup_all_rounds.json',
+      archetype_summary: 'archetype_summary_v5.json',
+      archetype_history: 'archetype_history.json',
+    };
+    const typeAliases = {
+      teamProfiles: 'team_profiles',
+      seedMatchups: 'seed_matchups',
+      archetypeSummary: 'archetype_summary',
+      archetypeHistory: 'archetype_history',
     };
     if (!req.file) return res.status(400).json({ success: false, error: 'File required' });
 
@@ -2591,39 +2646,41 @@ app.post('/admin/upload', auth, (req, res) => {
       const key = normalizeFileKey(fileName);
       if (!key) return '';
       if (key.includes('chatbotpredictionsv5') || key.includes('predictionsv5') || key.includes('allpairs')) return 'predictions';
-      if (key.includes('bracketcache2025') || key.includes('bracketcache')) return 'bracketCache';
-      if (key.includes('teamprofiles2025') || key.includes('teamprofiles')) return 'teamProfiles';
-      if (key.includes('seedmatchupallrounds') || key.includes('seedmatchups') || key.includes('seedhistory')) return 'seedMatchups';
-      if (key.includes('archetypesummaryv5') || key.includes('archetypesummary')) return 'archetypeSummary';
+      if (key.includes('teamprofiles2025') || key.includes('teamprofiles')) return 'team_profiles';
+      if (key.includes('seedmatchupallrounds') || key.includes('seedmatchups') || key.includes('seedhistory')) return 'seed_matchups';
+      if (key.includes('archetypesummaryv5') || key.includes('archetypesummary')) return 'archetype_summary';
+      if (key.includes('archetypehistory')) return 'archetype_history';
       return '';
     }
 
     const inferredType = inferTypeFromFilename(req.file.originalname);
     let resolvedType = '';
-    if (t && allowed[t]) resolvedType = t;
-    if (!resolvedType && inferredType && allowed[inferredType]) resolvedType = inferredType;
+    const normalizedType = typeAliases[t] || t;
+    if (normalizedType && uploadTypeMap[normalizedType]) resolvedType = normalizedType;
+    if (!resolvedType && inferredType && uploadTypeMap[inferredType]) resolvedType = inferredType;
     if (!resolvedType) {
       return res.status(400).json({
         success: false,
-        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(allowed).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_cache_2025*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json`
+        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
       });
     }
 
     try {
       const raw = fs.readFileSync(req.file.path, 'utf8');
       const { parsed, normalized, mode } = parseUploadedJson(raw);
-      fs.writeFileSync(path.join(DATA_DIR, allowed[resolvedType]), normalized);
+      fs.writeFileSync(path.join(DATA_DIR, uploadTypeMap[resolvedType]), normalized);
       fs.unlinkSync(req.file.path);
       dataStore[resolvedType] = parsed;
+      syncDataStoreAliases();
       reloadDataFromDisk('admin-upload');
       const sizeMB = (Buffer.byteLength(normalized) / 1024 / 1024).toFixed(1);
       if (t && t !== resolvedType) {
         console.log(`  [upload] type override: requested=${t}, inferred=${resolvedType}, file=${req.file.originalname}`);
       }
-      console.log(`  [upload] ${allowed[resolvedType]} uploaded and reloaded (${sizeMB}MB, parse:${mode})`);
+      console.log(`  [upload] ${uploadTypeMap[resolvedType]} uploaded and reloaded (${sizeMB}MB, parse:${mode})`);
       return res.json({
         success: true,
-        savedAs: allowed[resolvedType],
+        savedAs: uploadTypeMap[resolvedType],
         size: `${sizeMB}MB`,
         type: resolvedType,
       });
