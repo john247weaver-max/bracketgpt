@@ -144,6 +144,16 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-bracket_cache" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">bracket_cache_2025.json</div>
+            <div style="font-size:12px; color:#888;">~300-400 realistic matchups — frontend cache-first lookups (~2-4MB)</div>
+          </div>
+          <input type="file" id="file-bracket_cache" data-type="bracket_cache" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('bracket_cache', 'file-bracket_cache')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-team_profiles" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">team_profiles_2025.json</div>
@@ -198,6 +208,7 @@
           <label>Type</label>
           <select id="legacy-upload-type">
             <option value="predictions">predictions</option>
+            <option value="bracket_cache">bracket_cache</option>
             <option value="team_profiles">team_profiles</option>
             <option value="seed_matchups">seed_matchups</option>
             <option value="archetype_summary">archetype_summary</option>
@@ -372,6 +383,13 @@
               : 'Not loaded',
           },
           {
+            file: 'bracket_cache_2025.json',
+            loaded: files.bracket_cache?.loaded,
+            detail: files.bracket_cache?.loaded
+              ? `${files.bracket_cache.matchups} cached of ${files.bracket_cache.total_all_pairs} total`
+              : 'Not loaded',
+          },
+          {
             file: 'team_profiles_2025.json',
             loaded: files.team_profiles?.loaded,
             detail: files.team_profiles?.loaded
@@ -458,7 +476,7 @@
 
     async function uploadAll() {
       const allStatus = $('upload-all-status');
-      const types = ['predictions', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
+      const types = ['predictions', 'bracket_cache', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
       let ok = 0; let fail = 0;
       allStatus.textContent = '⏳ Uploading...';
 
@@ -520,6 +538,7 @@
         const s = await res.json();
         const files = s.files || {};
         $('status-predictions').textContent = files.predictions?.loaded ? '✅' : '❌';
+        $('status-bracket_cache').textContent = files.bracket_cache?.loaded ? '✅' : '❌';
         $('status-team_profiles').textContent = files.team_profiles?.loaded ? '✅' : '❌';
         $('status-seed_matchups').textContent = files.seed_matchups?.loaded ? '✅' : '❌';
         $('status-archetype_summary').textContent = files.archetype_summary?.loaded ? '✅' : '❌';

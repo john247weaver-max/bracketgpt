@@ -133,6 +133,7 @@ const FILE_MAP = {
 
 const DATA_FILES = {
   predictions: 'chatbot_predictions_v5.json',
+  bracket_cache: 'bracket_cache_2025.json',
   team_profiles: 'team_profiles_2025.json',
   seed_matchups: 'seed_matchup_all_rounds.json',
   archetype_summary: 'archetype_summary_v5.json',
@@ -186,6 +187,7 @@ function loadData() {
 }
 
 function syncDataStoreAliases() {
+  dataStore.bracketCache = dataStore.bracket_cache || dataStore.bracketCache || null;
   dataStore.teamProfiles = dataStore.team_profiles || null;
   dataStore.seedMatchups = dataStore.seed_matchups || null;
   dataStore.archetypeSummary = dataStore.archetype_summary || null;
@@ -2518,6 +2520,7 @@ app.post('/api/seed-bucket-analysis', async (req, res) => {
 app.get('/api/admin/data-status', auth, (req, res) => {
   const summary = {
     predictions: dataStore.predictions?.predictions?.length || 0,
+    bracket_cache: dataStore.bracket_cache?.total_matchups || dataStore.bracketCache?.total_matchups || 0,
     teams: Object.keys(dataStore.predictions?.team_directory || {}).length,
     profiles: Object.keys(dataStore.team_profiles?.teams || {}).length,
     archetypes: Object.keys(dataStore.archetype_summary?.archetype_descriptions || {}).length,
@@ -2534,6 +2537,11 @@ app.get('/api/admin/data-status', auth, (req, res) => {
       version: dataStore.predictions?.model_version ?? null,
       season: dataStore.predictions?.backtest_season ?? null,
       teams: Object.keys(dataStore.predictions?.team_directory ?? {}).length,
+      },
+      bracket_cache: {
+        loaded: !!(dataStore.bracket_cache || dataStore.bracketCache),
+        matchups: dataStore.bracket_cache?.total_matchups ?? dataStore.bracketCache?.total_matchups ?? 0,
+        total_all_pairs: dataStore.bracket_cache?.total_all_pairs ?? dataStore.bracketCache?.total_all_pairs ?? 0,
       },
       team_profiles: {
         loaded: !!dataStore.team_profiles,
@@ -2632,6 +2640,7 @@ app.post('/admin/upload', auth, (req, res) => {
     const t = String(req.body.type || '').trim();
     const uploadTypeMap = {
       predictions: 'chatbot_predictions_v5.json',
+      bracket_cache: 'bracket_cache_2025.json',
       team_profiles: 'team_profiles_2025.json',
       seed_matchups: 'seed_matchup_all_rounds.json',
       archetype_summary: 'archetype_summary_v5.json',
@@ -2639,6 +2648,9 @@ app.post('/admin/upload', auth, (req, res) => {
     };
     const typeAliases = {
       base: 'predictions',
+      bracketCache: 'bracket_cache',
+      bracket_cache_2025: 'bracket_cache',
+      cache: 'bracket_cache',
       teams: 'team_profiles',
       upset: 'seed_matchups',
       floor: 'archetype_summary',
@@ -2661,6 +2673,7 @@ app.post('/admin/upload', auth, (req, res) => {
       const key = normalizeFileKey(fileName);
       if (!key) return '';
       if (key.includes('chatbotpredictionsv5') || key.includes('predictionsv5') || key.includes('allpairs')) return 'predictions';
+      if (key.includes('bracketcache2025') || key.includes('bracketcache')) return 'bracket_cache';
       if (key.includes('teamprofiles2025') || key.includes('teamprofiles')) return 'team_profiles';
       if (key.includes('seedmatchupallrounds') || key.includes('seedmatchups') || key.includes('seedhistory')) return 'seed_matchups';
       if (key.includes('archetypesummaryv5') || key.includes('archetypesummary')) return 'archetype_summary';
@@ -2676,7 +2689,7 @@ app.post('/admin/upload', auth, (req, res) => {
     if (!resolvedType) {
       return res.status(400).json({
         success: false,
-        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
+        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_cache_2025*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
       });
     }
 
