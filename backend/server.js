@@ -3,11 +3,16 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-const compression = require('compression');
+let compression = null;
+try {
+  compression = require('compression');
+} catch (e) {
+  compression = null;
+}
 
 const app = express();
 app.use(cors());
-app.use(compression());
+if (compression) app.use(compression());
 app.use(express.json({ limit: '50mb' }));
 
 const DATA_DIR = path.join(__dirname, 'data');
