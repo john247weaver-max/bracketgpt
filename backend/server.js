@@ -3,9 +3,11 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const compression = require('compression');
 
 const app = express();
 app.use(cors());
+app.use(compression());
 app.use(express.json({ limit: '5mb' }));
 
 const DATA_DIR = path.join(__dirname, 'data');
@@ -122,6 +124,16 @@ const FILE_MAP = {
   context: ['context_2025.json', 'context.json'],
 };
 
+const DATA_FILES = {
+  predictions: 'chatbot_predictions_v5.json',
+  bracketCache: 'bracket_cache_2025.json',
+  teamProfiles: 'team_profiles_2025.json',
+  seedMatchups: 'seed_matchup_all_rounds.json',
+  archetypeSummary: 'archetype_summary_v5.json',
+};
+
+const dataStore = {};
+
 const historicalIndex = {
   predictionsByTeam: new Map(),
   predictionsBySeed: new Map(),
@@ -163,6 +175,166 @@ function loadData() {
     }
   }
   return anyLoaded;
+}
+
+function loadDataFiles() {
+  console.log('Loading data files...');
+  for (const [key, filename] of Object.entries(DATA_FILES)) {
+    const filepath = path.join(DATA_DIR, filename);
+    try {
+      if (fs.existsSync(filepath)) {
+        const raw = fs.readFileSync(filepath, 'utf8');
+        dataStore[key] = JSON.parse(raw);
+        const size = (Buffer.byteLength(raw) / 1024 / 1024).toFixed(1);
+        console.log(`  [ok] ${filename} loaded (${size}MB)`);
+      } else {
+        console.log(`  [warn] ${filename} not found - skipping`);
+        dataStore[key] = null;
+      }
+    } catch (e) {
+      console.error(`  [err] ${filename} failed to parse: ${e.message}`);
+      dataStore[key] = null;
+    }
+  }
+  console.log('Data loading complete.');
+}
+
+function findMatchup(t1Id, t2Id) {
+  const lookup = dataStore.predictions?.bracket_lookup || {};
+  const t1 = String(t1Id);
+  const t2 = String(t2Id);
+  const idx = lookup[t1]?.[t2] ?? lookup[t2]?.[t1];
+  if (idx !== undefined && dataStore.predictions?.predictions) {
+    return dataStore.predictions.predictions[idx];
+  }
+  return null;
+}
+
+function findTeamByName(name) {
+  if (!name) return null;
+  const lc = String(name).toLowerCase().trim();
+
+  const dir = dataStore.predictions?.team_directory || {};
+  for (const [id, team] of Object.entries(dir)) {
+    if (team.name && String(team.name).toLowerCase() === lc) {
+      return { id: parseInt(id, 10), ...team };
+    }
+  }
+  for (const [id, team] of Object.entries(dir)) {
+    if (team.name && String(team.name).toLowerCase().includes(lc)) {
+      return { id: parseInt(id, 10), ...team };
+    }
+  }
+
+  const profiles = dataStore.teamProfiles?.teams || {};
+  for (const [id, team] of Object.entries(profiles)) {
+    if (team.name && String(team.name).toLowerCase().includes(lc)) {
+      return { id: parseInt(id, 10), ...team };
+    }
+  }
+  return null;
+}
+
+function extractTeamNames(message) {
+  const dir = dataStore.predictions?.team_directory || {};
+  const found = [];
+  const lc = String(message || '').toLowerCase();
+  const teams = Object.values(dir).sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
+  for (const team of teams) {
+    if (team.name && lc.includes(String(team.name).toLowerCase())) {
+      found.push(team);
+      if (found.length >= 2) break;
+    }
+  }
+  return found;
+}
+
+function buildChatContext(userMessage) {
+  const context = {};
+  const teamsFound = extractTeamNames(userMessage);
+
+  if (teamsFound.length >= 2) {
+    const matchup = findMatchup(teamsFound[0].id, teamsFound[1].id);
+    if (matchup) {
+      context.matchup = {
+        t1: matchup.t1_name,
+        t2: matchup.t2_name,
+        t1_seed: matchup.t1_seed,
+        t2_seed: matchup.t2_seed,
+        model_win_prob: matchup.model_win_prob,
+        predicted_margin: matchup.predicted_margin,
+        confidence: matchup.confidence,
+        upset_flag: matchup.upset_flag,
+        predicted_winner: matchup.predicted_winner_name,
+        t1_archetype: matchup.t1_archetype,
+        t2_archetype: matchup.t2_archetype,
+        archetype_matchup: matchup.archetype_matchup,
+        key_factors: matchup.key_factors,
+        kenpom: matchup.kenpom,
+        t1_profile: matchup.t1_profile,
+        t2_profile: matchup.t2_profile,
+        t1_comp: matchup.t1_topComp,
+        t2_comp: matchup.t2_topComp,
+        form_and_risk: matchup.form_and_risk,
+        chatbot_responses: matchup.chatbot_responses,
+      };
+    }
+  }
+
+  if (teamsFound.length === 1) {
+    const teamId = String(teamsFound[0].id);
+    const profile = dataStore.teamProfiles?.teams?.[teamId] || teamsFound[0];
+    context.team = profile;
+  }
+
+  if (/upset|cinderella|underdog|seed|sleeper|bust|chalk/i.test(userMessage)) {
+    context.seedHistory = dataStore.seedMatchups || {};
+    const upsets = (dataStore.predictions?.predictions || [])
+      .filter((p) => p.upset_flag && p.upset_flag.length > 0)
+      .slice(0, 10)
+      .map((p) => ({
+        matchup: `${p.t1_name} vs ${p.t2_name}`,
+        prob: p.model_win_prob,
+        upset_flag: p.upset_flag,
+        confidence: p.confidence,
+      }));
+    if (upsets.length > 0) context.upsetPicks = upsets;
+  }
+
+  if (/bracket|strategy|pool|espn|points|optimize/i.test(userMessage)) {
+    context.espnScoring = dataStore.predictions?.espn_scoring;
+  }
+
+  if (/archetype|style|type|matchup.*history/i.test(userMessage)) {
+    context.archetypeSummary = dataStore.archetypeSummary?.archetype_descriptions;
+  }
+
+  return context;
+}
+
+function getSystemPrompt() {
+  const season = dataStore.predictions?.backtest_season || 2025;
+  const nMatchups = dataStore.predictions?.predictions?.length || 0;
+  const nTeams = Object.keys(dataStore.predictions?.team_directory || {}).length;
+
+  return `You are BracketGPT, an AI March Madness bracket advisor powered by a 3-model ensemble (XGBoost + LightGBM + CatBoost) trained on 20+ years of NCAA tournament data with KenPom advanced metrics.
+
+Season: ${season}
+Data: ${nMatchups} all-pairs predictions across ${nTeams} tournament teams.
+
+When context data is provided in the system message, ALWAYS:
+- Lead with the model win probability and confidence tier (e.g. "Model has Duke at 97% - LOCK")
+- Reference the archetype matchup (e.g. "Juggernaut vs Underdog: historically 78% win rate over 23 matchups")
+- Cite team strengths and weaknesses from the profile data
+- Mention momentum (rising/steady/fading) and injury flags from form_and_risk
+- For upset questions, reference historical seed win rates (e.g. "12-seeds beat 5-seeds 38.5% of the time")
+- Reference the historical comp when notable (e.g. "This Duke squad comps to 2015 Duke - Champion")
+- Use ESPN scoring context when discussing bracket strategy:
+  R64: 10pts, R32: 20, S16: 40, E8: 80, F4: 160, Championship: 320
+- Keep responses concise, confident, and data-driven
+- If context data is missing for a question, say so clearly
+
+Never make up statistics. Only cite numbers that appear in the provided context data.`;
 }
 
 function pushToMapArray(map, key, value) {
@@ -265,6 +437,7 @@ function enrichBracketWithPlayers() {
 }
 
 let hasData = loadData();
+loadDataFiles();
 enrichBracketWithPlayers();
 buildHistoricalIndex();
 buildBracketMatchupIndex();
@@ -276,6 +449,7 @@ if (store.bracketOutput?.strategies) {
 
 function reloadDataFromDisk(reason = 'reload') {
   const loaded = loadData();
+  loadDataFiles();
   enrichBracketWithPlayers();
   buildHistoricalIndex();
   buildBracketMatchupIndex();
@@ -1992,49 +2166,43 @@ app.get('/api/matchup/by-teams/:t1/:t2', (req, res) => {
   return res.json(matchup);
 });
 
+app.get('/api/bracket-cache', (req, res) => {
+  if (!dataStore.bracketCache) {
+    return res.status(404).json({ error: 'Bracket cache not loaded' });
+  }
+  return res.json(dataStore.bracketCache);
+});
+
 app.get('/api/matchup', (req, res) => {
-  const t1 = String(req.query.t1 || '').trim();
-  const t2 = String(req.query.t2 || '').trim();
-  if (!t1 || !t2) return res.status(400).json({ error: 't1 and t2 are required.' });
-  const matchup = findBracketMatchupByTeams(t1, t2);
-  if (!matchup) return res.status(404).json({ error: 'not found' });
+  const { t1, t2 } = req.query;
+  if (!t1 || !t2) {
+    return res.status(400).json({ error: 'Provide t1 and t2 query params (team IDs)' });
+  }
+  const matchup = findMatchup(t1, t2);
+  if (!matchup) {
+    return res.status(404).json({ error: `No prediction found for ${t1} vs ${t2}` });
+  }
+  return res.json(matchup);
+});
 
-  const q1 = normalizeTeamName(t1);
-  const q2 = normalizeTeamName(t2);
-  const m1 = normalizeTeamName(matchup?.t1?.name);
-  const m2 = normalizeTeamName(matchup?.t2?.name);
-  const flipped = m1 === q2 && m2 === q1;
-  const side1 = flipped ? matchup.t2 : matchup.t1;
-  const side2 = flipped ? matchup.t1 : matchup.t2;
+app.get('/api/team/:id', (req, res) => {
+  const teamId = String(req.params.id || '');
+  const fromDir = dataStore.predictions?.team_directory?.[teamId];
+  const fromProfiles = dataStore.teamProfiles?.teams?.[teamId];
+  const team = fromDir || fromProfiles;
+  if (!team) {
+    return res.status(404).json({ error: `Team ${teamId} not found` });
+  }
+  return res.json({ id: parseInt(teamId, 10), ...team });
+});
 
-  let t1Prob = normProb(side1?.win_probability);
-  let t2Prob = normProb(side2?.win_probability);
-  if (t1Prob === null && t2Prob !== null) t1Prob = 1 - t2Prob;
-  if (t2Prob === null && t1Prob !== null) t2Prob = 1 - t1Prob;
-  if (t1Prob === null) t1Prob = 0.5;
-  if (t2Prob === null) t2Prob = 1 - t1Prob;
-
-  const predictedWinner = matchup?.matchup_meta?.predicted_winner
-    || (t1Prob >= t2Prob ? side1?.name : side2?.name)
-    || side1?.name
-    || side2?.name
-    || '';
-  const predictedWinnerSeed = normalizeTeamName(predictedWinner) === normalizeTeamName(side1?.name)
-    ? Number(side1?.seed || 0) || null
-    : (normalizeTeamName(predictedWinner) === normalizeTeamName(side2?.name)
-      ? Number(side2?.seed || 0) || null
-      : null);
-  const upsetFlag = String(matchup?.matchup_meta?.upset_flag || matchup?.matchup_meta?.display_flag || 'chalk').toLowerCase();
-
-  return res.json({
-    t1_prob: t1Prob,
-    t2_prob: t2Prob,
-    predicted_winner: predictedWinner,
-    predicted_winner_seed: predictedWinnerSeed,
-    upset_flag: upsetFlag,
-    t1_seed: Number(side1?.seed || 0) || null,
-    t2_seed: Number(side2?.seed || 0) || null,
-  });
+app.get('/api/seed-history/:round', (req, res) => {
+  const round = String(req.params.round || '');
+  const data = dataStore.seedMatchups?.[round];
+  if (!data) {
+    return res.status(404).json({ error: `No seed data for round ${round}` });
+  }
+  return res.json(data);
 });
 
 app.get('/api/matchup/:matchupId', (req, res) => {
@@ -2103,7 +2271,28 @@ ${fmtCtx(ctx)}`);
 }
 
 app.post('/api/chat', async (req, res) => {
-  return handleChat(req, res, { forceBracketContext: false });
+  try {
+    if (!rateOk(req.ip || 'x')) return res.status(429).json({ error: 'Too many messages.' });
+    const { messages } = req.body || {};
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages array required' });
+    }
+
+    const lastMessage = messages[messages.length - 1]?.content || '';
+    const context = buildChatContext(lastMessage);
+
+    let systemContent = getSystemPrompt();
+    if (Object.keys(context).length > 0) {
+      systemContent += '\n\n--- CONTEXT DATA (from model predictions) ---\n';
+      systemContent += JSON.stringify(context, null, 2);
+    }
+
+    const reply = await callLLM(messages, systemContent, { rawSystemPrompt: true });
+    return res.json({ reply });
+  } catch (err) {
+    console.error('LLM call failed:', err.message);
+    return res.status(500).json({ error: 'Failed to get response from AI' });
+  }
 });
 
 app.post('/api/bracket-chat', async (req, res) => {
@@ -2223,6 +2412,35 @@ app.post('/api/seed-bucket-analysis', async (req, res) => {
   }
 });
 
+app.get('/api/admin/data-status', auth, (req, res) => {
+  return res.json({
+    predictions: {
+      loaded: !!dataStore.predictions,
+      matchups: dataStore.predictions?.predictions?.length ?? 0,
+      version: dataStore.predictions?.model_version ?? null,
+      season: dataStore.predictions?.backtest_season ?? null,
+      teams: Object.keys(dataStore.predictions?.team_directory ?? {}).length,
+    },
+    bracketCache: {
+      loaded: !!dataStore.bracketCache,
+      matchups: dataStore.bracketCache?.total_matchups ?? 0,
+      totalAllPairs: dataStore.bracketCache?.total_all_pairs ?? 0,
+    },
+    teamProfiles: {
+      loaded: !!dataStore.teamProfiles,
+      teams: Object.keys(dataStore.teamProfiles?.teams ?? {}).length,
+    },
+    seedMatchups: {
+      loaded: !!dataStore.seedMatchups,
+      rounds: Object.keys(dataStore.seedMatchups ?? {}).length,
+    },
+    archetypeSummary: {
+      loaded: !!dataStore.archetypeSummary,
+      archetypes: Object.keys(dataStore.archetypeSummary?.archetype_descriptions ?? {}).length,
+    },
+  });
+});
+
 app.get('/admin/config', auth, (req, res) => {
   const dataStatus = {};
   for (const key of Object.keys(FILE_MAP)) {
@@ -2286,25 +2504,34 @@ app.post('/admin/password', auth, (req, res) => {
 
 const up = multer({ dest: TMP_DIR });
 app.post('/admin/upload', auth, up.single('file'), (req, res) => {
-  const type = req.body.type;
-  if (!type || !FILE_MAP[type]) return res.status(400).json({ success: false, error: 'Bad type' });
-  const targetFile = FILE_MAP[type][0];
-  if (!req.file) return res.status(400).json({ success: false, error: 'No file' });
+  const t = req.body.type;
+  const allowed = {
+    predictions: 'chatbot_predictions_v5.json',
+    bracketCache: 'bracket_cache_2025.json',
+    teamProfiles: 'team_profiles_2025.json',
+    seedMatchups: 'seed_matchup_all_rounds.json',
+    archetypeSummary: 'archetype_summary_v5.json',
+  };
+  if (!t || !allowed[t]) {
+    return res.status(400).json({ error: `Invalid type. Allowed: ${Object.keys(allowed).join(', ')}` });
+  }
+  if (!req.file) return res.status(400).json({ error: 'File required' });
 
   try {
     const raw = fs.readFileSync(req.file.path, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!hasContent(parsed)) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ success: false, error: 'JSON is empty or missing supported fields.' });
-    }
-    fs.writeFileSync(path.join(DATA_DIR, targetFile), raw);
+    JSON.parse(raw);
+    fs.writeFileSync(path.join(DATA_DIR, allowed[t]), raw);
     fs.unlinkSync(req.file.path);
+    dataStore[t] = JSON.parse(raw);
     reloadDataFromDisk('admin-upload');
-    return res.json({ success: true });
+    return res.json({
+      success: true,
+      savedAs: allowed[t],
+      size: `${(Buffer.byteLength(raw) / 1024 / 1024).toFixed(1)}MB`,
+    });
   } catch (e) {
     if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    return res.status(400).json({ success: false, error: 'Bad JSON' });
+    return res.status(400).json({ error: `Invalid JSON or write failed: ${e.message}` });
   }
 });
 
