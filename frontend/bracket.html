@@ -2368,6 +2368,17 @@
         ]);
         let data = rBracket && rBracket.ok ? await rBracket.json() : null;
         if (!Array.isArray(data?.matchups) || data.matchups.length === 0) {
+          try {
+            const bootstrapRes = await fetch('/api/bracket/bootstrap');
+            if (bootstrapRes.ok) {
+              const bootstrapData = await bootstrapRes.json();
+              if (Array.isArray(bootstrapData?.matchups) && bootstrapData.matchups.length) {
+                data = bootstrapData;
+              }
+            }
+          } catch (e) {}
+        }
+        if (!Array.isArray(data?.matchups) || data.matchups.length === 0) {
           const fallbackData = await loadBracketFromUploadedJson();
           if (fallbackData) data = fallbackData;
         }

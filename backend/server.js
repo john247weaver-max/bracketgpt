@@ -517,13 +517,60 @@ function isR64Round(value) {
   return key === 'r64' || key === 'round64' || key === 'roundof64' || key === 'firstround' || key === '1stround';
 }
 
-function deriveR64MatchupsFromBracket2025() {
-  const games = Array.isArray(store.bracket2025?.bracketGames) ? store.bracket2025.bracketGames : [];
-  if (!games.length) return [];
+function normalizeR64Matchups(rows, seasonFallback) {
+  const out = [];
+  const data = Array.isArray(rows) ? rows : [];
+  let r64 = data.filter((m) => isR64Round(m?.round));
+  if (!r64.length && data.length) {
+    r64 = [...data]
+      .sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))
+      .slice(0, 32);
+  }
+  for (const m of r64) {
+    const season = Number(m?.season || seasonFallback || cfg.activeSeason || 2025);
+    const region = String(m?.region || 'Unknown').trim() || 'Unknown';
+    const gameNo = Number(m?.game_number || 0) || 1;
+    const t1 = m?.t1 || {};
+    const t2 = m?.t2 || {};
+    const p1 = normProb(t1?.win_probability ?? t1?.model_win_prob ?? 0.5);
+    const winP1 = p1 === null ? 0.5 : p1;
+    out.push({
+      matchup_id: String(m?.matchup_id || `AUTO_R64_${region.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}_${gameNo}`),
+      season,
+      round: 'R64',
+      region,
+      game_number: gameNo,
+      t1: {
+        team_id: t1?.team_id ?? t1?.id ?? null,
+        name: String(t1?.name || t1?.team || 'TBD'),
+        seed: Number.isFinite(Number(t1?.seed)) ? Number(t1.seed) : null,
+        win_probability: winP1,
+        predicted_margin: Number.isFinite(Number(t1?.predicted_margin)) ? Number(t1.predicted_margin) : null,
+      },
+      t2: {
+        team_id: t2?.team_id ?? t2?.id ?? null,
+        name: String(t2?.name || t2?.team || 'TBD'),
+        seed: Number.isFinite(Number(t2?.seed)) ? Number(t2.seed) : null,
+        win_probability: 1 - winP1,
+        predicted_margin: Number.isFinite(Number(t2?.predicted_margin)) ? Number(t2.predicted_margin) : null,
+      },
+      matchup_meta: {
+        predicted_winner: String(m?.matchup_meta?.predicted_winner || ''),
+        upset_flag: String(m?.matchup_meta?.upset_flag || m?.matchup_meta?.display_flag || 'chalk'),
+        display_flag: String(m?.matchup_meta?.display_flag || m?.matchup_meta?.upset_flag || 'chalk'),
+        confidence: String(m?.matchup_meta?.confidence || 'projected'),
+      },
+    });
+  }
+  return out;
+}
+
+function deriveR64MatchupsFromBracketGames(games, seasonFallback) {
+  if (!Array.isArray(games) || !games.length) return [];
   const r64Games = games.filter((g) => isR64Round(g?.round));
   if (!r64Games.length) return [];
 
-  const season = Number(store.bracket2025?.season || cfg.activeSeason || 2025);
+  const season = Number(seasonFallback || cfg.activeSeason || 2025);
   const regionGameNo = new Map();
   const out = [];
 
@@ -612,6 +659,57 @@ function deriveR64MatchupsFromBracket2025() {
   }
 
   return out.sort((a, b) => String(a.region).localeCompare(String(b.region)) || Number(a.game_number || 0) - Number(b.game_number || 0));
+}
+
+function deriveR64MatchupsFromBracket2025() {
+  const games = Array.isArray(store.bracket2025?.bracketGames) ? store.bracket2025.bracketGames : [];
+  return deriveR64MatchupsFromBracketGames(games, store.bracket2025?.season);
+}
+
+function deriveR64MatchupsFromRawJson(raw) {
+  if (!raw || typeof raw !== 'object') return [];
+  if (Array.isArray(raw.matchups)) {
+    return normalizeR64Matchups(raw.matchups, raw.season);
+  }
+  const games = Array.isArray(raw.bracketGames) ? raw.bracketGames : (Array.isArray(raw.games) ? raw.games : []);
+  if (games.length) {
+    return deriveR64MatchupsFromBracketGames(games, raw.season);
+  }
+  return [];
+}
+
+function deriveR64MatchupsFromDisk() {
+  let files = [];
+  try {
+    files = fs.readdirSync(DATA_DIR).filter((f) => /\.json$/i.test(f));
+  } catch (e) {
+    return [];
+  }
+  if (!files.length) return [];
+
+  const preferred = [
+    'bracketgpt_matchups_2025_final.json',
+    'bracketgpt_matchups_2025_v2.json',
+    'bracket_2025.json',
+    'bracket_predictions_2025.json',
+    'bracket_predictions.json',
+  ];
+  const ordered = [
+    ...preferred.filter((f) => files.includes(f)),
+    ...files.filter((f) => !preferred.includes(f) && /(bracket|matchup)/i.test(f)),
+  ];
+
+  for (const file of ordered) {
+    try {
+      const full = path.join(DATA_DIR, file);
+      const raw = JSON.parse(fs.readFileSync(full, 'utf8'));
+      const matchups = deriveR64MatchupsFromRawJson(raw);
+      if (matchups.length) return matchups;
+    } catch (e) {
+      // keep scanning files
+    }
+  }
+  return [];
 }
 
 function getProfileMap() {
@@ -2328,6 +2426,9 @@ app.get('/api/bracket', (req, res) => {
   if (!matchups.length) {
     matchups = deriveR64MatchupsFromBracket2025();
   }
+  if (!matchups.length) {
+    matchups = deriveR64MatchupsFromDisk();
+  }
   const pairings = (
     Array.isArray(store.bracketMatchups?.finalFourPairings) &&
     store.bracketMatchups.finalFourPairings.length >= 2
@@ -2337,6 +2438,25 @@ app.get('/api/bracket', (req, res) => {
   const regions = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
   res.json({
     season: bracketMatchupIndex.season,
+    regions: regions.length ? regions : bracketMatchupIndex.regions,
+    matchups,
+    finalFourPairings: pairings,
+  });
+});
+
+app.get('/api/bracket/bootstrap', (req, res) => {
+  const fromApi = Array.isArray(store.bracketMatchups?.matchups) ? normalizeR64Matchups(store.bracketMatchups.matchups, store.bracketMatchups?.season) : [];
+  let matchups = fromApi.length ? fromApi : deriveR64MatchupsFromBracket2025();
+  if (!matchups.length) matchups = deriveR64MatchupsFromDisk();
+  const regions = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
+  const pairings = (
+    Array.isArray(store.bracketMatchups?.finalFourPairings) &&
+    store.bracketMatchups.finalFourPairings.length >= 2
+  )
+    ? store.bracketMatchups.finalFourPairings
+    : [['South', 'West'], ['East', 'Midwest']];
+  return res.json({
+    season: Number(matchups[0]?.season || bracketMatchupIndex.season || cfg.activeSeason || 2025),
     regions: regions.length ? regions : bracketMatchupIndex.regions,
     matchups,
     finalFourPairings: pairings,
