@@ -411,6 +411,8 @@
         statusEl.textContent = data.success ? '✅' : '❌';
         if (!data.success) {
           alert('Upload failed (' + res.status + '): ' + (data.error || 'Unknown'));
+        } else if (data.type) {
+          console.log('Uploaded type:', data.type, 'savedAs:', data.savedAs);
         }
         await loadDataStatus();
         await initUploadStatus();
