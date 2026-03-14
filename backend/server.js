@@ -508,6 +508,112 @@ function buildBracketMatchupIndex() {
   bracketMatchupIndex.regions = regionSet.size ? Array.from(regionSet) : ['South', 'West', 'East', 'Midwest'];
 }
 
+function normalizeRoundKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function isR64Round(value) {
+  const key = normalizeRoundKey(value);
+  return key === 'r64' || key === 'round64' || key === 'roundof64' || key === 'firstround' || key === '1stround';
+}
+
+function deriveR64MatchupsFromBracket2025() {
+  const games = Array.isArray(store.bracket2025?.bracketGames) ? store.bracket2025.bracketGames : [];
+  if (!games.length) return [];
+  const r64Games = games.filter((g) => isR64Round(g?.round));
+  if (!r64Games.length) return [];
+
+  const season = Number(store.bracket2025?.season || cfg.activeSeason || 2025);
+  const regionGameNo = new Map();
+  const out = [];
+
+  for (const game of r64Games) {
+    const region = String(game?.region || 'Unknown').trim() || 'Unknown';
+    const gameNo = (regionGameNo.get(region) || 0) + 1;
+    regionGameNo.set(region, gameNo);
+
+    const t1Id = game?.team1Id ?? game?.team1_id ?? null;
+    const t2Id = game?.team2Id ?? game?.team2_id ?? null;
+    const t1Name = String(game?.team1 || game?.team1Name || 'TBD');
+    const t2Name = String(game?.team2 || game?.team2Name || 'TBD');
+    const t1Seed = Number(game?.seed1 ?? game?.team1Seed);
+    const t2Seed = Number(game?.seed2 ?? game?.team2Seed);
+
+    let t1Prob = null;
+    let t2Prob = null;
+    let predictedWinner = String(game?.predictedWinner || '');
+    let confidence = String(game?.confidence || '').toLowerCase();
+    let upsetFlag = 'chalk';
+    let predictedMargin = null;
+
+    if (t1Id !== null && t2Id !== null) {
+      const pred = findMatchup(t1Id, t2Id);
+      if (pred) {
+        const modelProb = normProb(pred.model_win_prob);
+        const aligned = String(pred.t1_id ?? '') === String(t1Id);
+        if (modelProb !== null) {
+          t1Prob = aligned ? modelProb : (1 - modelProb);
+          t2Prob = 1 - t1Prob;
+        }
+        predictedWinner = String(pred.predicted_winner_name || predictedWinner || '');
+        confidence = String(pred.confidence || confidence || '').toLowerCase();
+        upsetFlag = String(pred.upset_flag || upsetFlag || 'chalk').toLowerCase();
+        const rawMargin = Number(pred.predicted_margin);
+        if (Number.isFinite(rawMargin)) predictedMargin = aligned ? rawMargin : -rawMargin;
+      }
+    }
+
+    if (t1Prob === null || t2Prob === null) {
+      const fallback = normProb(game?.winProb);
+      if (fallback !== null) {
+        t1Prob = fallback;
+        t2Prob = 1 - fallback;
+      } else {
+        t1Prob = 0.5;
+        t2Prob = 0.5;
+      }
+    }
+
+    if (!confidence) {
+      const top = Math.max(t1Prob, t2Prob);
+      if (top >= 0.95) confidence = 'lock';
+      else if (top >= 0.85) confidence = 'confident';
+      else if (top >= 0.70) confidence = 'lean';
+      else confidence = 'toss_up';
+    }
+
+    out.push({
+      matchup_id: `AUTO_R64_${region.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}_${gameNo}`,
+      season,
+      round: 'R64',
+      region,
+      game_number: gameNo,
+      t1: {
+        team_id: t1Id,
+        name: t1Name,
+        seed: Number.isFinite(t1Seed) ? t1Seed : null,
+        win_probability: t1Prob,
+        predicted_margin: predictedMargin,
+      },
+      t2: {
+        team_id: t2Id,
+        name: t2Name,
+        seed: Number.isFinite(t2Seed) ? t2Seed : null,
+        win_probability: t2Prob,
+        predicted_margin: predictedMargin === null ? null : -predictedMargin,
+      },
+      matchup_meta: {
+        predicted_winner: predictedWinner,
+        upset_flag: upsetFlag,
+        display_flag: upsetFlag,
+        confidence,
+      },
+    });
+  }
+
+  return out.sort((a, b) => String(a.region).localeCompare(String(b.region)) || Number(a.game_number || 0) - Number(b.game_number || 0));
+}
+
 function getProfileMap() {
   const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
   const profileMap = {};
@@ -2212,14 +2318,15 @@ app.get('/api/ready', (req, res) => {
 
 app.get('/api/bracket', (req, res) => {
   const allMatchups = Array.isArray(store.bracketMatchups?.matchups) ? store.bracketMatchups.matchups : [];
-  const normalizeRoundKey = (round) => String(round || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const r64Keys = new Set(['r64', 'round64', 'roundof64', 'firstround', '1stround']);
-  let matchups = allMatchups.filter((m) => r64Keys.has(normalizeRoundKey(m?.round)));
+  let matchups = allMatchups.filter((m) => isR64Round(m?.round));
   if (!matchups.length && allMatchups.length) {
     // Fallback for uploads that omit/rename round labels: prefer first 32 slots by game_number.
     matchups = [...allMatchups]
       .sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))
       .slice(0, 32);
+  }
+  if (!matchups.length) {
+    matchups = deriveR64MatchupsFromBracket2025();
   }
   const pairings = (
     Array.isArray(store.bracketMatchups?.finalFourPairings) &&
