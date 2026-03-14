@@ -947,6 +947,9 @@
     function normalizeName(v) {
       return String(v || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
     }
+    function normalizeRegionName(v) {
+      return String(v || '').toLowerCase().replace(/[^a-z]/g, '');
+    }
 
     function refreshIcons() {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -1330,10 +1333,15 @@
       parentMap = new Map();
       regionRoundIds = {};
       finalIds = { F4: [], NCG: [] };
+      const canonicalRegionByNorm = new Map();
+      for (const region of regions) {
+        const key = normalizeRegionName(region);
+        if (key && !canonicalRegionByNorm.has(key)) canonicalRegionByNorm.set(key, region);
+      }
 
       for (const region of regions) {
         const r64 = baseMatchups
-          .filter((m) => m.region === region)
+          .filter((m) => normalizeRegionName(m.region) === normalizeRegionName(region))
           .sort((a, b) => Number(a.game_number || 0) - Number(b.game_number || 0));
         const ids = { R64: [], R32: [], S16: [], E8: [] };
         for (const m of r64) {
@@ -1367,12 +1375,22 @@
       const pairings = Array.isArray(finalFourPairings) && finalFourPairings.length >= 2
         ? finalFourPairings
         : [['South', 'West'], ['East', 'Midwest']];
-      const p1 = pairings[0];
-      const p2 = pairings[1];
-      if (!p1 || !p2 || !regionRoundIds[p1[0]] || !regionRoundIds[p1[1]] || !regionRoundIds[p2[0]] || !regionRoundIds[p2[1]]) {
-        finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
+      const resolveRegion = (raw) => {
+        const exact = String(raw || '');
+        if (regionRoundIds[exact]) return exact;
+        return canonicalRegionByNorm.get(normalizeRegionName(raw)) || exact;
+      };
+      const candidatePairs = pairings.map((pair) => [resolveRegion(pair?.[0]), resolveRegion(pair?.[1])]);
+      const isValidPair = (pair) => Array.isArray(pair) && pair.length >= 2 && regionRoundIds[pair[0]] && regionRoundIds[pair[1]];
+      let activePairs = candidatePairs;
+      if (!isValidPair(candidatePairs[0]) || !isValidPair(candidatePairs[1])) {
+        const available = Object.keys(regionRoundIds);
+        if (available.length >= 4) {
+          activePairs = [[available[0], available[1]], [available[2], available[3]]];
+        } else {
+          return;
+        }
       }
-      const activePairs = finalFourPairings;
       const f4a = 'AUTO_F4_' + activePairs[0][0].charAt(0) + activePairs[0][1].charAt(0);
       const f4b = 'AUTO_F4_' + activePairs[1][0].charAt(0) + activePairs[1][1].charAt(0);
       const ncg = 'AUTO_NCG_1';
@@ -2193,8 +2211,13 @@
           teamEpRankings = {};
           championProbs = {};
         }
-        if (Array.isArray(data.regions) && data.regions.length) {
-          regions = data.regions.filter(Boolean);
+        const regionFromMatchups = Array.isArray(data.matchups)
+          ? Array.from(new Set(data.matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)))
+          : [];
+        if (regionFromMatchups.length >= 2) {
+          regions = regionFromMatchups;
+        } else if (Array.isArray(data.regions) && data.regions.length) {
+          regions = data.regions.map((r) => String(r || '').trim()).filter(Boolean);
         }
         finalFourPairings = Array.isArray(data.finalFourPairings) && data.finalFourPairings.length >= 2
           ? data.finalFourPairings

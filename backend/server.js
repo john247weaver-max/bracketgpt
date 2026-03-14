@@ -2211,17 +2211,26 @@ app.get('/api/ready', (req, res) => {
 });
 
 app.get('/api/bracket', (req, res) => {
-  const allMatchups = store.bracketMatchups?.matchups || [];
-  const matchups = allMatchups.filter((m) => String(m.round || '').toUpperCase() === 'R64');
+  const allMatchups = Array.isArray(store.bracketMatchups?.matchups) ? store.bracketMatchups.matchups : [];
+  const normalizeRoundKey = (round) => String(round || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const r64Keys = new Set(['r64', 'round64', 'roundof64', 'firstround', '1stround']);
+  let matchups = allMatchups.filter((m) => r64Keys.has(normalizeRoundKey(m?.round)));
+  if (!matchups.length && allMatchups.length) {
+    // Fallback for uploads that omit/rename round labels: prefer first 32 slots by game_number.
+    matchups = [...allMatchups]
+      .sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))
+      .slice(0, 32);
+  }
   const pairings = (
     Array.isArray(store.bracketMatchups?.finalFourPairings) &&
     store.bracketMatchups.finalFourPairings.length >= 2
   )
     ? store.bracketMatchups.finalFourPairings
     : [['South', 'West'], ['East', 'Midwest']];
+  const regions = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
   res.json({
     season: bracketMatchupIndex.season,
-    regions: bracketMatchupIndex.regions,
+    regions: regions.length ? regions : bracketMatchupIndex.regions,
     matchups,
     finalFourPairings: pairings,
   });
