@@ -133,6 +133,7 @@ const FILE_MAP = {
 
 const DATA_FILES = {
   predictions: 'chatbot_predictions_v5.json',
+  bracket: 'bracket_2025.json',
   bracket_cache: 'bracket_cache_2025.json',
   team_profiles: 'team_profiles_2025.json',
   seed_matchups: 'seed_matchup_all_rounds.json',
@@ -187,6 +188,7 @@ function loadData() {
 }
 
 function syncDataStoreAliases() {
+  dataStore.bracketStructure = dataStore.bracket || null;
   dataStore.bracketCache = dataStore.bracket_cache || dataStore.bracketCache || null;
   dataStore.teamProfiles = dataStore.team_profiles || null;
   dataStore.seedMatchups = dataStore.seed_matchups || null;
@@ -279,12 +281,16 @@ function parseUploadedJson(rawInput) {
 }
 
 function findMatchup(t1Id, t2Id) {
-  const lookup = dataStore.predictions?.bracket_lookup || {};
   const t1 = String(t1Id);
   const t2 = String(t2Id);
-  const idx = lookup[t1]?.[t2] ?? lookup[t2]?.[t1];
-  if (idx !== undefined && dataStore.predictions?.predictions) {
-    return dataStore.predictions.predictions[idx];
+  const sources = [dataStore.bracket_cache, dataStore.predictions];
+  for (const source of sources) {
+    if (!source) continue;
+    const lookup = source.bracket_lookup || {};
+    const idx = lookup[t1]?.[t2] ?? lookup[t2]?.[t1];
+    if (idx !== undefined && source.predictions?.[idx]) {
+      return source.predictions[idx];
+    }
   }
   return null;
 }
@@ -2415,6 +2421,20 @@ app.get('/api/ready', (req, res) => {
 });
 
 app.get('/api/bracket', (req, res) => {
+  if (dataStore.bracket) {
+    const pairings = (
+      Array.isArray(store.bracketMatchups?.finalFourPairings) &&
+      store.bracketMatchups.finalFourPairings.length >= 2
+    )
+      ? store.bracketMatchups.finalFourPairings
+      : [['South', 'West'], ['East', 'Midwest']];
+    const r64 = Array.isArray(dataStore.bracket?.r64_matchups) ? dataStore.bracket.r64_matchups : [];
+    return res.json({
+      ...dataStore.bracket,
+      matchups: r64,
+      finalFourPairings: pairings,
+    });
+  }
   const allMatchups = Array.isArray(store.bracketMatchups?.matchups) ? store.bracketMatchups.matchups : [];
   let matchups = allMatchups.filter((m) => isR64Round(m?.round));
   if (!matchups.length && allMatchups.length) {
@@ -2508,10 +2528,13 @@ app.get('/api/matchup/by-teams/:t1/:t2', (req, res) => {
 });
 
 app.get('/api/bracket-cache', (req, res) => {
-  if (!dataStore.bracketCache) {
-    return res.status(404).json({ error: 'Bracket cache not loaded' });
+  if (dataStore.bracketCache) {
+    return res.json(dataStore.bracketCache);
   }
-  return res.json(dataStore.bracketCache);
+  if (dataStore.predictions) {
+    return res.json(dataStore.predictions);
+  }
+  return res.status(404).json({ error: 'No bracket data loaded' });
 });
 
 app.get('/api/matchup', (req, res) => {
@@ -2528,13 +2551,26 @@ app.get('/api/matchup', (req, res) => {
 
 app.get('/api/team/:id', (req, res) => {
   const teamId = String(req.params.id || '');
-  const fromDir = dataStore.predictions?.team_directory?.[teamId];
   const fromProfiles = dataStore.team_profiles?.teams?.[teamId];
-  const team = fromDir || fromProfiles;
+  const fromDir = dataStore.predictions?.team_directory?.[teamId];
+  const team = fromProfiles || fromDir;
   if (!team) {
     return res.status(404).json({ error: `Team ${teamId} not found` });
   }
   return res.json({ id: parseInt(teamId, 10), ...team });
+});
+
+app.get('/api/matchup/:t1/:t2', (req, res) => {
+  const t1 = String(req.params.t1 || '');
+  const t2 = String(req.params.t2 || '');
+  if (!t1 || !t2) {
+    return res.status(400).json({ error: 'Provide two team IDs in path params' });
+  }
+  const matchup = findMatchup(t1, t2);
+  if (!matchup) {
+    return res.status(404).json({ error: `No prediction found for ${t1} vs ${t2}` });
+  }
+  return res.json(matchup);
 });
 
 app.get('/api/seed-history/:round', (req, res) => {
@@ -2756,6 +2792,7 @@ app.post('/api/seed-bucket-analysis', async (req, res) => {
 app.get('/api/admin/data-status', auth, (req, res) => {
   const summary = {
     predictions: dataStore.predictions?.predictions?.length || 0,
+    bracket: dataStore.bracket?.teams?.length || 0,
     bracket_cache: dataStore.bracket_cache?.total_matchups || dataStore.bracketCache?.total_matchups || 0,
     teams: Object.keys(dataStore.predictions?.team_directory || {}).length,
     profiles: Object.keys(dataStore.team_profiles?.teams || {}).length,
@@ -2773,6 +2810,11 @@ app.get('/api/admin/data-status', auth, (req, res) => {
       version: dataStore.predictions?.model_version ?? null,
       season: dataStore.predictions?.backtest_season ?? null,
       teams: Object.keys(dataStore.predictions?.team_directory ?? {}).length,
+      },
+      bracket: {
+        loaded: !!dataStore.bracket,
+        teams: Array.isArray(dataStore.bracket?.teams) ? dataStore.bracket.teams.length : 0,
+        r64_matchups: Array.isArray(dataStore.bracket?.r64_matchups) ? dataStore.bracket.r64_matchups.length : 0,
       },
       bracket_cache: {
         loaded: !!(dataStore.bracket_cache || dataStore.bracketCache),
@@ -2876,6 +2918,7 @@ app.post('/admin/upload', auth, (req, res) => {
     const t = String(req.body.type || '').trim();
     const uploadTypeMap = {
       predictions: 'chatbot_predictions_v5.json',
+      bracket: 'bracket_2025.json',
       bracket_cache: 'bracket_cache_2025.json',
       team_profiles: 'team_profiles_2025.json',
       seed_matchups: 'seed_matchup_all_rounds.json',
@@ -2884,6 +2927,7 @@ app.post('/admin/upload', auth, (req, res) => {
     };
     const typeAliases = {
       base: 'predictions',
+      bracket2025: 'bracket',
       bracketCache: 'bracket_cache',
       bracket_cache_2025: 'bracket_cache',
       cache: 'bracket_cache',
@@ -2909,6 +2953,7 @@ app.post('/admin/upload', auth, (req, res) => {
       const key = normalizeFileKey(fileName);
       if (!key) return '';
       if (key.includes('chatbotpredictionsv5') || key.includes('predictionsv5') || key.includes('allpairs')) return 'predictions';
+      if (key.includes('bracket2025') || key === 'bracket') return 'bracket';
       if (key.includes('bracketcache2025') || key.includes('bracketcache')) return 'bracket_cache';
       if (key.includes('teamprofiles2025') || key.includes('teamprofiles')) return 'team_profiles';
       if (key.includes('seedmatchupallrounds') || key.includes('seedmatchups') || key.includes('seedhistory')) return 'seed_matchups';
@@ -2925,7 +2970,7 @@ app.post('/admin/upload', auth, (req, res) => {
     if (!resolvedType) {
       return res.status(400).json({
         success: false,
-        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_cache_2025*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
+        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_2025*.json, bracket_cache_2025*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
       });
     }
 

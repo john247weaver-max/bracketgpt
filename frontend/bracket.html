@@ -2367,6 +2367,9 @@
           fetch('/api/bracket-output').catch(() => null),
         ]);
         let data = rBracket && rBracket.ok ? await rBracket.json() : null;
+        if (data && !Array.isArray(data.matchups) && Array.isArray(data.r64_matchups)) {
+          data.matchups = data.r64_matchups;
+        }
         if (!Array.isArray(data?.matchups) || data.matchups.length === 0) {
           try {
             const bootstrapRes = await fetch('/api/bracket/bootstrap');
@@ -2408,6 +2411,8 @@
           : [];
         if (regionFromMatchups.length >= 2) {
           regions = regionFromMatchups;
+        } else if (data.regions && !Array.isArray(data.regions) && typeof data.regions === 'object') {
+          regions = Object.keys(data.regions).map((r) => String(r || '').trim()).filter(Boolean);
         } else if (Array.isArray(data.regions) && data.regions.length) {
           regions = data.regions.map((r) => String(r || '').trim()).filter(Boolean);
         }
