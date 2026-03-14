@@ -10,13 +10,13 @@
   <style>
   :root {
     --bg-base: #0d0f12;
-    --bg-surface: #161920;
-    --bg-surface-2: #1c2028;
-    --bg-line: #1e2229;
-    --accent: #e8b84b;
+    --bg-surface: #141619;
+    --bg-surface-2: #1e2124;
+    --bg-line: #2a2d31;
+    --accent: #C9A84C;
     --accent-hot: #e84b4b;
-    --accent-dim: #a07d2a;
-    --text-primary: #f0f2f5;
+    --accent-dim: rgba(201,168,76,0.12);
+    --text-primary: #e8eaed;
     --text-muted: #6b7280;
     --text-label: #9ca3af;
     --bg: var(--bg-base);
@@ -77,7 +77,13 @@
   }
   .nav-links a.active { color: var(--text-primary); border-bottom-color: var(--accent); }
 
-  .container { max-width: 1520px; margin: 0 auto; padding: 16px 16px 96px; }
+  .container {
+    max-width: 1520px;
+    margin: 0 auto;
+    padding: 16px 16px 96px;
+    transform-origin: top center;
+    transition: transform 400ms ease-in-out;
+  }
   .topbar {
     background: var(--bg-surface);
     border: 1px solid var(--bg-line);
@@ -428,17 +434,57 @@
     vertical-align: middle;
   }
 
-  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 12px; z-index: 200; background: rgba(13,15,18,.8); }
-  .overlay.open { display: flex; }
-  .card {
-    width: min(760px, 96vw);
-    max-height: 92vh;
-    overflow: auto;
-    border: 1px solid var(--bg-line);
-    border-radius: 4px;
-    background: var(--bg-surface);
-    padding: 12px;
+  .flow-banner {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms ease-in-out;
+    z-index: 1002;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
   }
+  .flow-banner.show { opacity: 1; }
+  .flow-locked .container,
+  .flow-locked .nav,
+  .flow-locked .mobile-tabs,
+  .flow-locked .optimizer-toggle { pointer-events: none; }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 999;
+    background: rgba(0,0,0,0.5);
+  }
+  .overlay.open { display: block; }
+  .card {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: 360px;
+    max-height: 82vh;
+    overflow: auto;
+    border-top: 2px solid var(--accent);
+    border-radius: 0;
+    background: var(--bg-surface);
+    padding: 20px 24px 28px;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.6);
+    transform: translateY(100%);
+    transition: transform 180ms ease-out;
+  }
+  .overlay.open .card { transform: translateY(0); }
+  .overlay.instant .card { transition: none; }
+
   .card-head { display:flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
   .badge {
     border: 1px solid var(--bg-line);
@@ -471,6 +517,126 @@
     font-weight: 700;
   }
   .close:hover { border-color: var(--accent); color: var(--accent); }
+
+  .guided-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-label);
+  }
+  .guided-matchup {
+    margin-bottom: 12px;
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    background: var(--bg-surface-2);
+  }
+  .guided-team-row {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 12px;
+    border-left: 3px solid transparent;
+  }
+  .guided-team-row.model {
+    border-left-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--text-primary);
+  }
+  .guided-divider {
+    height: 1px;
+    background: var(--bg-line);
+    margin: 0 12px;
+  }
+  .guided-team-seed {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+  }
+  .guided-team-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .guided-team-prob {
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--accent);
+    text-align: right;
+  }
+  .guided-model {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .guided-model-pick {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .guided-badge {
+    padding: 4px 8px;
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    background: var(--bg-surface-2);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .guided-badge.slight { color: #60a5fa; }
+  .guided-badge.strong { color: #f87171; }
+  .guided-badge.vulnerable { color: #fb923c; }
+  .guided-analysis {
+    min-height: 104px;
+    margin-bottom: 12px;
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    background: var(--bg-surface-2);
+    padding: 12px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.6;
+    color: var(--text-primary);
+  }
+  .guided-analysis.loading {
+    color: var(--text-label);
+    animation: analysisPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes analysisPulse {
+    0% { opacity: 0.55; }
+    50% { opacity: 1; }
+    100% { opacity: 0.55; }
+  }
+  .guided-pick-btn {
+    width: 100%;
+    height: 48px;
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    background: var(--accent);
+    color: #0d0f12;
+    cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .guided-pick-btn:hover { background: #d6b65b; border-color: #d6b65b; }
+  .guided-pick-btn:disabled { opacity: 0.55; cursor: default; }
 
   .vs-row { display:grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 12px; }
   .team-card { border: 1px solid var(--bg-line); border-radius: 2px; padding: 12px; background: var(--bg-surface-2); }
@@ -631,7 +797,7 @@
     .round-col { display: none; }
     .round-col.visible { display: block; }
     .mobile-tabs { display: grid; }
-    .card { width: 100%; max-height: 94vh; border-radius: 4px 4px 0 0; align-self: end; }
+    .card { width: 100%; max-height: 84vh; border-radius: 0; align-self: end; }
     .optimizer-toggle { top: auto; bottom: 92px; right: 12px; }
     .optimizer-panel {
       top: auto;
@@ -711,9 +877,10 @@
     </section>
   </main>
 
-  <div class="overlay" id="overlay" onclick="if(event.target.id==='overlay') closeCard()">
+  <div class="overlay" id="overlay" onclick="if(event.target.id==='overlay') closeCard(true, true)">
     <div class="card" id="card"></div>
   </div>
+  <div class="flow-banner" id="flowBanner"></div>
   <button class="btn btn-secondary optimizer-toggle" onclick="toggleOptimizer()"><i class="strategy-icon" data-lucide="bar-chart-2"></i> Optimizer</button>
   <aside class="optimizer-panel" id="optimizerPanel">
     <div class="opt-title"><i data-lucide="bar-chart-2"></i> Points Optimizer</div>
@@ -760,6 +927,14 @@
     let strategyBaselinePicks = {};
     let strategyEpByNode = {};
     let customOverrideNodes = new Set();
+    const flowRoundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
+    const roundDataMap = { R64: '64', R32: '32', S16: '16', E8: '8', F4: '4', NCG: '2' };
+    let autoAdvanceEnabled = true;
+    let flowLocked = false;
+    let guidedNodeId = '';
+    let analysisToken = 0;
+    let regionPreviewTimer = null;
+    let regionPreviewFadeTimer = null;
 
     const bracketState = {
       picks: {},
@@ -775,6 +950,120 @@
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
       }
+    }
+
+    function escAttr(v) {
+      return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    }
+
+    function roundBannerLabel(roundKey, region) {
+      return getRoundTitle(roundKey).split(' (')[0] + ' · ' + String(region || '').toUpperCase() + ' REGION';
+    }
+
+    function roundDataValue(roundKey) {
+      return roundDataMap[roundKey] || '';
+    }
+
+    function flowRegionsForRound(roundKey) {
+      if (roundKey === 'F4' || roundKey === 'NCG') return ['Final Four'];
+      return regions.slice();
+    }
+
+    function nodeIdsForRegionRound(region, roundKey) {
+      if (roundKey === 'F4') return finalIds.F4.slice();
+      if (roundKey === 'NCG') return finalIds.NCG.slice();
+      return (regionRoundIds[region]?.[roundKey] || []).slice();
+    }
+
+    function isNodePickable(node) {
+      const [t1, t2] = getMatchTeams(node);
+      return !!(t1 && t2);
+    }
+
+    function buildFlowTargets() {
+      const targets = [];
+      for (const roundKey of flowRoundOrder) {
+        for (const region of flowRegionsForRound(roundKey)) {
+          for (const id of nodeIdsForRegionRound(region, roundKey)) {
+            const node = nodesById.get(id);
+            if (!node) continue;
+            targets.push({ id, round: roundKey, region });
+          }
+        }
+      }
+      return targets;
+    }
+
+    function findNextFlowTarget(afterNodeId) {
+      const targets = buildFlowTargets();
+      let start = 0;
+      if (afterNodeId) {
+        const idx = targets.findIndex((t) => t.id === afterNodeId);
+        start = idx >= 0 ? idx + 1 : 0;
+      }
+      for (let i = start; i < targets.length; i++) {
+        const t = targets[i];
+        const node = nodesById.get(t.id);
+        if (!node || !isNodePickable(node) || validPickForNode(node)) continue;
+        return t;
+      }
+      if (start > 0) {
+        for (let i = 0; i < start; i++) {
+          const t = targets[i];
+          const node = nodesById.get(t.id);
+          if (!node || !isNodePickable(node) || validPickForNode(node)) continue;
+          return t;
+        }
+      }
+      return null;
+    }
+
+    function clearPreviewTimers() {
+      if (regionPreviewTimer) clearTimeout(regionPreviewTimer);
+      if (regionPreviewFadeTimer) clearTimeout(regionPreviewFadeTimer);
+      regionPreviewTimer = null;
+      regionPreviewFadeTimer = null;
+    }
+
+    function setInteractionLock(locked) {
+      flowLocked = !!locked;
+      document.body.classList.toggle('flow-locked', !!locked);
+    }
+
+    function showRegionBanner(region) {
+      const banner = document.getElementById('flowBanner');
+      if (!banner) return;
+      banner.textContent = String(region || '').toUpperCase() + ' COMPLETE';
+      banner.classList.add('show');
+      clearPreviewTimers();
+      regionPreviewFadeTimer = setTimeout(() => {
+        banner.classList.remove('show');
+      }, 4500);
+    }
+
+    function previewRegionCompletion(region, nextTarget) {
+      const container = document.querySelector('.container');
+      if (!container) {
+        if (nextTarget) openCard(nextTarget.id, { manualResume: false, autoResume: true });
+        return;
+      }
+      const pad = 24;
+      const rect = container.getBoundingClientRect();
+      const sx = Math.min(1, (window.innerWidth - pad * 2) / Math.max(1, rect.width));
+      const sy = Math.min(1, (window.innerHeight - pad * 2) / Math.max(1, rect.height));
+      const scale = Math.max(0.58, Math.min(sx, sy, 1));
+      setInteractionLock(true);
+      showRegionBanner(region);
+      container.style.transform = 'scale(' + scale.toFixed(3) + ')';
+      regionPreviewTimer = setTimeout(() => {
+        container.style.transform = 'scale(1)';
+        setTimeout(() => {
+          setInteractionLock(false);
+          if (nextTarget && autoAdvanceEnabled) {
+            openCard(nextTarget.id, { manualResume: false, autoResume: true });
+          }
+        }, 400);
+      }, 5000);
     }
 
     function showLoading() {
@@ -1051,7 +1340,7 @@
       }
     }
 
-    async function makePick(matchId, winnerName) {
+    async function makePick(matchId, winnerName, opts = {}) {
       const node = nodesById.get(matchId);
       if (!node || !winnerName) return;
       bracketState.picks[matchId] = winnerName;
@@ -1065,7 +1354,7 @@
       clearDescendantPicks(matchId);
       saveState();
       renderAll();
-      closeCard();
+      if (!opts.keepCardOpen) closeCard(true, false);
       for (const parentId of (parentMap.get(matchId) || [])) {
         const parentNode = nodesById.get(parentId);
         if (!parentNode) continue;
@@ -1152,7 +1441,18 @@
           '<span style="color:' + conf.color + '">' + conf.label + '</span>' +
         '</div>';
       }
-      return '<div class="match ' + pickedClass + ' ' + overrideClass + '">' +
+      const regionAttr = escAttr(String(node.region || '').toLowerCase());
+      const roundAttr = escAttr(roundDataValue(node.round));
+      const matchupAttr = escAttr(String(node.id || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+      return '<div class="match ' + pickedClass + ' ' + overrideClass + '"' +
+        ' data-region="' + regionAttr + '"' +
+        ' data-round="' + roundAttr + '"' +
+        ' data-matchup-id="' + matchupAttr + '"' +
+        ' data-team-a="' + escAttr(t1?.name || '') + '"' +
+        ' data-team-b="' + escAttr(t2?.name || '') + '"' +
+        ' data-seed-a="' + escAttr(t1?.seed || '') + '"' +
+        ' data-seed-b="' + escAttr(t2?.seed || '') + '"' +
+        ' onclick="onMatchClick(event,\'' + node.id + '\')">' +
         teamRow(node, t1, pick, p1) +
         teamRow(node, t2, pick, p2) +
         metaHtml +
@@ -1197,8 +1497,16 @@
     function championBlock() {
       const champId = finalIds.NCG[0];
       const winner = getWinnerTeam(champId);
-      if (!winner) return '<div class="match"><div class="team-row"><span class="seed">-</span><button class="team-btn" disabled>TBD</button><span class="prob">--</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
-      return '<div class="match picked"><div class="team-row"><span class="seed">' + (winner.seed ?? '-') + '</span><button class="team-btn winner" onclick="openCard(\'' + champId + '\')">' + winner.name + ' Champion</button><span class="prob">100%</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
+      if (!winner) {
+        return '<div class="match"' +
+          ' data-region="final-four" data-round="2" data-matchup-id="championship"' +
+          ' data-team-a="" data-team-b="" data-seed-a="" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
+          '<div class="team-row"><span class="seed">-</span><button class="team-btn" disabled>TBD</button><span class="prob">--</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
+      }
+      return '<div class="match picked"' +
+        ' data-region="final-four" data-round="2" data-matchup-id="championship"' +
+        ' data-team-a="' + escAttr(winner.name) + '" data-team-b="" data-seed-a="' + escAttr(winner.seed || '') + '" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
+        '<div class="team-row"><span class="seed">' + (winner.seed ?? '-') + '</span><button class="team-btn winner" onclick="openCard(\'' + champId + '\')">' + winner.name + ' Champion</button><span class="prob">100%</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
     }
 
     function renderProgress() {
@@ -1234,9 +1542,50 @@
       applyMobileRoundVisibility();
     }
 
-    function closeCard() {
-      document.getElementById('overlay').classList.remove('open');
-      document.getElementById('card').innerHTML = '';
+    function closeCard(instant = true, cancelAuto = false) {
+      const overlay = document.getElementById('overlay');
+      const card = document.getElementById('card');
+      if (!overlay || !card) return;
+      if (cancelAuto) autoAdvanceEnabled = false;
+      guidedNodeId = '';
+      analysisToken += 1;
+      if (instant) overlay.classList.add('instant');
+      overlay.classList.remove('open');
+      setTimeout(() => {
+        card.innerHTML = '';
+        overlay.classList.remove('instant');
+      }, instant ? 0 : 180);
+    }
+
+    function onMatchClick(event, nodeId) {
+      if (flowLocked) return;
+      const target = event?.target;
+      if (target && target.closest && target.closest('button')) return;
+      const node = nodesById.get(nodeId);
+      if (!node || !isNodePickable(node) || validPickForNode(node)) return;
+      autoAdvanceEnabled = true;
+      openCard(nodeId, { manualResume: true, autoResume: true });
+    }
+
+    async function guidedPickCurrent() {
+      if (!guidedNodeId || flowLocked) return;
+      const node = nodesById.get(guidedNodeId);
+      if (!node) return;
+      const [t1, t2] = getMatchTeams(node);
+      if (!t1 || !t2) return;
+      const data = await getCardData(node);
+      const t1Prob = Number(data?.t1?.win_probability || 0);
+      const t2Prob = Number(data?.t2?.win_probability || 0);
+      const winnerName = t1Prob >= t2Prob ? t1.name : t2.name;
+      await makePick(node.id, winnerName);
+      if (!autoAdvanceEnabled) return;
+      const next = findNextFlowTarget(node.id);
+      if (!next) return;
+      if (next.round === node.round && next.region === node.region) {
+        openCard(next.id, { manualResume: false, autoResume: true });
+        return;
+      }
+      previewRegionCompletion(node.region, next);
     }
 
     function fallbackMeta(node) {
