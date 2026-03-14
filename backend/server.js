@@ -2570,7 +2570,7 @@ app.post('/admin/upload', auth, (req, res) => {
       return res.status(400).json({ success: false, error: err.message || 'Upload failed' });
     }
 
-    const t = req.body.type;
+    const t = String(req.body.type || '').trim();
     const allowed = {
       predictions: 'chatbot_predictions_v5.json',
       bracketCache: 'bracket_cache_2025.json',
@@ -2578,24 +2578,54 @@ app.post('/admin/upload', auth, (req, res) => {
       seedMatchups: 'seed_matchup_all_rounds.json',
       archetypeSummary: 'archetype_summary_v5.json',
     };
-    if (!t || !allowed[t]) {
-      return res.status(400).json({ success: false, error: `Invalid type. Allowed: ${Object.keys(allowed).join(', ')}` });
-    }
     if (!req.file) return res.status(400).json({ success: false, error: 'File required' });
+
+    function normalizeFileKey(v) {
+      return String(v || '')
+        .toLowerCase()
+        .replace(/\.json$/i, '')
+        .replace(/[_\-\s().]+/g, '');
+    }
+
+    function inferTypeFromFilename(fileName) {
+      const key = normalizeFileKey(fileName);
+      if (!key) return '';
+      if (key.includes('chatbotpredictionsv5') || key.includes('predictionsv5') || key.includes('allpairs')) return 'predictions';
+      if (key.includes('bracketcache2025') || key.includes('bracketcache')) return 'bracketCache';
+      if (key.includes('teamprofiles2025') || key.includes('teamprofiles')) return 'teamProfiles';
+      if (key.includes('seedmatchupallrounds') || key.includes('seedmatchups') || key.includes('seedhistory')) return 'seedMatchups';
+      if (key.includes('archetypesummaryv5') || key.includes('archetypesummary')) return 'archetypeSummary';
+      return '';
+    }
+
+    const inferredType = inferTypeFromFilename(req.file.originalname);
+    let resolvedType = '';
+    if (t && allowed[t]) resolvedType = t;
+    if (!resolvedType && inferredType && allowed[inferredType]) resolvedType = inferredType;
+    if (!resolvedType) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(allowed).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_cache_2025*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json`
+      });
+    }
 
     try {
       const raw = fs.readFileSync(req.file.path, 'utf8');
       const { parsed, normalized, mode } = parseUploadedJson(raw);
-      fs.writeFileSync(path.join(DATA_DIR, allowed[t]), normalized);
+      fs.writeFileSync(path.join(DATA_DIR, allowed[resolvedType]), normalized);
       fs.unlinkSync(req.file.path);
-      dataStore[t] = parsed;
+      dataStore[resolvedType] = parsed;
       reloadDataFromDisk('admin-upload');
       const sizeMB = (Buffer.byteLength(normalized) / 1024 / 1024).toFixed(1);
-      console.log(`  [upload] ${allowed[t]} uploaded and reloaded (${sizeMB}MB, parse:${mode})`);
+      if (t && t !== resolvedType) {
+        console.log(`  [upload] type override: requested=${t}, inferred=${resolvedType}, file=${req.file.originalname}`);
+      }
+      console.log(`  [upload] ${allowed[resolvedType]} uploaded and reloaded (${sizeMB}MB, parse:${mode})`);
       return res.json({
         success: true,
-        savedAs: allowed[t],
+        savedAs: allowed[resolvedType],
         size: `${sizeMB}MB`,
+        type: resolvedType,
       });
     } catch (e) {
       if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
