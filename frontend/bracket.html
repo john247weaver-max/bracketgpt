@@ -1245,75 +1245,148 @@
       return [['South', 'West'], ['East', 'Midwest']];
     }
 
+    function normalizeR64Matchups(rawMatchups) {
+      const rows = Array.isArray(rawMatchups) ? rawMatchups : [];
+      let matchups = rows.filter((m) => isR64Round(m?.round));
+      if (!matchups.length && rows.length) {
+        matchups = rows
+          .slice()
+          .sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))
+          .slice(0, 32);
+      }
+      return matchups.map((m, idx) => {
+        const region = String(m?.region || 'Unknown').trim() || 'Unknown';
+        const gameNo = Number(m?.game_number || ((idx % 8) + 1));
+        const t1 = m?.t1 || {};
+        const t2 = m?.t2 || {};
+        const p1 = toProb(t1?.win_probability, 0.5);
+        return {
+          matchup_id: String(m?.matchup_id || ('FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo)),
+          season: Number(m?.season || 2025),
+          round: 'R64',
+          region,
+          game_number: gameNo,
+          t1: {
+            team_id: t1?.team_id ?? t1?.id ?? null,
+            name: String(t1?.name || 'TBD'),
+            seed: Number.isFinite(Number(t1?.seed)) ? Number(t1.seed) : null,
+            win_probability: p1,
+            predicted_margin: Number.isFinite(Number(t1?.predicted_margin)) ? Number(t1.predicted_margin) : null
+          },
+          t2: {
+            team_id: t2?.team_id ?? t2?.id ?? null,
+            name: String(t2?.name || 'TBD'),
+            seed: Number.isFinite(Number(t2?.seed)) ? Number(t2.seed) : null,
+            win_probability: 1 - p1,
+            predicted_margin: Number.isFinite(Number(t2?.predicted_margin)) ? Number(t2.predicted_margin) : null
+          },
+          matchup_meta: {
+            predicted_winner: String(m?.matchup_meta?.predicted_winner || ''),
+            upset_flag: String(m?.matchup_meta?.upset_flag || m?.matchup_meta?.display_flag || 'chalk'),
+            display_flag: String(m?.matchup_meta?.display_flag || m?.matchup_meta?.upset_flag || 'chalk'),
+            confidence: String(m?.matchup_meta?.confidence || 'projected')
+          }
+        };
+      });
+    }
+
     async function loadBracketFromUploadedJson() {
       try {
-        const res = await fetch('/data/bracket_2025.json');
-        if (!res.ok) return null;
-        const raw = await res.json();
-        const games = Array.isArray(raw?.bracketGames) ? raw.bracketGames : (Array.isArray(raw?.games) ? raw.games : []);
-        if (!games.length) return null;
-        const r64 = games.filter((g) => isR64Round(g?.round));
-        if (!r64.length) return null;
+        const candidates = [
+          '/data/bracketgpt_matchups_2025_final.json',
+          '/data/bracketgpt_matchups_2025_v2.json',
+          '/data/bracket_2025.json',
+          '/data/bracket_2025__1_.json',
+          '/data/bracket_2025%20(1).json',
+          '/data/bracket_predictions_2025.json',
+          '/data/bracket_predictions.json'
+        ];
 
-        const regionCounts = new Map();
-        const matchups = [];
-        for (const g of r64) {
-          const region = String(g?.region || 'Unknown').trim() || 'Unknown';
-          const gameNo = (regionCounts.get(region) || 0) + 1;
-          regionCounts.set(region, gameNo);
+        for (const filePath of candidates) {
+          const res = await fetch(filePath);
+          if (!res.ok) continue;
+          const raw = await res.json();
 
-          const t1Name = String(g?.team1 || g?.team1Name || 'TBD');
-          const t2Name = String(g?.team2 || g?.team2Name || 'TBD');
-          let p1 = toProb(g?.winProb, 0.5);
-          if (!Number.isFinite(p1)) p1 = 0.5;
-          const p2 = 1 - p1;
+          if (Array.isArray(raw?.matchups)) {
+            const matchups = normalizeR64Matchups(raw.matchups);
+            if (!matchups.length) continue;
+            const regionsList = Array.from(new Set(matchups.map((m) => String(m.region || '').trim()).filter(Boolean)));
+            return {
+              season: Number(raw?.season || 2025),
+              regions: regionsList,
+              matchups,
+              finalFourPairings: Array.isArray(raw?.finalFourPairings) && raw.finalFourPairings.length >= 2
+                ? raw.finalFourPairings
+                : fallbackPairings(regionsList)
+            };
+          }
 
-          const t1Seed = Number(g?.seed1 ?? g?.team1Seed);
-          const t2Seed = Number(g?.seed2 ?? g?.team2Seed);
-          const winner = String(g?.predictedWinner || (p1 >= p2 ? t1Name : t2Name));
-          const winnerNorm = normalizeName(winner);
-          const t1Win = winnerNorm === normalizeName(t1Name);
-          const t2Win = winnerNorm === normalizeName(t2Name);
-          let upsetFlag = 'chalk';
-          if (t1Win && Number.isFinite(t1Seed) && Number.isFinite(t2Seed) && t1Seed > t2Seed) upsetFlag = 'slight_upset_pick';
-          if (t2Win && Number.isFinite(t1Seed) && Number.isFinite(t2Seed) && t2Seed > t1Seed) upsetFlag = 'slight_upset_pick';
+          const games = Array.isArray(raw?.bracketGames) ? raw.bracketGames : (Array.isArray(raw?.games) ? raw.games : []);
+          if (!games.length) continue;
+          const r64 = games.filter((g) => isR64Round(g?.round));
+          if (!r64.length) continue;
 
-          matchups.push({
-            matchup_id: 'FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo,
+          const regionCounts = new Map();
+          const matchups = [];
+          for (const g of r64) {
+            const region = String(g?.region || 'Unknown').trim() || 'Unknown';
+            const gameNo = (regionCounts.get(region) || 0) + 1;
+            regionCounts.set(region, gameNo);
+
+            const t1Name = String(g?.team1 || g?.team1Name || 'TBD');
+            const t2Name = String(g?.team2 || g?.team2Name || 'TBD');
+            let p1 = toProb(g?.winProb, 0.5);
+            if (!Number.isFinite(p1)) p1 = 0.5;
+            const p2 = 1 - p1;
+
+            const t1Seed = Number(g?.seed1 ?? g?.team1Seed);
+            const t2Seed = Number(g?.seed2 ?? g?.team2Seed);
+            const winner = String(g?.predictedWinner || (p1 >= p2 ? t1Name : t2Name));
+            const winnerNorm = normalizeName(winner);
+            const t1Win = winnerNorm === normalizeName(t1Name);
+            const t2Win = winnerNorm === normalizeName(t2Name);
+            let upsetFlag = 'chalk';
+            if (t1Win && Number.isFinite(t1Seed) && Number.isFinite(t2Seed) && t1Seed > t2Seed) upsetFlag = 'slight_upset_pick';
+            if (t2Win && Number.isFinite(t1Seed) && Number.isFinite(t2Seed) && t2Seed > t1Seed) upsetFlag = 'slight_upset_pick';
+
+            matchups.push({
+              matchup_id: 'FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo,
+              season: Number(raw?.season || 2025),
+              round: 'R64',
+              region,
+              game_number: gameNo,
+              t1: {
+                team_id: g?.team1Id ?? g?.team1_id ?? null,
+                name: t1Name,
+                seed: Number.isFinite(t1Seed) ? t1Seed : null,
+                win_probability: p1,
+                predicted_margin: null
+              },
+              t2: {
+                team_id: g?.team2Id ?? g?.team2_id ?? null,
+                name: t2Name,
+                seed: Number.isFinite(t2Seed) ? t2Seed : null,
+                win_probability: p2,
+                predicted_margin: null
+              },
+              matchup_meta: {
+                predicted_winner: winner,
+                upset_flag: upsetFlag,
+                display_flag: upsetFlag,
+                confidence: String(g?.confidence || '').toLowerCase() || 'projected'
+              }
+            });
+          }
+
+          const regionsList = Array.from(new Set(matchups.map((m) => String(m.region || '').trim()).filter(Boolean)));
+          return {
             season: Number(raw?.season || 2025),
-            round: 'R64',
-            region,
-            game_number: gameNo,
-            t1: {
-              team_id: g?.team1Id ?? g?.team1_id ?? null,
-              name: t1Name,
-              seed: Number.isFinite(t1Seed) ? t1Seed : null,
-              win_probability: p1,
-              predicted_margin: null
-            },
-            t2: {
-              team_id: g?.team2Id ?? g?.team2_id ?? null,
-              name: t2Name,
-              seed: Number.isFinite(t2Seed) ? t2Seed : null,
-              win_probability: p2,
-              predicted_margin: null
-            },
-            matchup_meta: {
-              predicted_winner: winner,
-              upset_flag: upsetFlag,
-              display_flag: upsetFlag,
-              confidence: String(g?.confidence || '').toLowerCase() || 'projected'
-            }
-          });
+            regions: regionsList,
+            matchups,
+            finalFourPairings: fallbackPairings(regionsList)
+          };
         }
-
-        const regionsList = Array.from(new Set(matchups.map((m) => String(m.region || '').trim()).filter(Boolean)));
-        return {
-          season: Number(raw?.season || 2025),
-          regions: regionsList,
-          matchups,
-          finalFourPairings: fallbackPairings(regionsList)
-        };
+        return null;
       } catch (e) {
         return null;
       }
