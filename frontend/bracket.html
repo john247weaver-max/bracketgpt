@@ -602,6 +602,15 @@
     min-width: 36px;
     text-align: right;
   }
+  .mp-net {
+    font-family: var(--fd);
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    min-width: 28px;
+    text-align: right;
+    opacity: 0.7;
+  }
   .mp-team.picked .mp-pct {
     color: var(--green);
     font-weight: 900;
@@ -889,22 +898,6 @@
     letter-spacing: .08em; text-transform: uppercase;
     color: var(--dim);
   }
-  .pc-path-grade {
-    font-family: var(--fd);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    margin-top: 3px;
-  }
-  .pc-path-grade strong {
-    font-size: 13px;
-    font-weight: 900;
-  }
-  .pc-path-grade span {
-    color: var(--muted);
-    font-weight: 600;
-  }
   .pc-pick-tag {
     font-family: var(--fd); font-size: 10px; font-weight: 700;
     letter-spacing: .10em; text-transform: uppercase;
@@ -959,6 +952,46 @@
   .pc-mo.steady {
     background: rgba(46,116,212,.12); color: var(--blue);
     border: 1px solid rgba(46,116,212,.25);
+  }
+  .pc-stats-section {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .pc-stats-section:first-of-type {
+    margin-top: 4px;
+    padding-top: 0;
+    border-top: none;
+  }
+  .pc-stats-title {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 6px;
+  }
+  .pc-stat-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+  }
+  .pc-stat-label {
+    font-family: var(--fb);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .pc-stat-value {
+    font-family: var(--fd);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .pc-stat-value.bold {
+    font-size: 15px;
+    font-weight: 900;
   }
 
   .pc-stat {
@@ -1363,6 +1396,10 @@
     let strategyMap = {};
     let teamEpRankings = {};
     let championProbs = {};
+    let teamStats = {};
+    let roundAdvanceProbs = {};
+    let upsetScoresData = [];
+    let upsetThresholdsData = [];
     let activeStrategy = '';
     let strategyBaselinePicks = {};
     let strategyEpByNode = {};
@@ -1561,22 +1598,51 @@
     }
 
     function getUpsetRecommendation(size) {
-      let count;
-      let message;
-      if (size <= 15) {
-        count = 2;
-        message = '<strong>2 upsets</strong> recommended - play mostly chalk, one 12-over-5';
-      } else if (size <= 50) {
-        count = 4;
-        message = '<strong>4 upsets</strong> recommended - 2 in R64, 1-2 in R32/S16';
-      } else if (size <= 200) {
-        count = 6;
-        message = '<strong>6 upsets</strong> recommended - target ZAG picks across R64-S16';
-      } else {
-        count = 9;
-        message = '<strong>9 upsets</strong> recommended - need a contrarian Final Four';
+      if (upsetThresholdsData.length > 0) {
+        for (const tier of upsetThresholdsData) {
+          if (size <= tier.max_pool_size) {
+            const count = tier.recommended_upset_count;
+            const recs = tier.recommended_upsets || [];
+            const topNames = recs.slice(0, 3).map((r) =>
+              '(' + r.dog_seed + ') ' + getDisplayName(r.underdog)
+            ).join(', ');
+
+            let message;
+            if (count === 0) {
+              message = 'Play <strong>chalk</strong> — no upsets have positive value at this pool size';
+            } else if (count <= 2) {
+              message = '<strong>' + count + ' upset' + (count > 1 ? 's' : '') +
+                '</strong> worth the risk: ' + topNames;
+            } else {
+              message = '<strong>' + count + ' upsets</strong> have positive value — top picks: ' + topNames;
+            }
+            return { count, message, upsets: recs };
+          }
+        }
       }
-      return { count, message };
+      const minValue = size <= 15 ? 0.80 :
+        size <= 50 ? 0.30 :
+        size <= 200 ? 0.10 : 0.00;
+      const minProb = size <= 15 ? 0.35 :
+        size <= 50 ? 0.25 :
+        size <= 200 ? 0.18 : 0.12;
+
+      const qualifying = (upsetScoresData || []).filter(
+        (u) => u.upset_value >= minValue && u.model_prob_underdog >= minProb
+      );
+      const count = Math.min(qualifying.length, 12);
+      const topNames = qualifying.slice(0, 3).map((u) =>
+        '(' + u.dog_seed + ') ' + getDisplayName(u.underdog)
+      ).join(', ');
+
+      let message;
+      if (count === 0) {
+        message = 'Play <strong>chalk</strong> — no strong upset value at this pool size';
+      } else {
+        message = '<strong>' + count + ' upset' + (count > 1 ? 's' : '') +
+          '</strong> with positive value' + (topNames ? ': ' + topNames : '');
+      }
+      return { count, message, upsets: qualifying.slice(0, count) };
     }
 
     function countUserUpsets() {
@@ -2986,11 +3052,19 @@
       const normalizedProb = normalizeProbability(prob, null);
       const profile = getTeamProfileClient(team?.name || '');
       const teamColor = escAttr(String(team?.color_primary || profile?.color_primary || '#EEEEF3'));
+      const stats = teamStats[team?.name] || teamStats[getDisplayName(team?.name)] || {};
+      const netRating = stats.net_rating;
+      const netHtml = (netRating != null)
+        ? '<span class="mp-net" style="color:' +
+          (netRating >= 20 ? 'var(--green)' : netRating >= 10 ? 'var(--text)' : 'var(--muted)') +
+          '">' + (netRating >= 0 ? '+' : '') + netRating.toFixed(0) + '</span>'
+        : '';
       const pctText = Number.isFinite(normalizedProb) ? (Math.round(normalizedProb * 100) + '%') : '&mdash;';
       return '<div class="mp-team' + (picked ? ' picked' : '') + (eliminated ? ' eliminated' : '') + '"' +
         ' data-side="' + side + '">' +
         '<span class="mp-seed ' + seedClass(seedNum) + '">' + seedValue + '</span>' +
         '<span class="mp-name" style="color:' + teamColor + '">' + escHtml(displayName) + '</span>' +
+        netHtml +
         '<span class="mp-pct">' + pctText + '</span>' +
       '</div>';
     }
@@ -3552,8 +3626,16 @@
       pickCardContext = { matchupId: m.matchup_id, teamA: tA.name, teamB: tB.name };
       currentPickCardMatchup = m;
       const currentPick = getUserPick(m.matchup_id);
-
-      document.getElementById('pcRegion').textContent = `${m.region || ''} \u00b7 ${m.round || 'R64'}`;
+      const statsA = teamStats[tA.name] || teamStats[getDisplayName(tA.name)] || {};
+      const statsB = teamStats[tB.name] || teamStats[getDisplayName(tB.name)] || {};
+      const netA = statsA.net_rating;
+      const netB = statsB.net_rating;
+      let netCompare = '';
+      if (netA != null && netB != null) {
+        netCompare = ' \u00b7 ' + (netA >= 0 ? '+' : '') + netA.toFixed(1) + ' vs ' + (netB >= 0 ? '+' : '') + netB.toFixed(1);
+      }
+      document.getElementById('pcRegion').textContent =
+        (m.region || '') + ' \u00b7 ' + (m.round || 'R64') + netCompare;
       setFlag(m.display_flag);
 
       setTeam('A', tA, pctA, colorA, currentPick === 'a');
@@ -3576,7 +3658,43 @@
       renderCol('A', tA, colorA);
       renderCol('B', tB, colorB);
 
+      const insightLblEl = document.getElementById('pcInsight').querySelector('.pc-insight-lbl');
       document.getElementById('pcInsightTxt').textContent = m.recommended_pick_reason || m.historical_blurb || '-';
+      if (insightLblEl) insightLblEl.textContent = 'AI Read';
+      const matchupUpset = (upsetScoresData || []).find((u) => {
+        const nA = normalizeName(tA.name);
+        const nB = normalizeName(tB.name);
+        const nFav = normalizeName(u.favorite);
+        const nDog = normalizeName(u.underdog);
+        return (nA === nFav && nB === nDog) || (nA === nDog && nB === nFav);
+      });
+      if (matchupUpset) {
+        const insightLines = [];
+        const edge = Number(matchupUpset.model_edge || 0);
+        const leverage = Number(matchupUpset.pool_leverage || 0);
+        if (edge > 0) {
+          insightLines.push('Model gives ' + getDisplayName(matchupUpset.underdog) +
+            ' ' + (edge * 100).toFixed(0) + '% more chance than seed history suggests.');
+        }
+        if (leverage > 0) {
+          const publicPickPct = Number(matchupUpset.public_pick_pct);
+          if (Number.isFinite(publicPickPct)) {
+            insightLines.push('Only ' + (publicPickPct * 100).toFixed(0) +
+              '% of pools pick them — ' + (leverage * 100).toFixed(0) + '% leverage edge.');
+          } else {
+            insightLines.push((leverage * 100).toFixed(0) + '% leverage edge on this upset pick.');
+          }
+        }
+        insightLines.push('Upset value: ' + Number(matchupUpset.upset_value || 0).toFixed(2) +
+          ' — ' + String(matchupUpset.risk_label || 'Risk profile unavailable') + '.');
+        document.getElementById('pcInsightTxt').textContent = insightLines.join(' ');
+        if (insightLblEl) {
+          insightLblEl.textContent =
+            matchupUpset.risk_tier === 'low' ? 'UPSET OPPORTUNITY' :
+            matchupUpset.risk_tier === 'medium' ? 'UPSET WATCH' :
+            matchupUpset.risk_tier === 'elevated' ? 'UPSET ALERT' : 'LONG SHOT';
+        }
+      }
 
       const btnA = document.getElementById('pcBtnA');
       const btnB = document.getElementById('pcBtnB');
@@ -3609,15 +3727,6 @@
 
       const old = el.querySelector('.pc-pick-tag');
       if (old) old.remove();
-      const oldPath = el.querySelector('.pc-path-grade');
-      if (oldPath) oldPath.remove();
-
-      const grading = scoreToGrade(calcPathScore(team));
-      const pathEl = document.createElement('div');
-      pathEl.className = 'pc-path-grade';
-      pathEl.style.color = grading.color;
-      pathEl.innerHTML = `PATH: <strong>${grading.grade}</strong> <span>${grading.label}</span>`;
-      el.appendChild(pathEl);
 
       if (isPicked) {
         const tag = document.createElement('span');
@@ -3628,12 +3737,11 @@
     }
 
     function renderCol(side, team, color) {
-      const col = document.getElementById(`pcCol${side}`);
-      const nameEl = document.getElementById(`pcColName${side}`);
-      const moEl = document.getElementById(`pcMo${side}`);
-
-      nameEl.textContent = getDisplayName(team.name);
-
+      const col = document.getElementById('pcCol' + side);
+      const nameEl = document.getElementById('pcColName' + side);
+      const moEl = document.getElementById('pcMo' + side);
+      const displayName = getDisplayName(team.name);
+      nameEl.textContent = displayName;
       const mo = (team.momentum || 'steady').toLowerCase();
       const moMap = {
         rising: { cls: 'rising', label: '\u2191 Rising' },
@@ -3641,34 +3749,58 @@
         steady: { cls: 'steady', label: '\u2192 Steady' },
       };
       const moInfo = moMap[mo] || moMap.steady;
-      moEl.className = `pc-mo ${moInfo.cls}`;
+      moEl.className = 'pc-mo ' + moInfo.cls;
       moEl.textContent = moInfo.label;
-
-      col.querySelectorAll('.pc-stat').forEach((el) => el.remove());
-
-      const strengths = (team.strengths || []).slice(0, 2);
-      strengths.forEach((s) => col.appendChild(makeStatRow(s, true)));
-
-      const weaknesses = (team.weaknesses || []).slice(0, 2);
-      weaknesses.forEach((w) => col.appendChild(makeStatRow(w, false)));
+      col.querySelectorAll('.pc-stat, .pc-stats-section').forEach((el) => el.remove());
+      const stats = teamStats[team.name] || teamStats[displayName] || {};
+      const advance = roundAdvanceProbs[team.name] || roundAdvanceProbs[displayName] || {};
+      const champ = championProbs[team.name] || championProbs[displayName] || 0;
+      const ratingsSection = document.createElement('div');
+      ratingsSection.className = 'pc-stats-section';
+      ratingsSection.innerHTML = '<div class="pc-stats-title">RATINGS</div>';
+      const net = stats.net_rating;
+      if (net != null) {
+        const c = net >= 20 ? 'var(--green)' : net >= 10 ? 'var(--text)' : net >= 0 ? 'var(--muted)' : 'var(--red)';
+        ratingsSection.appendChild(makeStatLine('Net Rating', (net >= 0 ? '+' : '') + net.toFixed(1), c));
+      }
+      if (stats.adjoe != null) ratingsSection.appendChild(makeStatLine('Adj. Offense', stats.adjoe.toFixed(1), 'var(--text)'));
+      if (stats.adjde != null) ratingsSection.appendChild(makeStatLine('Adj. Defense', stats.adjde.toFixed(1), 'var(--text)'));
+      if (stats.tempo != null) ratingsSection.appendChild(makeStatLine('Tempo', stats.tempo.toFixed(1), 'var(--muted)'));
+      col.appendChild(ratingsSection);
+      const oddsSection = document.createElement('div');
+      oddsSection.className = 'pc-stats-section';
+      oddsSection.innerHTML = '<div class="pc-stats-title">TOURNAMENT ODDS</div>';
+      const winPct = normalizeProbability(team.win_pct || team.win_probability, null);
+      if (winPct != null) {
+        oddsSection.appendChild(makeStatLine('Win This Game', Math.round(winPct * 100) + '%', winPct >= 0.5 ? 'var(--green)' : 'var(--muted)', true));
+      }
+      const rounds = [
+        { key: 'R32', label: 'Round of 32' },
+        { key: 'S16', label: 'Sweet 16' },
+        { key: 'E8', label: 'Elite 8' },
+        { key: 'F4', label: 'Final Four' },
+        { key: 'NCG', label: 'Title Game' },
+      ];
+      for (const rd of rounds) {
+        const prob = advance[rd.key];
+        if (prob != null && prob > 0.005) {
+          const pct = (prob * 100).toFixed(1) + '%';
+          const c = prob >= 0.5 ? 'var(--green)' : prob >= 0.2 ? 'var(--text)' : 'var(--muted)';
+          oddsSection.appendChild(makeStatLine(rd.label, pct, c));
+        }
+      }
+      if (champ > 0.001) {
+        oddsSection.appendChild(makeStatLine('Win Championship', (champ * 100).toFixed(1) + '%', champ >= 0.10 ? 'var(--gold)' : 'var(--muted)'));
+      }
+      col.appendChild(oddsSection);
     }
 
-    function makeStatRow(text, isStrength) {
+    function makeStatLine(label, value, valueColor, bold) {
       const row = document.createElement('div');
-      row.className = 'pc-stat';
-
-      const icon = document.createElement('div');
-      icon.className = `pc-stat-icon ${isStrength ? 'icon-strength' : 'icon-weakness'}`;
-      const arrow = document.createElement('div');
-      arrow.className = isStrength ? 'pc-arrow-up' : 'pc-arrow-dn';
-      icon.appendChild(arrow);
-
-      const txt = document.createElement('span');
-      txt.className = `pc-stat-text ${isStrength ? 'strong' : ''}`;
-      txt.textContent = String(text || '');
-
-      row.appendChild(icon);
-      row.appendChild(txt);
+      row.className = 'pc-stat-line';
+      row.innerHTML = '<span class="pc-stat-label">' + escHtml(label) + '</span>' +
+        '<span class="pc-stat-value' + (bold ? ' bold' : '') + '" style="color:' +
+        escAttr(valueColor || 'var(--text)') + '">' + escHtml(value) + '</span>';
       return row;
     }
 
@@ -3921,9 +4053,28 @@
         '<div class="opt-row"><span>' + (i + 1) + '</span><span>' + getDisplayName(row[0]) + '</span><span>' + Number(row[1]).toFixed(1) + '</span></div>'
       ).join('') || '<div class="tiny">No EP data loaded.</div>';
       const champs = Object.entries(championProbs || {}).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 10);
-      champsEl.innerHTML = champs.map((row) =>
+      const champsHtml = champs.map((row) =>
         '<div class="champ-bar" style="--w:' + (Number(row[1]) * 100).toFixed(1) + '"><span>' + getDisplayName(row[0]) + '</span><span>' + (Number(row[1]) * 100).toFixed(1) + '%</span></div>'
       ).join('') || '<div class="tiny">No champion probability data loaded.</div>';
+      const f4Data = Object.entries(roundAdvanceProbs || {})
+        .map(([name, probs]) => {
+          const f4Total = (probs.F4 || 0) + (probs.NCG || 0) + (championProbs[name] || 0);
+          return [name, f4Total];
+        })
+        .filter(([, p]) => p > 0.005)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      let f4Html = '';
+      if (f4Data.length > 0) {
+        f4Html = '<div class="champ-header"><i data-lucide="target"></i> Final Four Probabilities</div>' +
+          f4Data.map(([name, prob]) =>
+            '<div class="champ-bar" style="--w:' + (prob * 100).toFixed(1) + '">' +
+            '<span>' + getDisplayName(name) + '</span>' +
+            '<span>' + (prob * 100).toFixed(1) + '%</span></div>'
+          ).join('');
+      }
+      champsEl.innerHTML = champsHtml + f4Html;
+      refreshIcons();
     }
 
     function toggleOptimizer() {
@@ -4033,6 +4184,10 @@
           strategyMap = bracketOutput.strategies || {};
           teamEpRankings = bracketOutput.team_ep_rankings || {};
           championProbs = bracketOutput.bracket_structure?.champion_probs || {};
+          teamStats = bracketOutput?.team_stats || {};
+          roundAdvanceProbs = bracketOutput?.round_advance_probs || {};
+          upsetScoresData = bracketOutput?.upset_scores || [];
+          upsetThresholdsData = bracketOutput?.upset_thresholds || [];
           if (bracketOutput.metadata?.scoring) {
             applyEspnScoringMap(bracketOutput.metadata.scoring);
           }
@@ -4040,6 +4195,10 @@
           strategyMap = {};
           teamEpRankings = {};
           championProbs = {};
+          teamStats = {};
+          roundAdvanceProbs = {};
+          upsetScoresData = [];
+          upsetThresholdsData = [];
         }
         const fallbackTotals = buildOptimizerStrategies();
         for (const key of strategyKeys) {
