@@ -3119,16 +3119,21 @@ app.get('/api/admin/data-status', auth, (req, res) => {
     predictions: dataStore.predictions?.predictions?.length || 0,
     bracket: dataStore.bracket?.teams?.length || 0,
     bracket_cache: dataStore.bracket_cache?.total_matchups || dataStore.bracketCache?.total_matchups || 0,
-    teams: Object.keys(dataStore.predictions?.team_directory || {}).length,
+    teams: Object.keys(dataStore.predictions?.team_directory || bracketReady?.team_directory || {}).length,
     profiles: Object.keys(dataStore.team_profiles?.teams || {}).length,
     archetypes: Object.keys(dataStore.archetype_summary?.archetype_descriptions || {}).length,
-    bracket_lookup: Object.keys(dataStore.predictions?.bracket_lookup || {}).length > 0,
-    seed_rounds: Object.keys(dataStore.seed_matchups || {}).length,
+    bracket_lookup: Object.keys(dataStore.predictions?.bracket_lookup || bracketReady?.bracket_lookup || {}).length > 0,
+    seed_rounds: Object.keys(dataStore.seed_matchups || bracketReady?.seed_matchup_history || {}).length,
   };
 
   return res.json({
     ...summary,
     files: {
+      bracket_ready: {
+        loaded: !!bracketReady,
+        matchups: Array.isArray(bracketReady?.matchups) ? bracketReady.matchups.length : 0,
+        teams: Object.keys(bracketReady?.team_directory ?? {}).length,
+      },
       predictions: {
       loaded: !!dataStore.predictions,
       matchups: dataStore.predictions?.predictions?.length ?? 0,

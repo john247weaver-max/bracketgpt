@@ -128,11 +128,21 @@
     <div class="card">
       <div class="title" style="font-size:14px;margin-bottom:8px;">📁 Upload Model Data (from Colab)</div>
       <p style="color:#888; margin-bottom:16px;">
-        Run <code>model_v5_3.py</code> in Colab, download the output files, then upload them here.<br>
+        Run <code>model_v5_4.py</code> in Colab, download the output files, then upload them here.<br>
         Upload order doesn't matter. All files validated as JSON before saving.
       </p>
 
       <div style="display:flex; flex-direction:column; gap:14px;">
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-bracket_ready" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">bracket_ready_2025.json</div>
+            <div style="font-size:12px; color:#888;">Single precomputed bracket payload (R64 + team directory + all predictions)</div>
+          </div>
+          <input type="file" id="file-bracket_ready" data-type="bracket_ready" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('bracket_ready', 'file-bracket_ready')">Upload</button>
+        </div>
+
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-predictions" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
@@ -218,6 +228,7 @@
           <label>Type</label>
           <select id="legacy-upload-type">
             <option value="predictions">predictions</option>
+            <option value="bracket_ready">bracket_ready</option>
             <option value="bracket">bracket</option>
             <option value="bracket_cache">bracket_cache</option>
             <option value="team_profiles">team_profiles</option>
@@ -387,6 +398,13 @@
         const files = status.files || {};
         const rows = [
           {
+            file: 'bracket_ready_2025.json',
+            loaded: files.bracket_ready?.loaded,
+            detail: files.bracket_ready?.loaded
+              ? `${files.bracket_ready.matchups} R64 matchups · ${files.bracket_ready.teams} teams`
+              : 'Not loaded',
+          },
+          {
             file: 'chatbot_predictions_v5.json',
             loaded: files.predictions?.loaded,
             detail: files.predictions?.loaded
@@ -494,7 +512,7 @@
 
     async function uploadAll() {
       const allStatus = $('upload-all-status');
-      const types = ['predictions', 'bracket', 'bracket_cache', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
+      const types = ['bracket_ready', 'predictions', 'bracket', 'bracket_cache', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
       let ok = 0; let fail = 0;
       allStatus.textContent = '⏳ Uploading...';
 
@@ -555,6 +573,7 @@
         });
         const s = await res.json();
         const files = s.files || {};
+        $('status-bracket_ready').textContent = files.bracket_ready?.loaded ? '✅' : '❌';
         $('status-predictions').textContent = files.predictions?.loaded ? '✅' : '❌';
         $('status-bracket').textContent = files.bracket?.loaded ? '✅' : '❌';
         $('status-bracket_cache').textContent = files.bracket_cache?.loaded ? '✅' : '❌';
