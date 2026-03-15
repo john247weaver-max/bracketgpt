@@ -141,6 +141,61 @@ const DATA_FILES = {
   archetype_history: 'archetype_history.json',
 };
 
+const REGION_ORDER_2025 = ['South', 'East', 'West', 'Midwest'];
+const FINAL_FOUR_PAIRINGS_2025 = [['South', 'East'], ['West', 'Midwest']];
+const BRACKET_SLOT_BY_SEED_PAIR = {
+  '1v16': 0,
+  '8v9': 1,
+  '5v12': 2,
+  '4v13': 3,
+  '6v11': 4,
+  '3v14': 5,
+  '7v10': 6,
+  '2v15': 7,
+};
+const BRACKET_2025 = {
+  South: [
+    { higher: 'Auburn', hSeed: 1, lower: 'Alabama St', lSeed: 16 },
+    { higher: 'Michigan St', hSeed: 2, lower: 'Bryant', lSeed: 15 },
+    { higher: 'Iowa St', hSeed: 3, lower: 'Lipscomb', lSeed: 14 },
+    { higher: 'Texas A&M', hSeed: 4, lower: 'Yale', lSeed: 13 },
+    { higher: 'Michigan', hSeed: 5, lower: 'UC San Diego', lSeed: 12 },
+    { higher: 'Mississippi', hSeed: 6, lower: 'North Carolina', lSeed: 11 },
+    { higher: 'Marquette', hSeed: 7, lower: 'New Mexico', lSeed: 10 },
+    { higher: 'Mississippi St', hSeed: 8, lower: 'Baylor', lSeed: 9 },
+  ],
+  East: [
+    { higher: 'Duke', hSeed: 1, lower: 'Mt St Mary\'s', lSeed: 16 },
+    { higher: 'Alabama', hSeed: 2, lower: 'Robert Morris', lSeed: 15 },
+    { higher: 'Wisconsin', hSeed: 3, lower: 'Montana', lSeed: 14 },
+    { higher: 'Arizona', hSeed: 4, lower: 'Akron', lSeed: 13 },
+    { higher: 'Oregon', hSeed: 5, lower: 'Liberty', lSeed: 12 },
+    { higher: 'BYU', hSeed: 6, lower: 'VCU', lSeed: 11 },
+    { higher: 'St Mary\'s CA', hSeed: 7, lower: 'Vanderbilt', lSeed: 10 },
+    { higher: 'Louisville', hSeed: 8, lower: 'Creighton', lSeed: 9 },
+  ],
+  West: [
+    { higher: 'Florida', hSeed: 1, lower: 'Norfolk St', lSeed: 16 },
+    { higher: 'St John\'s', hSeed: 2, lower: 'NE Omaha', lSeed: 15 },
+    { higher: 'Texas Tech', hSeed: 3, lower: 'UNC Wilmington', lSeed: 14 },
+    { higher: 'Maryland', hSeed: 4, lower: 'Grand Canyon', lSeed: 13 },
+    { higher: 'Memphis', hSeed: 5, lower: 'Colorado St', lSeed: 12 },
+    { higher: 'Missouri', hSeed: 6, lower: 'Drake', lSeed: 11 },
+    { higher: 'Kansas', hSeed: 7, lower: 'Arkansas', lSeed: 10 },
+    { higher: 'Connecticut', hSeed: 8, lower: 'Oklahoma', lSeed: 9 },
+  ],
+  Midwest: [
+    { higher: 'Houston', hSeed: 1, lower: 'SIUE', lSeed: 16 },
+    { higher: 'Tennessee', hSeed: 2, lower: 'Wofford', lSeed: 15 },
+    { higher: 'Kentucky', hSeed: 3, lower: 'Troy', lSeed: 14 },
+    { higher: 'Purdue', hSeed: 4, lower: 'High Point', lSeed: 13 },
+    { higher: 'Clemson', hSeed: 5, lower: 'McNeese St', lSeed: 12 },
+    { higher: 'Illinois', hSeed: 6, lower: 'Xavier', lSeed: 11 },
+    { higher: 'UCLA', hSeed: 7, lower: 'Utah St', lSeed: 10 },
+    { higher: 'Gonzaga', hSeed: 8, lower: 'Georgia', lSeed: 9 },
+  ],
+};
+
 const dataStore = {};
 
 const historicalIndex = {
@@ -156,7 +211,7 @@ const bracketMatchupIndex = {
   byId: new Map(),
   byRegion: new Map(),
   byTeam: new Map(),
-  regions: ['South', 'West', 'East', 'Midwest'],
+  regions: REGION_ORDER_2025.slice(),
   season: 2025,
 };
 
@@ -496,8 +551,9 @@ function buildBracketMatchupIndex() {
   bracketMatchupIndex.byId = new Map();
   bracketMatchupIndex.byRegion = new Map();
   bracketMatchupIndex.byTeam = new Map();
-  const rows = store.bracketMatchups?.matchups || [];
-  bracketMatchupIndex.season = Number(store.bracketMatchups?.season || cfg.activeSeason || 2025);
+  const payload = buildCanonicalR64Payload();
+  const rows = Array.isArray(payload?.matchups) ? payload.matchups : [];
+  bracketMatchupIndex.season = Number(payload?.season || cfg.activeSeason || 2025);
   const regionSet = new Set();
 
   for (const matchup of rows) {
@@ -511,7 +567,7 @@ function buildBracketMatchupIndex() {
     addBracketByTeam(matchup?.t2?.name, matchup);
   }
 
-  bracketMatchupIndex.regions = regionSet.size ? Array.from(regionSet) : ['South', 'West', 'East', 'Midwest'];
+  bracketMatchupIndex.regions = regionSet.size ? Array.from(regionSet) : REGION_ORDER_2025.slice();
 }
 
 function normalizeRoundKey(value) {
@@ -742,7 +798,7 @@ function getFinalFourPairingsArray() {
   if (Array.isArray(store.bracketMatchups?.finalFourPairings) && store.bracketMatchups.finalFourPairings.length >= 2) {
     return store.bracketMatchups.finalFourPairings;
   }
-  return [['South', 'West'], ['East', 'Midwest']];
+  return FINAL_FOUR_PAIRINGS_2025;
 }
 
 function getFinalFourPairingsObject(pairings) {
@@ -750,16 +806,258 @@ function getFinalFourPairingsObject(pairings) {
   return {
     semifinal_1: {
       region_a: String(rows?.[0]?.[0] || 'South'),
-      region_b: String(rows?.[0]?.[1] || 'West'),
+      region_b: String(rows?.[0]?.[1] || 'East'),
     },
     semifinal_2: {
-      region_a: String(rows?.[1]?.[0] || 'East'),
+      region_a: String(rows?.[1]?.[0] || 'West'),
       region_b: String(rows?.[1]?.[1] || 'Midwest'),
     },
   };
 }
 
-function buildCanonicalR64Payload() {
+function confidenceTierFromProb(prob) {
+  const p = Number(prob);
+  if (!Number.isFinite(p)) return 'TOSS-UP';
+  const edge = Math.max(p, 1 - p);
+  if (edge >= 0.95) return 'LOCK';
+  if (edge >= 0.85) return 'CONFIDENT';
+  if (edge >= 0.70) return 'LEAN';
+  if (edge >= 0.55) return 'SLIGHT';
+  return 'TOSS-UP';
+}
+
+function fallbackWinProbBySeed(higherSeed, lowerSeed) {
+  const h = Number(higherSeed);
+  const l = Number(lowerSeed);
+  if (!Number.isFinite(h) || !Number.isFinite(l)) return 0.5;
+  if (h === 1 && l === 16) return 0.99;
+  const diff = Math.max(0, l - h);
+  return Math.max(0.51, Math.min(0.95, 0.5 + diff * 0.03));
+}
+
+function buildTeamDirectoryIndexes(teamDirectory) {
+  const byNorm = new Map();
+  const byId = new Map();
+  for (const [rawId, teamRaw] of Object.entries(teamDirectory || {})) {
+    const team = teamRaw || {};
+    const id = Number(team.id ?? rawId);
+    const entry = {
+      id: Number.isFinite(id) ? id : null,
+      ...team,
+    };
+    const nameKey = normalizeTeamName(entry.name);
+    if (nameKey && !byNorm.has(nameKey)) byNorm.set(nameKey, entry);
+    if (entry.id != null) byId.set(String(entry.id), entry);
+  }
+  return { byNorm, byId };
+}
+
+function buildPredictionIndexes(predictions) {
+  const byNames = new Map();
+  const byIds = new Map();
+  const byTeamOppSeed = new Map();
+  const rows = Array.isArray(predictions) ? predictions : [];
+
+  function addTeamOppSeed(teamKey, oppSeed, pred, side) {
+    const seed = Number(oppSeed);
+    if (!teamKey || !Number.isFinite(seed)) return;
+    const key = `${teamKey}|${seed}`;
+    if (!byTeamOppSeed.has(key)) byTeamOppSeed.set(key, []);
+    byTeamOppSeed.get(key).push({ pred, side });
+  }
+
+  for (const pred of rows) {
+    const t1Key = normalizeTeamName(pred?.t1_name);
+    const t2Key = normalizeTeamName(pred?.t2_name);
+    if (t1Key && t2Key) {
+      byNames.set(`${t1Key}|${t2Key}`, pred);
+      byNames.set(`${t2Key}|${t1Key}`, pred);
+      addTeamOppSeed(t1Key, pred?.t2_seed, pred, 't1');
+      addTeamOppSeed(t2Key, pred?.t1_seed, pred, 't2');
+    }
+    const id1 = pred?.t1_id;
+    const id2 = pred?.t2_id;
+    if (id1 != null && id2 != null) {
+      byIds.set(`${id1}|${id2}`, pred);
+      byIds.set(`${id2}|${id1}`, pred);
+    }
+  }
+  return { byNames, byIds, byTeamOppSeed };
+}
+
+function resolveTeamEntry(teamIndexes, teamName) {
+  const byNorm = teamIndexes?.byNorm || new Map();
+  const exact = byNorm.get(normalizeTeamName(teamName));
+  if (exact) return exact;
+  const target = normalizeTeamName(teamName);
+  if (!target) return null;
+  for (const [key, team] of byNorm.entries()) {
+    if (key.includes(target) || target.includes(key)) return team;
+  }
+  return null;
+}
+
+function pickPredictionForTeams(predIndexes, higherName, lowerName, higherId, lowerId, lowerSeed) {
+  const byIds = predIndexes?.byIds || new Map();
+  const byNames = predIndexes?.byNames || new Map();
+  const byTeamOppSeed = predIndexes?.byTeamOppSeed || new Map();
+  const highKey = normalizeTeamName(higherName);
+  const lowKey = normalizeTeamName(lowerName);
+
+  let pred = null;
+  let proxy = false;
+  if (higherId != null && lowerId != null) {
+    pred = byIds.get(`${higherId}|${lowerId}`) || null;
+  }
+  if (!pred) pred = byNames.get(`${highKey}|${lowKey}`) || null;
+
+  let side = null;
+  if (pred) {
+    if (normalizeTeamName(pred?.t1_name) === highKey || String(pred?.t1_id ?? '') === String(higherId ?? '')) side = 't1';
+    else if (normalizeTeamName(pred?.t2_name) === highKey || String(pred?.t2_id ?? '') === String(higherId ?? '')) side = 't2';
+  }
+
+  if (!pred) {
+    const candidates = byTeamOppSeed.get(`${highKey}|${Number(lowerSeed)}`) || [];
+    if (candidates.length) {
+      candidates.sort((a, b) => {
+        const pa = normProb(a?.pred?.model_win_prob);
+        const pb = normProb(b?.pred?.model_win_prob);
+        const aEdge = Number.isFinite(pa) ? Math.abs(pa - 0.5) : 0;
+        const bEdge = Number.isFinite(pb) ? Math.abs(pb - 0.5) : 0;
+        return bEdge - aEdge;
+      });
+      pred = candidates[0].pred;
+      side = candidates[0].side;
+      proxy = true;
+    }
+  }
+
+  if (!side && pred) {
+    side = normalizeTeamName(pred?.t1_name) === highKey ? 't1' : 't2';
+  }
+  return { pred, side, proxy };
+}
+
+function buildTeamPayloadFromCache(teamEntry, pred, side, winProb) {
+  const prefix = side === 't2' ? 't2' : 't1';
+  const fallbackProfile = teamEntry?.profile || null;
+  const predProfile = pred?.[`${prefix}_profile`] || null;
+  return {
+    name: teamEntry?.name || '',
+    seed: Number(teamEntry?.seed ?? null),
+    team_id: teamEntry?.id ?? null,
+    win_probability: Number.isFinite(Number(winProb)) ? Number(winProb) : 0.5,
+    archetype: teamEntry?.archetype || pred?.[`${prefix}_archetype`] || 'Unknown',
+    profile: fallbackProfile || predProfile || null,
+    key_players: predProfile?.key_players || fallbackProfile?.key_players || null,
+    topComp: pred?.[`${prefix}_topComp`] || null,
+    comp_context: pred?.[`${prefix}_comp_context`] || null,
+    secondaryComp: pred?.[`${prefix}_secondaryComp`] || null,
+    secondary_comp_context: pred?.[`${prefix}_secondary_comp_context`] || null,
+    archetype_history: pred?.[`${prefix}_archetype_history`] || null,
+  };
+}
+
+function buildR64PayloadFromBracketCache() {
+  const cache = dataStore.bracket_cache || dataStore.predictions;
+  const predictions = Array.isArray(cache?.predictions) ? cache.predictions : [];
+  const teamDirectory = cache?.team_directory || {};
+  if (!predictions.length || !Object.keys(teamDirectory).length) return null;
+
+  const teamIndexes = buildTeamDirectoryIndexes(teamDirectory);
+  const predIndexes = buildPredictionIndexes(predictions);
+  const matchups = [];
+
+  for (const region of REGION_ORDER_2025) {
+    const games = Array.isArray(BRACKET_2025[region]) ? BRACKET_2025[region] : [];
+    for (const game of games) {
+      const pair = canonicalSeedPair(game.hSeed, game.lSeed);
+      const slot = Number(BRACKET_SLOT_BY_SEED_PAIR[pair]);
+      const higher = resolveTeamEntry(teamIndexes, game.higher);
+      const lower = resolveTeamEntry(teamIndexes, game.lower);
+      const higherName = higher?.name || game.higher;
+      const lowerName = lower?.name || game.lower;
+      const higherId = higher?.id ?? null;
+      const lowerId = lower?.id ?? null;
+      const found = pickPredictionForTeams(predIndexes, higherName, lowerName, higherId, lowerId, game.lSeed);
+      const pred = found.pred;
+      const side = found.side || 't1';
+      const modelProb = normProb(pred?.model_win_prob);
+      const defaultProb = fallbackWinProbBySeed(game.hSeed, game.lSeed);
+      const higherProb = Number.isFinite(modelProb) ? (side === 't1' ? modelProb : (1 - modelProb)) : defaultProb;
+      const lowerProb = 1 - higherProb;
+      const predictedWinner = pred?.predicted_winner_name || (higherProb >= 0.5 ? higherName : lowerName);
+      const upsetFlag = String(pred?.upset_flag || '').trim();
+      const confidence = String(pred?.confidence || confidenceTierFromProb(higherProb)).toUpperCase();
+      const seedHistory = cache?.seed_matchup_all_rounds?.R64?.[`${Math.min(game.hSeed, game.lSeed)}_vs_${Math.max(game.hSeed, game.lSeed)}`] || null;
+      const leverageDelta = Number(pred?.value_score);
+
+      const t1 = buildTeamPayloadFromCache({ ...higher, name: higherName, seed: game.hSeed, id: higherId }, pred, side === 't1' ? 't1' : 't2', higherProb);
+      const t2 = buildTeamPayloadFromCache({ ...lower, name: lowerName, seed: game.lSeed, id: lowerId }, pred, side === 't1' ? 't2' : 't1', lowerProb);
+
+      matchups.push({
+        matchup_id: `${String(region).toLowerCase()}-r64-${pair}`,
+        season: Number(cache?.season || cfg.activeSeason || 2025),
+        round: 'R64',
+        region,
+        slot: Number.isFinite(slot) ? slot : 0,
+        game_number: Number.isFinite(slot) ? slot + 1 : null,
+        t1,
+        t2,
+        matchup_meta: {
+          predicted_winner: predictedWinner,
+          confidence,
+          upset_flag: upsetFlag || (higherProb >= 0.55 ? 'chalk' : 'toss_up'),
+          display_flag: upsetFlag || (higherProb >= 0.55 ? 'chalk' : 'toss_up'),
+          model_agrees_with_seed: pred?.model_agrees_with_seed ?? (higherProb >= 0.5),
+          archetype_matchup: pred?.archetype_matchup || null,
+          key_factors: pred?.key_factors || null,
+          kenpom: pred?.kenpom || null,
+          form_and_risk: pred?.form_and_risk || null,
+          chatbot_responses: pred?.chatbot_responses || null,
+          chatbot_prompt: `Compare ${higherName} vs ${lowerName} in the Round of 64`,
+          seed_matchup: seedHistory,
+          pool_meta: {
+            leverage_delta: Number.isFinite(leverageDelta) ? leverageDelta : null,
+            contrarian_flag: Number.isFinite(leverageDelta) ? leverageDelta > 0.03 : false,
+            points_this_round: Number(cache?.espn_scoring?.R64 || 10),
+          },
+          risk: {
+            tier: Math.abs(higherProb - 0.5) >= 0.2 ? 'low' : (Math.abs(higherProb - 0.5) >= 0.1 ? 'medium' : 'high'),
+            reason: pred?.form_and_risk?.matchup_risk_note || (found.proxy ? 'Proxy matchup used due missing direct pair in cache.' : 'Derived from cached model probabilities.'),
+          },
+          proxy_prediction: !!found.proxy,
+          source_matchup: pred ? `${pred.t1_name} vs ${pred.t2_name}` : null,
+        },
+      });
+    }
+  }
+
+  matchups.sort((a, b) => {
+    const regionDiff = REGION_ORDER_2025.indexOf(a.region) - REGION_ORDER_2025.indexOf(b.region);
+    if (regionDiff !== 0) return regionDiff;
+    return Number(a.slot || 0) - Number(b.slot || 0);
+  });
+
+  return {
+    season: Number(cache?.season || cfg.activeSeason || 2025),
+    regions: REGION_ORDER_2025.slice(),
+    matchups,
+    finalFourPairings: FINAL_FOUR_PAIRINGS_2025,
+    final_four_pairings: getFinalFourPairingsObject(FINAL_FOUR_PAIRINGS_2025),
+    teamDirectory: teamDirectory,
+    team_directory: teamDirectory,
+    seedMatchupHistory: cache?.seed_matchup_all_rounds || dataStore.seed_matchups || {},
+    seed_matchup_all_rounds: cache?.seed_matchup_all_rounds || dataStore.seed_matchups || {},
+    archetypeMatrix: cache?.archetype_matchup_matrix || {},
+    archetype_matchup_matrix: cache?.archetype_matchup_matrix || {},
+    espnScoring: cache?.espn_scoring || {},
+    espn_scoring: cache?.espn_scoring || {},
+  };
+}
+
+function buildLegacyCanonicalR64Payload() {
   let matchups = [];
 
   const fromBracketMatchups = Array.isArray(store.bracketMatchups?.matchups)
@@ -790,13 +1088,30 @@ function buildCanonicalR64Payload() {
   const regions = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
   const season = Number(matchups[0]?.season || store.bracketMatchups?.season || dataStore.bracket?.season || bracketMatchupIndex.season || cfg.activeSeason || 2025);
   const finalFourPairings = getFinalFourPairingsArray();
+  const cache = dataStore.bracket_cache || dataStore.predictions || {};
   return {
     season,
     regions: regions.length ? regions : bracketMatchupIndex.regions,
     matchups,
     finalFourPairings,
     final_four_pairings: getFinalFourPairingsObject(finalFourPairings),
+    teamDirectory: cache?.team_directory || {},
+    team_directory: cache?.team_directory || {},
+    seedMatchupHistory: cache?.seed_matchup_all_rounds || dataStore.seed_matchups || {},
+    seed_matchup_all_rounds: cache?.seed_matchup_all_rounds || dataStore.seed_matchups || {},
+    archetypeMatrix: cache?.archetype_matchup_matrix || {},
+    archetype_matchup_matrix: cache?.archetype_matchup_matrix || {},
+    espnScoring: cache?.espn_scoring || {},
+    espn_scoring: cache?.espn_scoring || {},
   };
+}
+
+function buildCanonicalR64Payload() {
+  const cachePayload = buildR64PayloadFromBracketCache();
+  if (Array.isArray(cachePayload?.matchups) && cachePayload.matchups.length === 32) {
+    return cachePayload;
+  }
+  return buildLegacyCanonicalR64Payload();
 }
 
 function canonicalSeedPair(seedA, seedB) {
@@ -2610,15 +2925,6 @@ app.get('/api/ready', (req, res) => {
 
 app.get('/api/bracket', (req, res) => {
   const payload = buildCanonicalR64Payload();
-  const allM = Array.isArray(store.bracketMatchups?.matchups)
-    ? store.bracketMatchups.matchups
-    : (Array.isArray(store.bracketMatchups?.predictions) ? store.bracketMatchups.predictions : []);
-  console.log('=== SERVER BRACKET DEBUG ===');
-  console.log('store.bracketMatchups type:', typeof store.bracketMatchups);
-  console.log('store.bracketMatchups keys:', Object.keys(store.bracketMatchups || {}));
-  console.log('Total matchups in store:', allM.length);
-  console.log('Unique rounds:', Array.from(new Set(allM.map((m) => m?.round))));
-  console.log('Unique seeds:', Array.from(new Set(allM.map((m) => canonicalSeedPair(m?.t1?.seed ?? m?.t1_seed, m?.t2?.seed ?? m?.t2_seed) || 'unknown'))));
   if (!Array.isArray(payload.matchups) || payload.matchups.length === 0) {
     return res.status(404).json({
       error: 'No bracket data loaded',

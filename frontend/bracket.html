@@ -829,7 +829,7 @@
         <h1>2025 Interactive Bracket</h1>
         <div class="actions">
           <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
-          <button class="btn btn-primary" onclick="autoFill()">Auto-Fill Model Picks</button>
+          <button class="btn btn-primary" onclick="autoFillModelPicks()">Auto-Fill Model Picks</button>
           <button class="btn btn-secondary" onclick="exportBracket()">Export Bracket</button>
         </div>
       </div>
@@ -898,9 +898,11 @@
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
   <script>
     const STORAGE_KEY = 'bracketgpt_state_v2';
-    let regions = ['South', 'East', 'Midwest', 'West'];
+    let regions = ['South', 'East', 'West', 'Midwest'];
     const roundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
     const roundPoints = { R64: 10, R32: 20, S16: 40, E8: 80, F4: 160, NCG: 320 };
+    const r64SlotByPair = { '1v16': 0, '8v9': 1, '5v12': 2, '4v13': 3, '6v11': 4, '3v14': 5, '7v10': 6, '2v15': 7 };
+    const defaultFinalFourPairings = [['South', 'East'], ['West', 'Midwest']];
     const strategyKeys = ['chalk', 'balanced', 'upset'];
     const seedColors = {
       1: 'var(--accent)', 2: 'var(--accent)', 3: 'var(--accent)', 4: 'var(--accent)',
@@ -919,7 +921,7 @@
     let matchupCache = new Map();
     const bracketTeamIdByName = new Map();
     const teamIndex = new Map();
-    let finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
+    let finalFourPairings = defaultFinalFourPairings.slice();
     let mobileRound = 'R64';
     let bracketOutput = null;
     let strategyMap = {};
@@ -972,9 +974,12 @@
 
     function md(text) {
       const safe = escHtml(text || '');
-      return safe
+      const withInline = safe
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+      return withInline
+        .replace(/(?:^|\n)- (.*?)(?=\n|$)/g, '<br>&bull; $1')
         .replace(/\n/g, '<br>');
     }
 
@@ -1144,6 +1149,7 @@
         lock: { label: 'LOCK', color: 'var(--accent)' },
         confident: { label: 'CONFIDENT', color: 'var(--accent)' },
         lean: { label: 'LEAN', color: 'var(--accent-dim)' },
+        slight: { label: 'SLIGHT', color: 'var(--accent-dim)' },
         'toss-up': { label: 'TOSS-UP', color: 'var(--accent-dim)' },
         toss_up: { label: 'TOSS-UP', color: 'var(--accent-dim)' },
         underdog: { label: 'UNDERDOG', color: 'var(--accent-hot)' },
@@ -1192,8 +1198,16 @@
       return estimateEpFromTeam(node.round, pickName);
     }
 
-    function makeNode(id, round, region, source, children) {
-      return { id, round, region, source: source || null, children: children || [] };
+    function makeNode(id, round, region, source, children, slot) {
+      return {
+        id,
+        round,
+        region,
+        slot: Number.isFinite(Number(slot)) ? Number(slot) : null,
+        source: source || null,
+        children: children || [],
+        parent: null
+      };
     }
 
     function matchupKey(nameA, nameB) {
@@ -1278,11 +1292,17 @@
         color_primary: m?.team2Color ?? null
       };
       const p1 = toProb(t1?.win_probability ?? t1?.model_win_prob, 0.5);
+      const pair = canonicalSeedPair(t1?.seed, t2?.seed);
+      const explicitSlot = Number(m?.slot);
+      const inferredSlot = Number.isFinite(explicitSlot)
+        ? explicitSlot
+        : (Number.isFinite(Number(r64SlotByPair[pair])) ? Number(r64SlotByPair[pair]) : (gameNo - 1));
       return {
         matchup_id: String(m?.matchup_id || ('FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo)),
         season: Number(m?.season || seasonFallback || 2025),
         round: 'R64',
         region,
+        slot: Number.isFinite(inferredSlot) ? inferredSlot : (idx % 8),
         game_number: gameNo,
         t1: {
           team_id: t1?.team_id ?? t1?.id ?? null,
@@ -1314,11 +1334,11 @@
     function fallbackPairings(regionsList) {
       const names = Array.isArray(regionsList) ? regionsList : [];
       const has = (r) => names.includes(r);
-      if (has('South') && has('West') && has('East') && has('Midwest')) {
-        return [['South', 'West'], ['East', 'Midwest']];
+      if (has('South') && has('East') && has('West') && has('Midwest')) {
+        return defaultFinalFourPairings.slice();
       }
       if (names.length >= 4) return [[names[0], names[1]], [names[2], names[3]]];
-      return [['South', 'West'], ['East', 'Midwest']];
+      return defaultFinalFourPairings.slice();
     }
 
     function normalizeR64Matchups(rawMatchups) {
@@ -1578,69 +1598,90 @@
 
     function orderRegionR64Matchups(rows) {
       const list = Array.isArray(rows) ? rows.slice() : [];
-      const slotOrder = ['1v16', '8v9', '5v12', '4v13', '6v11', '3v14', '7v10', '2v15'];
-      const byPair = new Map();
-      for (const row of list) {
-        const key = canonicalSeedPair(row?.t1?.seed, row?.t2?.seed);
-        if (!key) continue;
-        if (!byPair.has(key)) byPair.set(key, []);
-        byPair.get(key).push(row);
-      }
-      const ordered = [];
-      for (const pair of slotOrder) {
-        const next = (byPair.get(pair) || []).shift();
-        if (next) ordered.push(next);
-      }
-      for (const row of list.sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))) {
-        if (!ordered.includes(row)) ordered.push(row);
-      }
-      return ordered;
+      return list.sort((a, b) => {
+        const aSlot = Number(a?.slot);
+        const bSlot = Number(b?.slot);
+        const aHas = Number.isFinite(aSlot);
+        const bHas = Number.isFinite(bSlot);
+        if (aHas && bHas && aSlot !== bSlot) return aSlot - bSlot;
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+        const pairA = canonicalSeedPair(a?.t1?.seed, a?.t2?.seed);
+        const pairB = canonicalSeedPair(b?.t1?.seed, b?.t2?.seed);
+        const slotA = Number(r64SlotByPair[pairA]);
+        const slotB = Number(r64SlotByPair[pairB]);
+        const slotAHas = Number.isFinite(slotA);
+        const slotBHas = Number.isFinite(slotB);
+        if (slotAHas && slotBHas && slotA !== slotB) return slotA - slotB;
+        if (slotAHas && !slotBHas) return -1;
+        if (!slotAHas && slotBHas) return 1;
+        return Number(a?.game_number || 0) - Number(b?.game_number || 0);
+      });
     }
 
     function linkParent(childId, parentId) {
       if (!parentMap.has(childId)) parentMap.set(childId, []);
       parentMap.get(childId).push(parentId);
+      const child = nodesById.get(childId);
+      if (child) child.parent = parentId;
     }
 
-    function buildTree() {
+    function makeRegionMatchupMap(rows) {
+      const byRegion = {};
+      for (const row of (rows || [])) {
+        const region = String(row?.region || '').trim();
+        if (!region) continue;
+        if (!byRegion[region]) byRegion[region] = [];
+        byRegion[region].push(row);
+      }
+      for (const key of Object.keys(byRegion)) {
+        byRegion[key] = orderRegionR64Matchups(byRegion[key]);
+      }
+      return byRegion;
+    }
+
+    function buildTree(regionMatchups, regionList) {
       nodesById = new Map();
       parentMap = new Map();
       regionRoundIds = {};
       finalIds = { F4: [], NCG: [] };
+      const byRegion = (regionMatchups && typeof regionMatchups === 'object')
+        ? regionMatchups
+        : makeRegionMatchupMap(baseMatchups);
+      const activeRegions = Array.isArray(regionList) && regionList.length ? regionList.slice() : regions.slice();
       const canonicalRegionByNorm = new Map();
-      for (const region of regions) {
+      for (const region of activeRegions) {
         const key = normalizeRegionName(region);
         if (key && !canonicalRegionByNorm.has(key)) canonicalRegionByNorm.set(key, region);
       }
 
-      for (const region of regions) {
-        const r64 = orderRegionR64Matchups(
-          baseMatchups.filter((m) => normalizeRegionName(m.region) === normalizeRegionName(region))
-        );
+      for (const region of activeRegions) {
+        const r64 = orderRegionR64Matchups(byRegion[region] || []);
         const ids = { R64: [], R32: [], S16: [], E8: [] };
-        for (const m of r64) {
-          const id = m.matchup_id;
-          nodesById.set(id, makeNode(id, 'R64', region, m, []));
+        for (let i = 0; i < 8; i++) {
+          const m = r64[i] || null;
+          const id = `${region}-R64-${i}`;
+          nodesById.set(id, makeNode(id, 'R64', region, m, [], i));
           ids.R64.push(id);
         }
         for (let i = 0; i < 4; i++) {
           const c1 = ids.R64[i * 2];
           const c2 = ids.R64[i * 2 + 1];
-          const id = `AUTO_R32_${region}_${i + 1}`;
-          nodesById.set(id, makeNode(id, 'R32', region, null, [c1, c2]));
+          const id = `${region}-R32-${i}`;
+          nodesById.set(id, makeNode(id, 'R32', region, null, [c1, c2], i));
           ids.R32.push(id);
           linkParent(c1, id); linkParent(c2, id);
         }
         for (let i = 0; i < 2; i++) {
           const c1 = ids.R32[i * 2];
           const c2 = ids.R32[i * 2 + 1];
-          const id = `AUTO_S16_${region}_${i + 1}`;
-          nodesById.set(id, makeNode(id, 'S16', region, null, [c1, c2]));
+          const id = `${region}-S16-${i}`;
+          nodesById.set(id, makeNode(id, 'S16', region, null, [c1, c2], i));
           ids.S16.push(id);
           linkParent(c1, id); linkParent(c2, id);
         }
-        const e8id = `AUTO_E8_${region}_1`;
-        nodesById.set(e8id, makeNode(e8id, 'E8', region, null, [ids.S16[0], ids.S16[1]]));
+        const e8id = `${region}-E8-0`;
+        nodesById.set(e8id, makeNode(e8id, 'E8', region, null, [ids.S16[0], ids.S16[1]], 0));
         ids.E8.push(e8id);
         linkParent(ids.S16[0], e8id); linkParent(ids.S16[1], e8id);
         regionRoundIds[region] = ids;
@@ -1648,7 +1689,7 @@
 
       const pairings = Array.isArray(finalFourPairings) && finalFourPairings.length >= 2
         ? finalFourPairings
-        : [['South', 'West'], ['East', 'Midwest']];
+        : defaultFinalFourPairings;
       const resolveRegion = (raw) => {
         const exact = String(raw || '');
         if (regionRoundIds[exact]) return exact;
@@ -1665,16 +1706,16 @@
           return;
         }
       }
-      const f4a = 'AUTO_F4_' + activePairs[0][0].charAt(0) + activePairs[0][1].charAt(0);
-      const f4b = 'AUTO_F4_' + activePairs[1][0].charAt(0) + activePairs[1][1].charAt(0);
-      const ncg = 'AUTO_NCG_1';
+      const f4a = 'F4-0';
+      const f4b = 'F4-1';
+      const ncg = 'NCG-0';
       const pair1a = regionRoundIds[activePairs[0][0]].E8[0];
       const pair1b = regionRoundIds[activePairs[0][1]].E8[0];
       const pair2a = regionRoundIds[activePairs[1][0]].E8[0];
       const pair2b = regionRoundIds[activePairs[1][1]].E8[0];
-      nodesById.set(f4a, makeNode(f4a, 'F4', 'Final Four', null, [pair1a, pair1b]));
-      nodesById.set(f4b, makeNode(f4b, 'F4', 'Final Four', null, [pair2a, pair2b]));
-      nodesById.set(ncg, makeNode(ncg, 'NCG', 'Final Four', null, [f4a, f4b]));
+      nodesById.set(f4a, makeNode(f4a, 'F4', 'F4', null, [pair1a, pair1b], 0));
+      nodesById.set(f4b, makeNode(f4b, 'F4', 'F4', null, [pair2a, pair2b], 1));
+      nodesById.set(ncg, makeNode(ncg, 'NCG', 'NCG', null, [f4a, f4b], 0));
       linkParent(pair1a, f4a); linkParent(pair1b, f4a);
       linkParent(pair2a, f4b); linkParent(pair2b, f4b);
       linkParent(f4a, ncg); linkParent(f4b, ncg);
@@ -1788,8 +1829,9 @@
       }
       const disabled = '';
       const winner = team && pick === team.name ? 'winner' : '';
+      const seedValue = Number.isFinite(Number(team?.seed)) ? Number(team.seed) : (team?.seed ?? '-');
       return '<div class="team-row">' +
-        '<span class="seed">' + (team?.seed ?? '-') + '</span>' +
+        '<span class="seed">' + seedValue + '</span>' +
         '<button class="team-btn ' + winner + '" ' + disabled + ' onclick="makePick(\'' + node.id + '\',\'' + (team?.name || '').replace(/'/g, "\\'") + '\')">' + (team?.name || 'TBD') + '</button>' +
         '<span class="prob">' + (Number.isFinite(prob) ? (prob * 100).toFixed(1) + '%' : '--') + '</span>' +
         '<button class="info" onclick="openCard(\'' + node.id + '\')">i</button>' +
@@ -2056,9 +2098,9 @@
     }
 
     async function getCardData(node) {
-      if (node.round === 'R64' && node.source) return node.source;
       const [t1, t2] = getMatchTeams(node);
       if (!t1 || !t2) return fallbackMeta(node);
+      if (node.round === 'R64' && node.source) return node.source;
       const tA = teamIndex.get(normalizeName(t1.name)) || {};
       const tB = teamIndex.get(normalizeName(t2.name)) || {};
       const prob = estimateWinProb(t1.name, t2.name);
@@ -2098,7 +2140,44 @@
         },
         matchup_meta: buildSyntheticMeta(t1, t2, prob, tA, tB, node)
       };
-      return synthetic;
+      try {
+        const m = await getMatchupForTeams(t1.name, t2.name);
+        if (!m) return synthetic;
+        const mT1Name = normalizeName(m?.t1?.name);
+        const mT2Name = normalizeName(m?.t2?.name);
+        const wantedT1 = normalizeName(t1.name);
+        const wantedT2 = normalizeName(t2.name);
+        const apiT1 = mT1Name === wantedT1 ? m?.t1 : (mT2Name === wantedT1 ? m?.t2 : null);
+        const apiT2 = mT1Name === wantedT2 ? m?.t1 : (mT2Name === wantedT2 ? m?.t2 : null);
+        const p1 = Number(apiT1?.win_probability);
+        const p2 = Number(apiT2?.win_probability);
+        const resolvedP1 = Number.isFinite(p1) ? p1 : (Number.isFinite(p2) ? (1 - p2) : prob);
+        const resolvedP2 = Number.isFinite(p2) ? p2 : (1 - resolvedP1);
+        return {
+          ...synthetic,
+          matchup_id: m?.matchup_id || synthetic.matchup_id,
+          t1: {
+            ...(synthetic.t1 || t1),
+            ...(apiT1 || {}),
+            name: t1.name,
+            seed: apiT1?.seed ?? t1.seed,
+            win_probability: resolvedP1
+          },
+          t2: {
+            ...(synthetic.t2 || t2),
+            ...(apiT2 || {}),
+            name: t2.name,
+            seed: apiT2?.seed ?? t2.seed,
+            win_probability: resolvedP2
+          },
+          matchup_meta: {
+            ...(synthetic.matchup_meta || {}),
+            ...(m?.matchup_meta || {})
+          }
+        };
+      } catch (e) {
+        return synthetic;
+      }
     }
 
     function applyMobileRoundVisibility() {
@@ -2192,8 +2271,62 @@
       const modelTeam = t1p >= t2p ? t1 : t2;
       const modelName = modelTeam?.name || 'TBD';
       const modelIsT1 = modelName && modelName === t1.name;
-      const upset = String(meta.upset_flag || meta.display_flag || 'chalk').replace(/_/g, ' ').toUpperCase();
-      const badgeClass = upsetBadgeClass(meta.upset_flag || meta.display_flag || 'chalk');
+      const confidence = getConfidenceBadge(meta.confidence || getConfidenceLabel(t1p).label);
+      const displayFlag = getDisplayFlag(meta, t1p);
+      const flagLabel = String(meta.display_flag || meta.upset_flag || displayFlag || 'chalk').replace(/_/g, ' ').toUpperCase();
+      const matchupPrompt = String(meta.chatbot_prompt || ('Compare ' + (t1.name || 'Team A') + ' vs ' + (t2.name || 'Team B') + ' in the ' + getRoundTitle(node.round).split(' (')[0]));
+      const responses = meta.chatbot_responses || meta.responses || {};
+      const blurbParts = [
+        responses.quick,
+        responses.value,
+        responses.stats,
+        responses.upset,
+        responses.archetype,
+        responses.historical,
+        responses.seed_history,
+      ].filter((v) => typeof v === 'string' && v.trim());
+      const blurb = blurbParts.length
+        ? blurbParts.join('\n\n')
+        : (meta?.risk?.reason || meta?.form_and_risk?.matchup_risk_note || 'Model analysis unavailable for this matchup.');
+
+      const archetypeMatchup = meta.archetype_matchup || meta.archetype_h2h || null;
+      const keyFactors = meta.key_factors || null;
+      const kenpom = meta.kenpom || null;
+      const formRisk = meta.form_and_risk || null;
+      const risk = riskBadge(meta?.risk?.tier || (formRisk?.matchup_risk_note ? 'medium' : 'low'));
+
+      const toPct = (v) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return null;
+        if (n <= 1) return n * 100;
+        if (n <= 100) return n;
+        return null;
+      };
+      const pctText = (v, d = 1) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? (n * 100).toFixed(d) + '%' : '--';
+      };
+      const pub1 = toPct(t1?.pool?.public_pick_pct);
+      const pub2 = toPct(t2?.pool?.public_pick_pct);
+      const leverage = meta?.pool_meta?.leverage_delta;
+      const compA = t1.topComp || t1.primary_comp || null;
+      const compB = t2.topComp || t2.primary_comp || null;
+      const escPickA = String(t1?.name || '').replace(/'/g, "\\'");
+      const escPickB = String(t2?.name || '').replace(/'/g, "\\'");
+      const askHref = '/?q=' + encodeURIComponent(matchupPrompt);
+      const archA = t1.archetype || (Array.isArray(t1.archetypes) ? t1.archetypes[0] : '') || 'Unknown';
+      const archB = t2.archetype || (Array.isArray(t2.archetypes) ? t2.archetypes[0] : '') || 'Unknown';
+      const playersFor = (team) => {
+        const arr = Array.isArray(team?.key_players) ? team.key_players : [];
+        if (!arr.length) return '<div class="tiny">No key player notes.</div>';
+        return arr.slice(0, 4).map((p) => {
+          if (typeof p === 'string') return '<div class="player-row"><span class="player-name">' + escHtml(p) + '</span></div>';
+          return '<div class="player-row"><span class="player-name">' + escHtml(p?.name || 'Player') + '</span>' +
+            '<span class="player-role">' + escHtml(p?.role || '') + '</span>' +
+            '<span class="player-note">' + escHtml(p?.note || '') + '</span></div>';
+        }).join('');
+      };
+
       card.innerHTML =
         '<div class="card-head">' +
           '<span class="guided-label">' + roundBannerLabel(node.round, node.region) + '</span>' +
@@ -2203,22 +2336,89 @@
           '<div class="guided-team-row ' + (modelIsT1 ? 'model' : '') + '">' +
             '<span class="guided-team-seed">' + (t1.seed ?? '-') + '</span>' +
             '<span class="guided-team-name">' + (t1.name || 'TBD') + '</span>' +
-            '<span class="guided-team-prob">' + ((t1p * 100).toFixed(1)) + '%</span>' +
+            '<span class="guided-team-prob">' + pctText(t1p) + '</span>' +
           '</div>' +
           '<div class="guided-divider"></div>' +
           '<div class="guided-team-row ' + (!modelIsT1 ? 'model' : '') + '">' +
             '<span class="guided-team-seed">' + (t2.seed ?? '-') + '</span>' +
             '<span class="guided-team-name">' + (t2.name || 'TBD') + '</span>' +
-            '<span class="guided-team-prob">' + ((t2p * 100).toFixed(1)) + '%</span>' +
+            '<span class="guided-team-prob">' + pctText(t2p) + '</span>' +
           '</div>' +
         '</div>' +
-        '<div class="guided-model">' +
-          '<span class="guided-model-pick">Model Pick: ' + modelName + '</span>' +
-          '<span class="guided-badge ' + badgeClass + '">' + upset + '</span>' +
+        '<div class="model-pick">' +
+          '<span class="model-pick-label">Model Pick</span>' +
+          '<span class="model-pick-team">' + escHtml(modelName) + '</span>' +
+          '<span class="model-pick-prob">' + pctText(Math.max(t1p, t2p)) + '</span>' +
+          '<span class="model-pick-conf" style="color:' + confidence.color + '">' + confidence.label + '</span>' +
         '</div>' +
-        '<div class="guided-analysis loading" id="guided-analysis">Loading model analysis...</div>' +
-        '<button class="guided-pick-btn" id="guided-pick-btn" onclick="guidedPickCurrent()">Pick ' + modelName + '</button>';
-      fetchAnalysis(node, t1, t2);
+        '<div class="guided-model">' +
+          '<span class="guided-badge ' + badgeClass(displayFlag) + '">' + escHtml(flagLabel) + '</span>' +
+          '<span class="tiny">Archetypes: ' + escHtml(archA) + ' vs ' + escHtml(archB) + '</span>' +
+        '</div>' +
+        '<div class="guided-analysis" id="guided-analysis">' + md(blurb) + '</div>' +
+
+        '<div class="section">' +
+          '<h3>Case</h3>' +
+          '<div class="data-row"><span class="data-label">Archetype H2H</span><span class="data-value">' +
+            (archetypeMatchup
+              ? escHtml((archetypeMatchup.t1_arch || archA) + ' vs ' + (archetypeMatchup.t2_arch || archB) +
+                (Number.isFinite(Number(archetypeMatchup.historical_wr))
+                  ? (' | WR ' + (Number(archetypeMatchup.historical_wr) * 100).toFixed(1) + '% over n=' + Number(archetypeMatchup.historical_n || 0))
+                  : ' | limited history'))
+              : 'No archetype matchup history') +
+          '</span></div>' +
+          '<div class="data-row"><span class="data-label">Key Factors</span><span class="data-value">' +
+            (keyFactors
+              ? ('Elo Δ ' + (Number(keyFactors.elo_diff || 0)).toFixed(1) +
+                 ' | Pyth ' + Number(keyFactors.t1_pyth || 0).toFixed(3) + ' vs ' + Number(keyFactors.t2_pyth || 0).toFixed(3) +
+                 ' | NetEff ' + Number(keyFactors.t1_net_eff || 0).toFixed(1) + ' vs ' + Number(keyFactors.t2_net_eff || 0).toFixed(1))
+              : 'No factor breakdown') +
+          '</span></div>' +
+          '<div class="data-row"><span class="data-label">KenPom</span><span class="data-value">' +
+            (kenpom
+              ? (escHtml((t1.name || 'T1') + ': O ' + Number(kenpom.t1_ortg || 0).toFixed(1) + ' D ' + Number(kenpom.t1_drtg || 0).toFixed(1) +
+                ' | ' + (t2.name || 'T2') + ': O ' + Number(kenpom.t2_ortg || 0).toFixed(1) + ' D ' + Number(kenpom.t2_drtg || 0).toFixed(1)))
+              : 'No KenPom matchup metrics') +
+          '</span></div>' +
+          compLine(t1.name || 'Team A', compA) +
+          compLine(t2.name || 'Team B', compB) +
+          '<div class="data-row"><span class="data-label">' + escHtml(t1.name || 'Team A') + ' Players</span><span class="data-value"></span></div>' +
+          playersFor(t1) +
+          '<div class="data-row"><span class="data-label">' + escHtml(t2.name || 'Team B') + ' Players</span><span class="data-value"></span></div>' +
+          playersFor(t2) +
+        '</div>' +
+
+        '<div class="section">' +
+          '<h3>Pool</h3>' +
+          '<div class="data-row"><span class="data-label">Public Picks</span><span class="data-value">' +
+            escHtml((t1.name || 'T1') + ': ' + (pub1 == null ? 'N/A' : pub1.toFixed(1) + '%') + ' | ' +
+              (t2.name || 'T2') + ': ' + (pub2 == null ? 'N/A' : pub2.toFixed(1) + '%')) +
+          '</span></div>' +
+          '<div class="data-row"><span class="data-label">Leverage</span><span class="data-value">' + escHtml(leverageText(leverage)) + '</span></div>' +
+          '<div class="data-row"><span class="data-label">Round Value</span><span class="data-value">' + escHtml(exposureText(node.round, meta)) + '</span></div>' +
+        '</div>' +
+
+        '<div class="section">' +
+          '<h3>Risk</h3>' +
+          '<div class="data-row"><span class="data-label">Confidence</span><span class="data-value" style="color:' + confidence.color + '">' + confidence.label + '</span></div>' +
+          '<div class="data-row"><span class="data-label">Risk Tier</span><span class="data-value" style="color:' + risk.color + '">' + escHtml(risk.label) + '</span></div>' +
+          '<div class="data-row"><span class="data-label">Risk Note</span><span class="data-value">' + escHtml(meta?.risk?.reason || formRisk?.matchup_risk_note || 'No added risk note.') + '</span></div>' +
+          '<div class="data-row"><span class="data-label">Form</span><span class="data-value">' +
+            escHtml((formRisk?.t1_momentum || 'n/a') + ' vs ' + (formRisk?.t2_momentum || 'n/a') +
+              ' | L10 ' + (formRisk?.t1_last10_win_rate ?? 'n/a') + ' / ' + (formRisk?.t2_last10_win_rate ?? 'n/a')) +
+          '</span></div>' +
+          '<div class="data-row"><span class="data-label">Injury Flags</span><span class="data-value">' +
+            escHtml((formRisk?.t1_injury_alert ? (t1.name + ': yes') : (t1.name + ': no')) + ' | ' +
+              (formRisk?.t2_injury_alert ? (t2.name + ': yes') : (t2.name + ': no'))) +
+          '</span></div>' +
+        '</div>' +
+
+        '<button class="guided-pick-btn" id="guided-pick-btn" onclick="makePick(\'' + node.id + '\',\'' + (modelName || '').replace(/'/g, "\\'") + '\')">Pick ' + escHtml(modelName) + ' (Model)</button>' +
+        '<div class="pick-actions">' +
+          '<button class="pick-btn ' + (modelIsT1 ? 'recommended' : '') + '" onclick="makePick(\'' + node.id + '\',\'' + escPickA + '\')">' + escHtml(t1.name || 'Team 1') + '</button>' +
+          '<button class="pick-btn ' + (!modelIsT1 ? 'recommended' : '') + '" onclick="makePick(\'' + node.id + '\',\'' + escPickB + '\')">' + escHtml(t2.name || 'Team 2') + '</button>' +
+        '</div>' +
+        '<a class="ask-btn" href="' + askHref + '" target="_blank" rel="noopener">Ask BracketGPT</a>';
     }
 
     async function fetchAnalysis(node, t1, t2) {
@@ -2261,40 +2461,7 @@
       if (!overlay) return;
       overlay.classList.add('open');
       overlay.classList.remove('instant');
-      let data = await getCardData(node);
-      try {
-        const m = await getMatchupForTeams(t1.name, t2.name);
-        if (m) {
-          const mT1Name = normalizeName(m?.t1?.name);
-          const mT2Name = normalizeName(m?.t2?.name);
-          const wantedT1 = normalizeName(t1.name);
-          const wantedT2 = normalizeName(t2.name);
-          const t1FromApi = mT1Name === wantedT1 ? m?.t1 : (mT2Name === wantedT1 ? m?.t2 : null);
-          const t2FromApi = mT1Name === wantedT2 ? m?.t1 : (mT2Name === wantedT2 ? m?.t2 : null);
-          data = {
-            ...data,
-            t1: {
-              ...(data.t1 || t1),
-              name: t1.name,
-              seed: t1FromApi?.seed ?? t1.seed,
-              win_probability: Number(t1FromApi?.win_probability ?? data?.t1?.win_probability ?? 0),
-            },
-            t2: {
-              ...(data.t2 || t2),
-              name: t2.name,
-              seed: t2FromApi?.seed ?? t2.seed,
-              win_probability: Number(t2FromApi?.win_probability ?? data?.t2?.win_probability ?? 0),
-            },
-            matchup_meta: {
-              ...(data.matchup_meta || {}),
-              predicted_winner: m?.matchup_meta?.predicted_winner || data?.matchup_meta?.predicted_winner || '',
-              upset_flag: m?.matchup_meta?.upset_flag || data?.matchup_meta?.upset_flag || 'chalk',
-              display_flag: m?.matchup_meta?.display_flag || data?.matchup_meta?.display_flag || 'chalk',
-              confidence: m?.matchup_meta?.confidence || data?.matchup_meta?.confidence || null
-            }
-          };
-        }
-      } catch (e) {}
+      const data = await getCardData(node);
       if (guidedNodeId !== node.id) return;
       renderCard(data, node);
     }
@@ -2421,7 +2588,7 @@
       renderAll();
     }
 
-    async function autoFill() {
+    async function autoFillModelPicks() {
       if (!confirm('Fill bracket with model-recommended picks? You can still change individual picks after.')) return;
       activeStrategy = '';
       bracketState.activeStrategy = 'custom';
@@ -2466,6 +2633,10 @@
       }
       saveState();
       renderAll();
+    }
+
+    async function autoFill() {
+      return autoFillModelPicks();
     }
 
     async function exportBracket() {
@@ -2540,15 +2711,21 @@
           teamEpRankings = {};
           championProbs = {};
         }
+        window._teamDir = data.teamDirectory || data.team_directory || {};
+        window._seedHistory = data.seedMatchupHistory || data.seed_matchup_all_rounds || {};
+        window._archetypeMatrix = data.archetypeMatrix || data.archetype_matchup_matrix || {};
+        window._espnScoring = data.espnScoring || data.espn_scoring || {};
         const regionFromMatchups = Array.isArray(data.matchups)
           ? Array.from(new Set(data.matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)))
           : [];
-        if (regionFromMatchups.length >= 2) {
+        if (Array.isArray(data.regions) && data.regions.length) {
+          regions = data.regions.map((r) => String(r || '').trim()).filter(Boolean);
+        } else if (regionFromMatchups.length >= 2) {
           regions = regionFromMatchups;
         } else if (data.regions && !Array.isArray(data.regions) && typeof data.regions === 'object') {
           regions = Object.keys(data.regions).map((r) => String(r || '').trim()).filter(Boolean);
-        } else if (Array.isArray(data.regions) && data.regions.length) {
-          regions = data.regions.map((r) => String(r || '').trim()).filter(Boolean);
+        } else {
+          regions = ['South', 'East', 'West', 'Midwest'];
         }
         if (data?.final_four_pairings) {
           finalFourPairings = [
@@ -2558,26 +2735,30 @@
         } else if (Array.isArray(data.finalFourPairings) && data.finalFourPairings.length >= 2) {
           finalFourPairings = data.finalFourPairings;
         } else {
-          finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
+          finalFourPairings = defaultFinalFourPairings.slice();
         }
+        window._f4Pairings = finalFourPairings;
         baseMatchups = Array.isArray(data.matchups) ? data.matchups : [];
-        console.log('=== BRACKET DEBUG ===');
-        console.log('Total matchups from API:', baseMatchups.length);
-        console.log('Unique seed pairings:', [...new Set(baseMatchups.map((m) => (m.t1?.seed ?? '?') + 'v' + (m.t2?.seed ?? '?')))]);
-        console.log('Unique regions:', [...new Set(baseMatchups.map((m) => m.region))]);
-        console.log('Unique rounds:', [...new Set(baseMatchups.map((m) => m.round))]);
-        console.log('First matchup:', JSON.stringify(baseMatchups[0] || {}, null, 2));
-        console.log('Last matchup:', JSON.stringify(baseMatchups[baseMatchups.length - 1] || {}, null, 2));
         if (baseMatchups.length === 0) {
           document.getElementById('regions').innerHTML = '';
           document.getElementById('finals').innerHTML = '';
           showError(bracketHint || 'No bracket data loaded from API or uploaded bracket JSON. Verify backend/data/bracket_2025.json and backend/data/chatbot_predictions_v5.json are present.');
           return;
         }
+        const byRegion = {};
+        for (const m of baseMatchups) {
+          const region = String(m?.region || '').trim();
+          if (!region) continue;
+          if (!byRegion[region]) byRegion[region] = [];
+          byRegion[region].push(m);
+        }
+        for (const region of Object.keys(byRegion)) {
+          byRegion[region] = orderRegionR64Matchups(byRegion[region]);
+        }
         matchupById = new Map(baseMatchups.map((m) => [m.matchup_id, m]));
         buildTeamIndex();
         loadState();
-        buildTree();
+        buildTree(byRegion, regions);
         updateStrategyBar();
         renderOptimizer();
         if (strategyKeys.includes(String(bracketState.activeStrategy || '').toLowerCase()) && strategyMap[String(bracketState.activeStrategy || '').toLowerCase()]) {
