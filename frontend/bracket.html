@@ -831,9 +831,54 @@
     background: var(--surface);
     padding: 11px 16px;
       border-bottom: 1px solid var(--border);
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex;
+      flex-direction: column;
       gap: 8px;
     }
+  .pc-header-top {
+    display: grid;
+    grid-template-columns: 28px 1fr 28px;
+    align-items: center;
+    gap: 8px;
+  }
+  .pc-progress {
+    text-align: center;
+    font-family: var(--fd);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .pc-nav-btn {
+    width: 28px;
+    height: 24px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--fd);
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+  }
+  .pc-nav-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .pc-nav-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+    border-color: var(--border);
+    color: var(--muted);
+  }
+  .pc-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
   .pc-region {
     font-family: var(--fd); font-size: 11px; font-weight: 700;
     letter-spacing: .12em; text-transform: uppercase;
@@ -1179,6 +1224,7 @@
             <h1>2025 Interactive Bracket</h1>
             <div class="actions">
               <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
+              <button class="btn btn-secondary" onclick="startGuidedFlow()">Start Picking</button>
               <button class="btn btn-primary" onclick="autoFillModelPicks()">Auto-Fill Model Picks</button>
               <button class="btn btn-secondary" onclick="exportBracket()">Export Bracket</button>
             </div>
@@ -1274,9 +1320,16 @@
   <div class="overlay" id="overlay" onclick="closeOverlay(event)">
     <div class="pick-card" id="pickCard">
       <div class="pc-header">
-        <span class="pc-region" id="pcRegion">East &middot; R64</span>
-        <span class="pc-flag" id="pcFlag"></span>
-        <span class="signal-tag" id="pcSignal" style="display:none"></span>
+        <div class="pc-header-top">
+          <button class="pc-nav-btn" id="pcPrevBtn" onclick="navigatePickCard(-1)" aria-label="Previous game">&#8249;</button>
+          <span class="pc-progress" id="pcProgress">Game 1 of 63 &middot; South &middot; Round of 64</span>
+          <button class="pc-nav-btn" id="pcNextBtn" onclick="navigatePickCard(1)" aria-label="Next game">&#8250;</button>
+        </div>
+        <div class="pc-header-main">
+          <span class="pc-region" id="pcRegion">East &middot; R64</span>
+          <span class="pc-flag" id="pcFlag"></span>
+          <span class="signal-tag" id="pcSignal" style="display:none"></span>
+        </div>
       </div>
 
       <div class="pc-teams">
@@ -1419,12 +1472,35 @@
     let strategyEpByNode = {};
     let customOverrideNodes = new Set();
     const flowRoundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
+    const PICK_REGIONS = ['South', 'East', 'West', 'Midwest'];
+    const PICK_ROUNDS = ['R64', 'R32', 'S16', 'E8'];
+    const PICK_SEQUENCE = [];
+    const PICK_ROUND_LABELS = {
+      R64: 'Round of 64',
+      R32: 'Round of 32',
+      S16: 'Sweet 16',
+      E8: 'Elite 8',
+      F4: 'Final Four',
+      NCG: 'Championship'
+    };
+    for (const region of PICK_REGIONS) {
+      for (const round of PICK_ROUNDS) {
+        const count = { R64: 8, R32: 4, S16: 2, E8: 1 }[round];
+        for (let i = 0; i < count; i++) PICK_SEQUENCE.push(`${region}-${round}-${i}`);
+      }
+    }
+    PICK_SEQUENCE.push('F4-0', 'F4-1', 'NCG-0');
+    const PICK_SEQUENCE_INDEX = new Map(PICK_SEQUENCE.map((id, idx) => [id, idx]));
     const roundDataMap = { R64: '64', R32: '32', S16: '16', E8: '8', F4: '4', NCG: '2' };
     let autoAdvanceEnabled = true;
     let flowLocked = false;
     let flowLockTimestamp = 0;
     let flowLockSafetyBound = false;
     let guidedNodeId = '';
+    let guidedFlowActive = false;
+    let currentPickIndex = -1;
+    let guidedAdvanceTimer = null;
+    let bulkFilling = false;
     let analysisToken = 0;
     let pickCardContext = { matchupId: '', teamA: '', teamB: '' };
     let currentPickCardMatchup = null;
@@ -1873,66 +1949,108 @@
       renderChatHistory();
     }
 
-    function roundBannerLabel(roundKey, region) {
-      return getRoundTitle(roundKey).split(' (')[0] + ' · ' + String(region || '').toUpperCase() + ' REGION';
-    }
-
-    function roundDataValue(roundKey) {
-      return roundDataMap[roundKey] || '';
-    }
-
-    function flowRegionsForRound(roundKey) {
-      if (roundKey === 'F4' || roundKey === 'NCG') return ['Final Four'];
-      return regions.slice();
-    }
-
-    function nodeIdsForRegionRound(region, roundKey) {
-      if (roundKey === 'F4') return finalIds.F4.slice();
-      if (roundKey === 'NCG') return finalIds.NCG.slice();
-      return (regionRoundIds[region]?.[roundKey] || []).slice();
-    }
-
     function isNodePickable(node) {
       const [t1, t2] = getMatchTeams(node);
       return !!(t1 && t2);
     }
 
-    function buildFlowTargets() {
-      const targets = [];
-      for (const roundKey of flowRoundOrder) {
-        for (const region of flowRegionsForRound(roundKey)) {
-          for (const id of nodeIdsForRegionRound(region, roundKey)) {
-            const node = nodesById.get(id);
-            if (!node) continue;
-            targets.push({ id, round: roundKey, region });
-          }
-        }
-      }
-      return targets;
+    function clearGuidedAdvanceTimer() {
+      if (guidedAdvanceTimer) clearTimeout(guidedAdvanceTimer);
+      guidedAdvanceTimer = null;
     }
 
-    function findNextFlowTarget(afterNodeId) {
-      const targets = buildFlowTargets();
-      let start = 0;
-      if (afterNodeId) {
-        const idx = targets.findIndex((t) => t.id === afterNodeId);
-        start = idx >= 0 ? idx + 1 : 0;
-      }
-      for (let i = start; i < targets.length; i++) {
-        const t = targets[i];
-        const node = nodesById.get(t.id);
-        if (!node || !isNodePickable(node) || validPickForNode(node)) continue;
-        return t;
-      }
-      if (start > 0) {
-        for (let i = 0; i < start; i++) {
-          const t = targets[i];
-          const node = nodesById.get(t.id);
-          if (!node || !isNodePickable(node) || validPickForNode(node)) continue;
-          return t;
-        }
+    function getNextReadyNode(fromIndex, includePicked = false) {
+      for (let i = Math.max(0, fromIndex); i < PICK_SEQUENCE.length; i++) {
+        const nodeId = PICK_SEQUENCE[i];
+        const node = nodesById.get(nodeId);
+        if (!node || !isNodePickable(node)) continue;
+        if (!includePicked && validPickForNode(node)) continue;
+        return i;
       }
       return null;
+    }
+
+    function getPrevReadyNode(fromIndex) {
+      for (let i = Math.min(fromIndex, PICK_SEQUENCE.length - 1); i >= 0; i--) {
+        const nodeId = PICK_SEQUENCE[i];
+        const node = nodesById.get(nodeId);
+        if (!node || !isNodePickable(node)) continue;
+        return i;
+      }
+      return null;
+    }
+
+    function flowProgressText(nodeId, fallbackRegion, fallbackRound) {
+      const idx = PICK_SEQUENCE_INDEX.get(nodeId);
+      const node = nodeId ? nodesById.get(nodeId) : null;
+      const region = node?.region || fallbackRegion || '';
+      const round = node?.round || fallbackRound || 'R64';
+      const roundLabel = PICK_ROUND_LABELS[round] || round;
+      if (Number.isInteger(idx)) {
+        return `Game ${idx + 1} of ${PICK_SEQUENCE.length} - ${region} - ${roundLabel}`;
+      }
+      return `${region} - ${roundLabel}`;
+    }
+
+    function updatePickCardNav(nodeId) {
+      const idx = PICK_SEQUENCE_INDEX.get(nodeId);
+      const progressEl = document.getElementById('pcProgress');
+      const prevBtn = document.getElementById('pcPrevBtn');
+      const nextBtn = document.getElementById('pcNextBtn');
+      if (!Number.isInteger(idx)) {
+        if (progressEl) progressEl.textContent = 'Manual Pick';
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
+        return;
+      }
+      const node = nodesById.get(nodeId);
+      if (progressEl) progressEl.textContent = flowProgressText(nodeId, node?.region, node?.round);
+      const prevIdx = getPrevReadyNode(idx - 1);
+      const nextIdx = getNextReadyNode(idx + 1, true);
+      if (prevBtn) prevBtn.disabled = prevIdx === null;
+      if (nextBtn) nextBtn.disabled = nextIdx === null;
+    }
+
+    function showBracketCompleteState() {
+      const banner = document.getElementById('flowBanner');
+      if (!banner) return;
+      banner.textContent = 'BRACKET COMPLETE';
+      banner.classList.add('show');
+      clearPreviewTimers();
+      regionPreviewFadeTimer = setTimeout(() => banner.classList.remove('show'), 2200);
+    }
+
+    function exitGuidedFlow(opts = {}) {
+      guidedFlowActive = false;
+      currentPickIndex = -1;
+      clearGuidedAdvanceTimer();
+      if (opts.closeCard) closeCard(true, false);
+    }
+
+    function startGuidedFlow() {
+      if (bulkFilling) return;
+      guidedFlowActive = true;
+      clearGuidedAdvanceTimer();
+      const first = getNextReadyNode(0, true);
+      if (first === null) {
+        showBracketCompleteState();
+        guidedFlowActive = false;
+        return;
+      }
+      currentPickIndex = first;
+      openCard(PICK_SEQUENCE[first], { autoResume: false, manualResume: true });
+    }
+
+    function navigatePickCard(direction) {
+      const matchupId = currentPickCardMatchup?.matchup_id || guidedNodeId;
+      const idx = PICK_SEQUENCE_INDEX.get(matchupId);
+      if (!Number.isInteger(idx)) return;
+      const targetIdx = direction < 0
+        ? getPrevReadyNode(idx - 1)
+        : getNextReadyNode(idx + 1, true);
+      if (targetIdx === null) return;
+      currentPickIndex = targetIdx;
+      openCard(PICK_SEQUENCE[targetIdx], { autoResume: false, manualResume: false });
     }
 
     function clearPreviewTimers() {
@@ -3008,13 +3126,31 @@
       saveState();
       renderAll();
       updateUpsetRec();
-      if (!opts.keepCardOpen) closeCard(true, false);
+      const thisIdx = PICK_SEQUENCE_INDEX.get(matchId);
+      if (Number.isInteger(thisIdx)) currentPickIndex = thisIdx;
+      const shouldAutoAdvanceGuided = guidedFlowActive && !bulkFilling;
+      if (!opts.keepCardOpen && !shouldAutoAdvanceGuided) closeCard(true, false);
       for (const parentId of (parentMap.get(matchId) || [])) {
         const parentNode = nodesById.get(parentId);
         if (!parentNode) continue;
         const [pt1, pt2] = getMatchTeams(parentNode);
         if (!pt1 || !pt2) continue;
       }
+      if (!shouldAutoAdvanceGuided) return;
+      clearGuidedAdvanceTimer();
+      guidedAdvanceTimer = setTimeout(() => {
+        if (!guidedFlowActive || bulkFilling) return;
+        const scanFrom = Number.isInteger(currentPickIndex) ? currentPickIndex + 1 : 0;
+        const nextIdx = getNextReadyNode(scanFrom);
+        if (nextIdx !== null) {
+          currentPickIndex = nextIdx;
+          openCard(PICK_SEQUENCE[nextIdx], { autoResume: false, manualResume: false });
+          return;
+        }
+        showBracketCompleteState();
+        guidedFlowActive = false;
+        closeCard(true, false);
+      }, 350);
     }
 
     function validPickForNode(node) {
@@ -3260,7 +3396,7 @@
       const overlay = document.getElementById('overlay');
       if (!overlay) return;
       if (cancelAuto) {
-        autoAdvanceEnabled = false;
+        exitGuidedFlow();
         clearPreviewTimers();
         setInteractionLock(false);
         const container = document.querySelector('.container');
@@ -3280,8 +3416,7 @@
       if (target && target.closest && target.closest('button')) return;
       const node = nodesById.get(nodeId);
       if (!node || !isNodePickable(node)) return;
-      autoAdvanceEnabled = true;
-      openCard(nodeId, { manualResume: true, autoResume: true });
+      openCard(nodeId, { manualResume: true, autoResume: false });
     }
 
     async function guidedPickCurrent() {
@@ -3295,14 +3430,6 @@
       const t2Prob = Number(data?.t2?.win_probability || 0);
       const winnerName = t1Prob >= t2Prob ? t1.name : t2.name;
       await makePick(node.id, winnerName);
-      if (!autoAdvanceEnabled) return;
-      const next = findNextFlowTarget(node.id);
-      if (!next) return;
-      if (next.round === node.round && next.region === node.region) {
-        openCard(next.id, { manualResume: false, autoResume: true });
-        return;
-      }
-      previewRegionCompletion(node.region, next);
     }
 
     function fallbackMeta(node) {
@@ -3648,8 +3775,10 @@
       if (netA != null && netB != null) {
         netCompare = ' \u00b7 ' + (netA >= 0 ? '+' : '') + netA.toFixed(1) + ' vs ' + (netB >= 0 ? '+' : '') + netB.toFixed(1);
       }
+      updatePickCardNav(m.matchup_id);
+      const roundLabel = PICK_ROUND_LABELS[m.round] || (m.round || 'R64');
       document.getElementById('pcRegion').textContent =
-        (m.region || '') + ' \u00b7 ' + (m.round || 'R64') + netCompare;
+        (m.region || '') + ' \u00b7 ' + roundLabel + netCompare;
       setFlag(m.display_flag);
 
       setTeam('A', tA, pctA, colorA, currentPick === 'a');
@@ -3852,8 +3981,11 @@
       const overlay = document.getElementById('overlay');
       if (!overlay) return;
       if (e && e.target !== overlay) return;
-      currentPickCardMatchup = null;
-      hideOverlay();
+      if (guidedFlowActive) {
+        closeCard(true, true);
+        return;
+      }
+      closeCard(true, false);
     }
 
     function initBracketDelegation() {
@@ -3889,18 +4021,23 @@
       if (!node) return;
       const [t1, t2] = getMatchTeams(node);
       if (!t1 || !t2) return;
-      if (opts.autoResume !== false) autoAdvanceEnabled = true;
       guidedNodeId = node.id;
+      const seqIdx = PICK_SEQUENCE_INDEX.get(node.id);
+      if (Number.isInteger(seqIdx)) currentPickIndex = seqIdx;
       const data = await getCardData(node);
       if (guidedNodeId !== node.id) return;
       openPickCard(toPickCardMatchup(data, node));
     }
 
     function resumeAutoFlow(afterNodeId) {
-      if (!autoAdvanceEnabled || flowLocked) return;
-      const next = findNextFlowTarget(afterNodeId);
-      if (!next) return;
-      openCard(next.id, { autoResume: true, manualResume: false });
+      if (!guidedFlowActive || flowLocked || bulkFilling) return;
+      const baseIdx = Number.isInteger(PICK_SEQUENCE_INDEX.get(afterNodeId))
+        ? PICK_SEQUENCE_INDEX.get(afterNodeId) + 1
+        : Math.max(0, currentPickIndex + 1);
+      const nextIdx = getNextReadyNode(baseIdx);
+      if (nextIdx === null) return;
+      currentPickIndex = nextIdx;
+      openCard(PICK_SEQUENCE[nextIdx], { autoResume: false, manualResume: false });
     }
 
     function updateStrategyBar() {
@@ -4133,28 +4270,34 @@
 
     async function autoFillModelPicks() {
       if (!confirm('Fill bracket with model-recommended picks? You can still change individual picks after.')) return;
+      if (guidedFlowActive) exitGuidedFlow({ closeCard: true });
+      bulkFilling = true;
       activeStrategy = '';
       bracketState.activeStrategy = 'custom';
       strategyBaselinePicks = {};
       strategyEpByNode = {};
       customOverrideNodes.clear();
-      for (const round of roundOrder) {
-        for (const node of nodesById.values()) {
-          if (node.round !== round) continue;
-          const [t1, t2] = getMatchTeams(node);
-          if (!t1 || !t2) continue;
-          if (node.source) {
-            const p1 = normalizeProbability(node.source.t1?.win_probability, 0.5);
-            bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
-            continue;
-          }
-          const est = Number(estimateWinProb(t1.name, t2.name));
-          if (Number.isFinite(est)) {
-            bracketState.picks[node.id] = est >= 0.5 ? t1.name : t2.name;
-          } else {
-            bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
+      try {
+        for (const round of roundOrder) {
+          for (const node of nodesById.values()) {
+            if (node.round !== round) continue;
+            const [t1, t2] = getMatchTeams(node);
+            if (!t1 || !t2) continue;
+            if (node.source) {
+              const p1 = normalizeProbability(node.source.t1?.win_probability, 0.5);
+              bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
+              continue;
+            }
+            const est = Number(estimateWinProb(t1.name, t2.name));
+            if (Number.isFinite(est)) {
+              bracketState.picks[node.id] = est >= 0.5 ? t1.name : t2.name;
+            } else {
+              bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
+            }
           }
         }
+      } finally {
+        bulkFilling = false;
       }
       saveState();
       renderAll();
@@ -4289,7 +4432,10 @@
             }
           }
         }
-        if (!openedFromQuery) resumeAutoFlow();
+        if (!openedFromQuery) {
+          guidedFlowActive = false;
+          currentPickIndex = -1;
+        }
       } catch (e) {
         showError(String(e?.message || '').trim() || "Couldn't load bracket data.");
       } finally {
@@ -4306,6 +4452,16 @@
       applyMobileRoundVisibility();
       requestAnimationFrame(redrawBracketConnectors);
     });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const overlay = document.getElementById('overlay');
+      if (!overlay || !overlay.classList.contains('open')) return;
+      if (guidedFlowActive) {
+        closeCard(true, true);
+        return;
+      }
+      closeCard(true, false);
+    });
 
     initBracketDelegation();
     refreshIcons();
@@ -4314,4 +4470,5 @@
   </script>
 </body>
 </html>
+
 

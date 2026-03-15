@@ -38,6 +38,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+from difflib import SequenceMatcher
 
 import numpy as np
 import pandas as pd
@@ -74,6 +75,7 @@ warnings.filterwarnings("ignore")
 np.random.seed(42)
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (BracketGPT/2.0 research)"}
+KENPOM_NAME_MAP = {}
 
 
 # =============================================================================
@@ -83,6 +85,7 @@ class Config:
     DATA_DIR = Path("./data")
     OUTPUT_DIR = Path("./outputs")
     KENPOM_PATH = None
+    KENPOM_NAME_MAP_PATH = Path("./data/kenpom_name_map.json")
     MIN_SEASON = 2003
     BACKTEST_SEASON = 2025
 
@@ -150,6 +153,154 @@ def prefix_rename(df: pd.DataFrame, prefix: str,
         else:
             rename_map[c] = f'{prefix}_{c}'
     return out.rename(columns=rename_map)
+
+
+def normalize_team_name(name: str) -> str:
+    name = str(name or "").lower().strip()
+    for ch in [".", ",", "'", "&", "-", "(", ")", "/"]:
+        name = name.replace(ch, " ")
+    tokens = [t for t in name.split() if t]
+    aliases = {
+        "st": "state",
+        "st.": "state",
+        "saint": "st",
+        "univ": "university",
+        "u": "university",
+        "a&m": "am",
+    }
+    normalized = [aliases.get(tok, tok) for tok in tokens]
+    return " ".join(normalized)
+
+
+def fuzzy_name_score(a: str, b: str) -> int:
+    return int(round(100 * SequenceMatcher(None, normalize_team_name(a), normalize_team_name(b)).ratio()))
+
+
+def load_kenpom_name_map(path: Path) -> dict:
+    merged = dict(KENPOM_NAME_MAP)
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                disk_map = json.load(f)
+            if isinstance(disk_map, dict):
+                merged.update({str(k): str(v) for k, v in disk_map.items()})
+        except Exception as exc:
+            print(f"⚠️ Could not load KenPom name map at {path}: {exc}")
+    return merged
+
+
+def persist_kenpom_name_map(path: Path, name_map: dict):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(dict(sorted(name_map.items())), f, indent=2)
+        f.write("\n")
+
+
+def resolve_kenpom_team_ids(kp: pd.DataFrame, teams: pd.DataFrame) -> pd.DataFrame:
+    if teams.empty or "TeamName" not in teams.columns or "TeamID" not in teams.columns:
+        print("⚠️ Missing Kaggle team metadata; skipping KenPom TeamID reconciliation.")
+        return kp
+
+    kp = kp.copy()
+    name_col = "TeamName" if "TeamName" in kp.columns else ("Team" if "Team" in kp.columns else None)
+    if not name_col:
+        print("⚠️ KenPom file is missing TeamName/Team column; skipping TeamID reconciliation.")
+        return kp
+
+    if "TeamID" not in kp.columns:
+        kp["TeamID"] = np.nan
+
+    kaggle_names = teams[["TeamID", "TeamName"]].dropna().drop_duplicates("TeamID").copy()
+    kaggle_names["norm_name"] = kaggle_names["TeamName"].map(normalize_team_name)
+    kaggle_exact = {
+        norm: (int(row.TeamID), str(row.TeamName))
+        for row in kaggle_names.itertuples(index=False)
+        for norm in [row.norm_name]
+    }
+
+    # 1) Exact normalized match
+    unresolved_names = set()
+    for idx, row in kp.iterrows():
+        if pd.notna(row.get("TeamID")):
+            continue
+        raw_name = str(row.get(name_col, "")).strip()
+        if not raw_name:
+            continue
+        norm_name = normalize_team_name(raw_name)
+        exact = kaggle_exact.get(norm_name)
+        if exact:
+            kp.at[idx, "TeamID"] = exact[0]
+        else:
+            unresolved_names.add(raw_name)
+
+    if not unresolved_names:
+        return kp
+
+    # 2) Fuzzy pre-pass BEFORE map application
+    print(f"🔎 KenPom fuzzy pre-pass on {len(unresolved_names)} unmatched team names...")
+    fuzzy_auto = {}
+    fuzzy_review = []
+    fuzzy_hard = []
+    kaggle_pool = kaggle_names[["TeamID", "TeamName"]].to_records(index=False)
+
+    for kenpom_name in sorted(unresolved_names):
+        best_id, best_name, best_score = None, None, -1
+        for team_id, team_name in kaggle_pool:
+            score = fuzzy_name_score(kenpom_name, team_name)
+            if score > best_score:
+                best_id, best_name, best_score = int(team_id), str(team_name), score
+
+        if best_score > 85:
+            fuzzy_auto[kenpom_name] = (best_id, best_name, best_score)
+        elif best_score >= 70:
+            fuzzy_review.append((kenpom_name, best_name, best_score))
+        else:
+            fuzzy_hard.append((kenpom_name, best_name, best_score))
+
+    if fuzzy_auto:
+        for k_name, (team_id, _, _) in fuzzy_auto.items():
+            mask = kp[name_col].astype(str).str.strip() == k_name
+            kp.loc[mask & kp["TeamID"].isna(), "TeamID"] = team_id
+        print("✅ Auto-applied fuzzy matches (>85):")
+        for k_name, (_, best_name, score) in sorted(fuzzy_auto.items()):
+            print(f"   {k_name} -> {best_name} [{score}]")
+    else:
+        print("ℹ️ No fuzzy auto-matches above 85.")
+
+    if fuzzy_review:
+        print("👀 Fuzzy review needed (70-85):")
+        for k_name, best_name, score in fuzzy_review:
+            print(f"   {k_name} -> {best_name} [{score}]")
+
+    if fuzzy_hard:
+        print("❌ Hard mismatches (<70):")
+        for k_name, best_name, score in fuzzy_hard:
+            print(f"   {k_name} -> {best_name} [{score}]")
+
+    # 3) Apply manual/cache map after fuzzy pre-pass
+    name_map = load_kenpom_name_map(Config.KENPOM_NAME_MAP_PATH)
+    if name_map:
+        for kenpom_name, kaggle_name in name_map.items():
+            norm_target = normalize_team_name(kaggle_name)
+            exact = kaggle_exact.get(norm_target)
+            if not exact:
+                continue
+            team_id = exact[0]
+            mask = kp[name_col].astype(str).str.strip() == str(kenpom_name).strip()
+            kp.loc[mask & kp["TeamID"].isna(), "TeamID"] = team_id
+
+    # 4) Cache confirmed fuzzy auto-matches for future runs
+    if fuzzy_auto:
+        updates = {k_name: best_name for k_name, (_, best_name, _) in fuzzy_auto.items()}
+        updated_map = load_kenpom_name_map(Config.KENPOM_NAME_MAP_PATH)
+        updated_map.update(updates)
+        persist_kenpom_name_map(Config.KENPOM_NAME_MAP_PATH, updated_map)
+        print(f"💾 Cached {len(updates)} fuzzy matches to {Config.KENPOM_NAME_MAP_PATH}")
+
+    unresolved_after = kp[kp["TeamID"].isna()][name_col].dropna().astype(str).str.strip().nunique()
+    if unresolved_after:
+        print(f"⚠️ KenPom unresolved names after fuzzy+map: {unresolved_after}")
+    return kp
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -375,10 +526,12 @@ def load_data(data_dir: Path):
     return M_regular, M_tourney, seeds, teams
 
 
-def load_kenpom(kenpom_path):
+def load_kenpom(kenpom_path, teams: pd.DataFrame = None):
     if kenpom_path and Path(kenpom_path).exists():
         print(f"📊 Loading KenPom from {kenpom_path}")
         kp = pd.read_csv(kenpom_path)
+        if teams is not None:
+            kp = resolve_kenpom_team_ids(kp, teams)
         print(f"   KenPom: {len(kp)} team-seasons, {len(kp.columns)} columns")
         return kp
     print("ℹ️ No KenPom data — using box score features only.")
@@ -1435,7 +1588,7 @@ def main():
         print("=" * 70)
 
         regular, tourney, seeds, teams = load_data(Config.DATA_DIR)
-        kenpom = load_kenpom(args.kenpom_path)
+        kenpom = load_kenpom(args.kenpom_path, teams)
 
         elo_df = compute_elo(regular, args.backtest)
         team_stats = compute_season_stats(regular)
