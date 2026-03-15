@@ -3406,7 +3406,7 @@
         recommended_pick_reason: String(reason || ''),
         historical_blurb: String(fallbackBlurb || ''),
         team1: {
-          name: String(getDisplayName(srcA?.name || 'Team A')),
+          name: String(srcA?.name || 'Team A'),
           seed: Number.isFinite(Number(srcA?.seed)) ? Number(srcA.seed) : '-',
           region: String(data?.region || node?.region || ''),
           color_primary: srcA?.color_primary || '#2E74D4',
@@ -3416,7 +3416,7 @@
           weaknesses: Array.isArray(srcA?.weaknesses) ? srcA.weaknesses : []
         },
         team2: {
-          name: String(getDisplayName(srcB?.name || 'Team B')),
+          name: String(srcB?.name || 'Team B'),
           seed: Number.isFinite(Number(srcB?.seed)) ? Number(srcB.seed) : '-',
           region: String(data?.region || node?.region || ''),
           color_primary: srcB?.color_primary || '#E8601F',
@@ -3449,8 +3449,8 @@
 
       document.getElementById('pcBarA').style.cssText = `width:${pctA}%; background:${colorA}`;
       document.getElementById('pcBarB').style.cssText = `width:${pctB}%; background:${colorB}`;
-      document.getElementById('pcBarLblA').textContent = `${tA.name} ${pctA}%`;
-      document.getElementById('pcBarLblB').textContent = `${tB.name} ${pctB}%`;
+      document.getElementById('pcBarLblA').textContent = `${getDisplayName(tA.name)} ${pctA}%`;
+      document.getElementById('pcBarLblB').textContent = `${getDisplayName(tB.name)} ${pctB}%`;
 
       renderCol('A', tA, colorA);
       renderCol('B', tB, colorB);
@@ -3459,8 +3459,8 @@
 
       const btnA = document.getElementById('pcBtnA');
       const btnB = document.getElementById('pcBtnB');
-      btnA.textContent = tA.name;
-      btnB.textContent = tB.name;
+      btnA.textContent = getDisplayName(tA.name);
+      btnB.textContent = getDisplayName(tB.name);
       btnA.style.background = colorA;
       btnB.style.background = colorB;
       btnA.classList.toggle('unchosen', currentPick === 'b');
@@ -3475,7 +3475,7 @@
       const isFav = pct >= 50;
 
       document.getElementById(`pcSeed${side}`).textContent = `#${team.seed} SEED`;
-      document.getElementById(`pcName${side}`).textContent = String(team.name || '').toUpperCase();
+      document.getElementById(`pcName${side}`).textContent = String(getDisplayName(team.name || '') || '').toUpperCase();
 
       const pctEl = document.getElementById(`pcPct${side}`);
       pctEl.textContent = `${pct}%`;
@@ -3510,7 +3510,7 @@
       const nameEl = document.getElementById(`pcColName${side}`);
       const moEl = document.getElementById(`pcMo${side}`);
 
-      nameEl.textContent = team.name;
+      nameEl.textContent = getDisplayName(team.name);
 
       const mo = (team.momentum || 'steady').toLowerCase();
       const moMap = {
