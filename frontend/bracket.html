@@ -1987,9 +1987,9 @@
       const round = node?.round || fallbackRound || 'R64';
       const roundLabel = PICK_ROUND_LABELS[round] || round;
       if (Number.isInteger(idx)) {
-        return `Game ${idx + 1} of ${PICK_SEQUENCE.length} - ${region} - ${roundLabel}`;
+        return `Game ${idx + 1} of ${PICK_SEQUENCE.length} \u00b7 ${region} \u00b7 ${roundLabel}`;
       }
-      return `${region} - ${roundLabel}`;
+      return `${region} \u00b7 ${roundLabel}`;
     }
 
     function updatePickCardNav(nodeId) {
