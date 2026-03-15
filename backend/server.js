@@ -536,8 +536,24 @@ function normalizeR64Matchups(rows, seasonFallback) {
     const season = Number(m?.season || seasonFallback || cfg.activeSeason || 2025);
     const region = String(m?.region || 'Unknown').trim() || 'Unknown';
     const gameNo = Number(m?.game_number || 0) || 1;
-    const t1 = m?.t1 || {};
-    const t2 = m?.t2 || {};
+    const t1 = m?.t1 || {
+      team_id: m?.team1Id ?? m?.team1_id ?? null,
+      name: m?.team1 || m?.team1Name || m?.t1_name || 'TBD',
+      seed: m?.seed1 ?? m?.team1Seed ?? m?.t1_seed ?? null,
+      win_probability: m?.winProb ?? m?.model_win_prob ?? null,
+      predicted_margin: m?.predicted_margin ?? null,
+      abbreviation: m?.team1Abbreviation ?? null,
+      color_primary: m?.team1Color ?? null,
+    };
+    const t2 = m?.t2 || {
+      team_id: m?.team2Id ?? m?.team2_id ?? null,
+      name: m?.team2 || m?.team2Name || m?.t2_name || 'TBD',
+      seed: m?.seed2 ?? m?.team2Seed ?? m?.t2_seed ?? null,
+      win_probability: null,
+      predicted_margin: m?.predicted_margin == null ? null : -Number(m.predicted_margin),
+      abbreviation: m?.team2Abbreviation ?? null,
+      color_primary: m?.team2Color ?? null,
+    };
     const p1 = normProb(t1?.win_probability ?? t1?.model_win_prob ?? 0.5);
     const winP1 = p1 === null ? 0.5 : p1;
     out.push({
@@ -552,6 +568,8 @@ function normalizeR64Matchups(rows, seasonFallback) {
         seed: Number.isFinite(Number(t1?.seed)) ? Number(t1.seed) : null,
         win_probability: winP1,
         predicted_margin: Number.isFinite(Number(t1?.predicted_margin)) ? Number(t1.predicted_margin) : null,
+        abbreviation: t1?.abbreviation || null,
+        color_primary: t1?.color_primary || null,
       },
       t2: {
         team_id: t2?.team_id ?? t2?.id ?? null,
@@ -559,6 +577,8 @@ function normalizeR64Matchups(rows, seasonFallback) {
         seed: Number.isFinite(Number(t2?.seed)) ? Number(t2.seed) : null,
         win_probability: 1 - winP1,
         predicted_margin: Number.isFinite(Number(t2?.predicted_margin)) ? Number(t2.predicted_margin) : null,
+        abbreviation: t2?.abbreviation || null,
+        color_primary: t2?.color_primary || null,
       },
       matchup_meta: {
         predicted_winner: String(m?.matchup_meta?.predicted_winner || ''),
@@ -716,6 +736,65 @@ function deriveR64MatchupsFromDisk() {
     }
   }
   return [];
+}
+
+function getFinalFourPairingsArray() {
+  if (Array.isArray(store.bracketMatchups?.finalFourPairings) && store.bracketMatchups.finalFourPairings.length >= 2) {
+    return store.bracketMatchups.finalFourPairings;
+  }
+  return [['South', 'West'], ['East', 'Midwest']];
+}
+
+function getFinalFourPairingsObject(pairings) {
+  const rows = Array.isArray(pairings) ? pairings : getFinalFourPairingsArray();
+  return {
+    semifinal_1: {
+      region_a: String(rows?.[0]?.[0] || 'South'),
+      region_b: String(rows?.[0]?.[1] || 'West'),
+    },
+    semifinal_2: {
+      region_a: String(rows?.[1]?.[0] || 'East'),
+      region_b: String(rows?.[1]?.[1] || 'Midwest'),
+    },
+  };
+}
+
+function buildCanonicalR64Payload() {
+  let matchups = [];
+
+  const fromBracketMatchups = Array.isArray(store.bracketMatchups?.matchups)
+    ? normalizeR64Matchups(store.bracketMatchups.matchups, store.bracketMatchups?.season)
+    : [];
+  if (fromBracketMatchups.length) {
+    matchups = fromBracketMatchups;
+  } else {
+    const bracketR64 = Array.isArray(dataStore.bracket?.r64_matchups) ? dataStore.bracket.r64_matchups : [];
+    const fromBracketFile = normalizeR64Matchups(bracketR64, dataStore.bracket?.season);
+    if (fromBracketFile.length) {
+      matchups = fromBracketFile;
+    } else {
+      const bracketGames = Array.isArray(dataStore.bracket?.bracketGames)
+        ? dataStore.bracket.bracketGames
+        : (Array.isArray(dataStore.bracket?.games) ? dataStore.bracket.games : []);
+      const fromGames = deriveR64MatchupsFromBracketGames(bracketGames, dataStore.bracket?.season);
+      if (fromGames.length) {
+        matchups = fromGames;
+      } else {
+        matchups = deriveR64MatchupsFromDisk();
+      }
+    }
+  }
+
+  const regions = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
+  const season = Number(matchups[0]?.season || store.bracketMatchups?.season || dataStore.bracket?.season || bracketMatchupIndex.season || cfg.activeSeason || 2025);
+  const finalFourPairings = getFinalFourPairingsArray();
+  return {
+    season,
+    regions: regions.length ? regions : bracketMatchupIndex.regions,
+    matchups,
+    finalFourPairings,
+    final_four_pairings: getFinalFourPairingsObject(finalFourPairings),
+  };
 }
 
 function getProfileMap() {
@@ -2395,13 +2474,27 @@ app.get('/api/config', (req, res) => {
 });
 
 app.get('/api/data-status', (req, res) => {
+  let files = [];
+  try {
+    files = fs.readdirSync(DATA_DIR).filter((f) => f.toLowerCase().endsWith('.json'));
+  } catch (e) {
+    files = [];
+  }
+  const bracketRows = Array.isArray(store.bracketMatchups?.matchups) ? store.bracketMatchups.matchups.length : 0;
+  const pickCardRows = Array.isArray(dataStore.pick_cards?.matchups)
+    ? dataStore.pick_cards.matchups.length
+    : bracketRows;
   res.json({
+    bracketMatchups: bracketRows,
     predictions: dataStore.predictions?.predictions?.length || 0,
     teams: Object.keys(dataStore.predictions?.team_directory || {}).length,
+    teamProfiles: Object.keys(dataStore.team_profiles?.teams || {}).length,
     profiles: Object.keys(dataStore.team_profiles?.teams || {}).length,
+    pickCards: pickCardRows,
     archetypes: Object.keys(dataStore.archetype_summary?.archetype_descriptions || {}).length,
     bracket_lookup: Object.keys(dataStore.predictions?.bracket_lookup || {}).length > 0,
     seed_rounds: Object.keys(dataStore.seed_matchups || {}).length,
+    files,
   });
 });
 
@@ -2421,66 +2514,25 @@ app.get('/api/ready', (req, res) => {
 });
 
 app.get('/api/bracket', (req, res) => {
-  if (dataStore.bracket) {
-    const pairings = (
-      Array.isArray(store.bracketMatchups?.finalFourPairings) &&
-      store.bracketMatchups.finalFourPairings.length >= 2
-    )
-      ? store.bracketMatchups.finalFourPairings
-      : [['South', 'West'], ['East', 'Midwest']];
-    const r64 = Array.isArray(dataStore.bracket?.r64_matchups) ? dataStore.bracket.r64_matchups : [];
-    return res.json({
-      ...dataStore.bracket,
-      matchups: r64,
-      finalFourPairings: pairings,
+  const payload = buildCanonicalR64Payload();
+  if (!Array.isArray(payload.matchups) || payload.matchups.length === 0) {
+    return res.status(404).json({
+      error: 'No bracket data loaded',
+      hint: 'Upload bracket JSON via /admin or commit JSON files to backend/data/',
     });
   }
-  const allMatchups = Array.isArray(store.bracketMatchups?.matchups) ? store.bracketMatchups.matchups : [];
-  let matchups = allMatchups.filter((m) => isR64Round(m?.round));
-  if (!matchups.length && allMatchups.length) {
-    // Fallback for uploads that omit/rename round labels: prefer first 32 slots by game_number.
-    matchups = [...allMatchups]
-      .sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))
-      .slice(0, 32);
-  }
-  if (!matchups.length) {
-    matchups = deriveR64MatchupsFromBracket2025();
-  }
-  if (!matchups.length) {
-    matchups = deriveR64MatchupsFromDisk();
-  }
-  const pairings = (
-    Array.isArray(store.bracketMatchups?.finalFourPairings) &&
-    store.bracketMatchups.finalFourPairings.length >= 2
-  )
-    ? store.bracketMatchups.finalFourPairings
-    : [['South', 'West'], ['East', 'Midwest']];
-  const regions = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
-  res.json({
-    season: bracketMatchupIndex.season,
-    regions: regions.length ? regions : bracketMatchupIndex.regions,
-    matchups,
-    finalFourPairings: pairings,
-  });
+  return res.json(payload);
 });
 
 app.get('/api/bracket/bootstrap', (req, res) => {
-  const fromApi = Array.isArray(store.bracketMatchups?.matchups) ? normalizeR64Matchups(store.bracketMatchups.matchups, store.bracketMatchups?.season) : [];
-  let matchups = fromApi.length ? fromApi : deriveR64MatchupsFromBracket2025();
-  if (!matchups.length) matchups = deriveR64MatchupsFromDisk();
-  const regions = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
-  const pairings = (
-    Array.isArray(store.bracketMatchups?.finalFourPairings) &&
-    store.bracketMatchups.finalFourPairings.length >= 2
-  )
-    ? store.bracketMatchups.finalFourPairings
-    : [['South', 'West'], ['East', 'Midwest']];
-  return res.json({
-    season: Number(matchups[0]?.season || bracketMatchupIndex.season || cfg.activeSeason || 2025),
-    regions: regions.length ? regions : bracketMatchupIndex.regions,
-    matchups,
-    finalFourPairings: pairings,
-  });
+  const payload = buildCanonicalR64Payload();
+  if (!Array.isArray(payload.matchups) || payload.matchups.length === 0) {
+    return res.status(404).json({
+      error: 'No bracket data loaded',
+      hint: 'Upload bracket JSON via /admin or commit JSON files to backend/data/',
+    });
+  }
+  return res.json(payload);
 });
 
 app.get('/api/bracket-output', (req, res) => {
