@@ -1235,6 +1235,65 @@
       return fallback;
     }
 
+    function normalizeIncomingMatchup(raw, idx, seasonFallback) {
+      const m = raw || {};
+      const region = String(m?.region || 'Unknown').trim() || 'Unknown';
+      const gameNo = Number(m?.game_number || ((idx % 8) + 1));
+      const t1Raw = m?.t1 || {};
+      const t2Raw = m?.t2 || {};
+      const hasNested = Object.keys(t1Raw).length > 0 || Object.keys(t2Raw).length > 0;
+      const t1 = hasNested ? t1Raw : {
+        team_id: m?.team1Id ?? m?.team1_id ?? null,
+        name: m?.team1 || m?.team1Name || m?.t1_name || 'TBD',
+        seed: m?.seed1 ?? m?.team1Seed ?? m?.t1_seed ?? null,
+        win_probability: m?.winProb ?? m?.model_win_prob ?? null,
+        predicted_margin: m?.predicted_margin ?? null,
+        abbreviation: m?.team1Abbreviation ?? null,
+        color_primary: m?.team1Color ?? null
+      };
+      const t2 = hasNested ? t2Raw : {
+        team_id: m?.team2Id ?? m?.team2_id ?? null,
+        name: m?.team2 || m?.team2Name || m?.t2_name || 'TBD',
+        seed: m?.seed2 ?? m?.team2Seed ?? m?.t2_seed ?? null,
+        win_probability: null,
+        predicted_margin: m?.predicted_margin == null ? null : -Number(m.predicted_margin),
+        abbreviation: m?.team2Abbreviation ?? null,
+        color_primary: m?.team2Color ?? null
+      };
+      const p1 = toProb(t1?.win_probability ?? t1?.model_win_prob, 0.5);
+      return {
+        matchup_id: String(m?.matchup_id || ('FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo)),
+        season: Number(m?.season || seasonFallback || 2025),
+        round: 'R64',
+        region,
+        game_number: gameNo,
+        t1: {
+          team_id: t1?.team_id ?? t1?.id ?? null,
+          name: String(t1?.name || 'TBD'),
+          seed: Number.isFinite(Number(t1?.seed)) ? Number(t1.seed) : null,
+          win_probability: p1,
+          predicted_margin: Number.isFinite(Number(t1?.predicted_margin)) ? Number(t1.predicted_margin) : null,
+          abbreviation: t1?.abbreviation || null,
+          color_primary: t1?.color_primary || null
+        },
+        t2: {
+          team_id: t2?.team_id ?? t2?.id ?? null,
+          name: String(t2?.name || 'TBD'),
+          seed: Number.isFinite(Number(t2?.seed)) ? Number(t2.seed) : null,
+          win_probability: 1 - p1,
+          predicted_margin: Number.isFinite(Number(t2?.predicted_margin)) ? Number(t2.predicted_margin) : null,
+          abbreviation: t2?.abbreviation || null,
+          color_primary: t2?.color_primary || null
+        },
+        matchup_meta: {
+          predicted_winner: String(m?.matchup_meta?.predicted_winner || m?.predictedWinner || ''),
+          upset_flag: String(m?.matchup_meta?.upset_flag || m?.matchup_meta?.display_flag || m?.upset_flag || 'chalk'),
+          display_flag: String(m?.matchup_meta?.display_flag || m?.matchup_meta?.upset_flag || m?.upset_flag || 'chalk'),
+          confidence: String(m?.matchup_meta?.confidence || m?.confidence || 'projected')
+        }
+      };
+    }
+
     function fallbackPairings(regionsList) {
       const names = Array.isArray(regionsList) ? regionsList : [];
       const has = (r) => names.includes(r);
@@ -1254,40 +1313,35 @@
           .sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))
           .slice(0, 32);
       }
-      return matchups.map((m, idx) => {
-        const region = String(m?.region || 'Unknown').trim() || 'Unknown';
-        const gameNo = Number(m?.game_number || ((idx % 8) + 1));
-        const t1 = m?.t1 || {};
-        const t2 = m?.t2 || {};
-        const p1 = toProb(t1?.win_probability, 0.5);
-        return {
-          matchup_id: String(m?.matchup_id || ('FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo)),
-          season: Number(m?.season || 2025),
-          round: 'R64',
-          region,
-          game_number: gameNo,
-          t1: {
-            team_id: t1?.team_id ?? t1?.id ?? null,
-            name: String(t1?.name || 'TBD'),
-            seed: Number.isFinite(Number(t1?.seed)) ? Number(t1.seed) : null,
-            win_probability: p1,
-            predicted_margin: Number.isFinite(Number(t1?.predicted_margin)) ? Number(t1.predicted_margin) : null
-          },
-          t2: {
-            team_id: t2?.team_id ?? t2?.id ?? null,
-            name: String(t2?.name || 'TBD'),
-            seed: Number.isFinite(Number(t2?.seed)) ? Number(t2.seed) : null,
-            win_probability: 1 - p1,
-            predicted_margin: Number.isFinite(Number(t2?.predicted_margin)) ? Number(t2.predicted_margin) : null
-          },
-          matchup_meta: {
-            predicted_winner: String(m?.matchup_meta?.predicted_winner || ''),
-            upset_flag: String(m?.matchup_meta?.upset_flag || m?.matchup_meta?.display_flag || 'chalk'),
-            display_flag: String(m?.matchup_meta?.display_flag || m?.matchup_meta?.upset_flag || 'chalk'),
-            confidence: String(m?.matchup_meta?.confidence || 'projected')
-          }
-        };
-      });
+      return matchups.map((m, idx) => normalizeIncomingMatchup(m, idx, m?.season || 2025));
+    }
+
+    function normalizeBracketPayload(raw) {
+      const data = raw || {};
+      const sourceRows = Array.isArray(data?.matchups)
+        ? data.matchups
+        : (Array.isArray(data?.r64_matchups) ? data.r64_matchups : []);
+      const matchups = normalizeR64Matchups(sourceRows);
+      const regionsFromRows = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
+      const pairingsArray = Array.isArray(data?.finalFourPairings) && data.finalFourPairings.length >= 2
+        ? data.finalFourPairings
+        : (data?.final_four_pairings
+          ? [
+              [data.final_four_pairings?.semifinal_1?.region_a, data.final_four_pairings?.semifinal_1?.region_b],
+              [data.final_four_pairings?.semifinal_2?.region_a, data.final_four_pairings?.semifinal_2?.region_b]
+            ]
+          : fallbackPairings(regionsFromRows));
+      return {
+        ...data,
+        season: Number(data?.season || matchups?.[0]?.season || 2025),
+        regions: regionsFromRows.length ? regionsFromRows : (Array.isArray(data?.regions) ? data.regions : []),
+        matchups,
+        finalFourPairings: pairingsArray,
+        final_four_pairings: data?.final_four_pairings || {
+          semifinal_1: { region_a: pairingsArray?.[0]?.[0] || 'South', region_b: pairingsArray?.[0]?.[1] || 'West' },
+          semifinal_2: { region_a: pairingsArray?.[1]?.[0] || 'East', region_b: pairingsArray?.[1]?.[1] || 'Midwest' }
+        }
+      };
     }
 
     async function loadBracketFromUploadedJson() {
@@ -1466,13 +1520,13 @@
         const t1 = m?.t1;
         const t2 = m?.t2;
         if (!t1?.name || !t2?.name) continue;
-        teamIndex.set(t1.name, {
+        teamIndex.set(normalizeName(t1.name), {
           ...t1,
           region: m.region,
           r64Opponent: t2.name,
           r64Margin: Number.isFinite(Number(t1.predicted_margin)) ? Number(t1.predicted_margin) : 0
         });
-        teamIndex.set(t2.name, {
+        teamIndex.set(normalizeName(t2.name), {
           ...t2,
           region: m.region,
           r64Opponent: t1.name,
@@ -1480,7 +1534,7 @@
         });
       }
       for (const team of teamIndex.values()) {
-        const opp = teamIndex.get(team.r64Opponent);
+        const opp = teamIndex.get(normalizeName(team.r64Opponent));
         const oppSeed = Number(opp?.seed) || 16;
         const oppBase = Number(seedBaseline[oppSeed] ?? -14);
         const ownSeed = Number(team.seed) || 16;
@@ -1491,8 +1545,8 @@
     }
 
     function estimateWinProb(teamAName, teamBName) {
-      const a = teamIndex.get(teamAName);
-      const b = teamIndex.get(teamBName);
+      const a = teamIndex.get(normalizeName(teamAName));
+      const b = teamIndex.get(normalizeName(teamBName));
       if (!a || !b) return 0.5;
       const diff = Number(a.power || 0) - Number(b.power || 0);
       return 1 / (1 + Math.pow(10, -diff / 11));
@@ -1960,8 +2014,8 @@
       if (node.round === 'R64' && node.source) return node.source;
       const [t1, t2] = getMatchTeams(node);
       if (!t1 || !t2) return fallbackMeta(node);
-      const tA = teamIndex.get(t1.name) || {};
-      const tB = teamIndex.get(t2.name) || {};
+      const tA = teamIndex.get(normalizeName(t1.name)) || {};
+      const tB = teamIndex.get(normalizeName(t2.name)) || {};
       const prob = estimateWinProb(t1.name, t2.name);
       const pickPct1 = Number(tA.pool?.public_pick_pct);
       const pickPct2 = Number(tB.pool?.public_pick_pct);
@@ -2332,10 +2386,20 @@
                 : Number(data?.t2?.win_probability || 0.5);
               bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
             } else {
-              bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
+              const est = Number(estimateWinProb(t1.name, t2.name));
+              if (Number.isFinite(est)) {
+                bracketState.picks[node.id] = est >= 0.5 ? t1.name : t2.name;
+              } else {
+                bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
+              }
             }
           } catch (e) {
-            bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
+            const est = Number(estimateWinProb(t1.name, t2.name));
+            if (Number.isFinite(est)) {
+              bracketState.picks[node.id] = est >= 0.5 ? t1.name : t2.name;
+            } else {
+              bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
+            }
           }
         }
       }
@@ -2360,33 +2424,42 @@
     async function init() {
       showLoading();
       clearError();
+      let bracketHint = '';
       try {
         await loadBracketData();
         const [rBracket, rOutput] = await Promise.all([
           fetch('/api/bracket'),
           fetch('/api/bracket-output').catch(() => null),
         ]);
-        let data = rBracket && rBracket.ok ? await rBracket.json() : null;
-        if (data && !Array.isArray(data.matchups) && Array.isArray(data.r64_matchups)) {
-          data.matchups = data.r64_matchups;
+        let data = null;
+        if (rBracket && rBracket.ok) {
+          const raw = await rBracket.json();
+          data = normalizeBracketPayload(raw);
+        } else if (rBracket) {
+          const err = await rBracket.json().catch(() => ({}));
+          bracketHint = String(err?.hint || err?.error || '').trim();
         }
         if (!Array.isArray(data?.matchups) || data.matchups.length === 0) {
           try {
             const bootstrapRes = await fetch('/api/bracket/bootstrap');
             if (bootstrapRes.ok) {
               const bootstrapData = await bootstrapRes.json();
-              if (Array.isArray(bootstrapData?.matchups) && bootstrapData.matchups.length) {
-                data = bootstrapData;
+              const normalizedBootstrap = normalizeBracketPayload(bootstrapData);
+              if (Array.isArray(normalizedBootstrap?.matchups) && normalizedBootstrap.matchups.length) {
+                data = normalizedBootstrap;
               }
+            } else {
+              const bootErr = await bootstrapRes.json().catch(() => ({}));
+              if (!bracketHint) bracketHint = String(bootErr?.hint || bootErr?.error || '').trim();
             }
           } catch (e) {}
         }
         if (!Array.isArray(data?.matchups) || data.matchups.length === 0) {
           const fallbackData = await loadBracketFromUploadedJson();
-          if (fallbackData) data = fallbackData;
+          if (fallbackData) data = normalizeBracketPayload(fallbackData);
         }
-        if (!data || !Array.isArray(data.matchups)) {
-          throw new Error('Could not load bracket data');
+        if (!data || !Array.isArray(data.matchups) || data.matchups.length === 0) {
+          throw new Error(bracketHint || 'Could not load bracket data');
         }
         if (rOutput && rOutput.ok) {
           bracketOutput = await rOutput.json();
@@ -2416,14 +2489,21 @@
         } else if (Array.isArray(data.regions) && data.regions.length) {
           regions = data.regions.map((r) => String(r || '').trim()).filter(Boolean);
         }
-        finalFourPairings = Array.isArray(data.finalFourPairings) && data.finalFourPairings.length >= 2
-          ? data.finalFourPairings
-          : [['South', 'West'], ['East', 'Midwest']];
+        if (data?.final_four_pairings) {
+          finalFourPairings = [
+            [data.final_four_pairings?.semifinal_1?.region_a, data.final_four_pairings?.semifinal_1?.region_b],
+            [data.final_four_pairings?.semifinal_2?.region_a, data.final_four_pairings?.semifinal_2?.region_b]
+          ];
+        } else if (Array.isArray(data.finalFourPairings) && data.finalFourPairings.length >= 2) {
+          finalFourPairings = data.finalFourPairings;
+        } else {
+          finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
+        }
         baseMatchups = Array.isArray(data.matchups) ? data.matchups : [];
         if (baseMatchups.length === 0) {
           document.getElementById('regions').innerHTML = '';
           document.getElementById('finals').innerHTML = '';
-          showError('No bracket data loaded from API or uploaded bracket JSON. Verify backend/data/bracket_2025.json and backend/data/chatbot_predictions_v5.json are present.');
+          showError(bracketHint || 'No bracket data loaded from API or uploaded bracket JSON. Verify backend/data/bracket_2025.json and backend/data/chatbot_predictions_v5.json are present.');
           return;
         }
         matchupById = new Map(baseMatchups.map((m) => [m.matchup_id, m]));
@@ -2452,7 +2532,7 @@
         }
         if (!openedFromQuery) resumeAutoFlow();
       } catch (e) {
-        showError("Couldn't load bracket data.");
+        showError(String(e?.message || '').trim() || "Couldn't load bracket data.");
       } finally {
         hideLoading();
       }
