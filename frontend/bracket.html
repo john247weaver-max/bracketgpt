@@ -113,6 +113,29 @@
     align-items: baseline;
     gap: 8px;
   }
+  .chat-clear-btn {
+    margin-left: auto;
+    border: 1px solid var(--border);
+    background: var(--bg-surface-2);
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .chat-clear-btn:hover {
+    color: var(--text);
+    border-color: var(--blue);
+  }
+  .chat-clear-btn:disabled {
+    opacity: .45;
+    cursor: default;
+  }
   .chat-pane-title {
     font-family: var(--fd);
     font-size: 13px;
@@ -138,6 +161,33 @@
     padding: 10px 12px 14px;
     border-top: 1px solid var(--border);
     flex-shrink: 0;
+  }
+  .chat-actions {
+    display: flex;
+    margin-bottom: 8px;
+  }
+  .chat-analyze-btn {
+    width: 100%;
+    border: 1px solid rgba(46,116,212,.45);
+    background: rgba(46,116,212,.14);
+    color: #dbe9ff;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-family: var(--fd);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .chat-analyze-btn:hover {
+    background: rgba(46,116,212,.24);
+    border-color: rgba(46,116,212,.85);
+  }
+  .chat-analyze-btn:disabled {
+    opacity: .45;
+    cursor: default;
   }
   .chat-input-row {
     display: flex;
@@ -1292,9 +1342,13 @@
       <div class="chat-pane-header">
         <span class="chat-pane-title">ASK BRACKETGPT</span>
         <span class="chat-pane-sub">AI bracket advisor</span>
+        <button id="clearChatBtn" class="chat-clear-btn" onclick="clearChat()">Clear</button>
       </div>
       <div class="chat-messages" id="messages"></div>
       <div class="chat-input-area">
+        <div class="chat-actions">
+          <button id="analyzeBracketBtn" class="chat-analyze-btn" onclick="analyzeMyBracket()">Analyze My Bracket</button>
+        </div>
         <div class="chat-input-row">
           <input
             type="text"
@@ -1862,6 +1916,16 @@
       } catch (e) {}
     }
 
+    function updateChatControlState() {
+      const sendBtn = document.getElementById('sendBtn');
+      const clearBtn = document.getElementById('clearChatBtn');
+      const analyzeBtn = document.getElementById('analyzeBracketBtn');
+      const picksCount = Object.keys(bracketState?.picks || {}).length;
+      if (sendBtn) sendBtn.disabled = !!chatBusy;
+      if (clearBtn) clearBtn.disabled = !!chatBusy || chatHistory.length === 0;
+      if (analyzeBtn) analyzeBtn.disabled = !!chatBusy || picksCount === 0;
+    }
+
     function loadChatHistory() {
       try {
         const raw = localStorage.getItem(CHAT_STORAGE_KEY);
@@ -1881,27 +1945,52 @@
       for (const msg of chatHistory) {
         renderChatMessage(msg.role === 'user' ? 'user' : 'bot', msg.content || '');
       }
+      updateChatControlState();
     }
 
-    async function send() {
+    function clearChat() {
+      if (chatBusy) return;
+      if (!chatHistory.length) {
+        updateChatControlState();
+        return;
+      }
+      if (!confirm('Clear this chat conversation?')) return;
+      chatHistory = [];
+      try {
+        localStorage.removeItem(CHAT_STORAGE_KEY);
+      } catch (e) {}
+      renderChatHistory();
+      const inputEl = document.getElementById('input');
+      if (inputEl) inputEl.focus();
+    }
+
+    function analyzeMyBracket() {
+      const picksCount = Object.keys(bracketState?.picks || {}).length;
+      if (!picksCount || chatBusy) return;
+      const prompt = `Analyze my current bracket (${picksCount}/63 picks made, pool size ${poolSize}). Use chatbot_predictions_v5.json matchup probabilities and my current picks to identify strengths, risks, upset balance, and the top 3 improvements to maximize ESPN expected points.`;
+      send(prompt);
+    }
+
+    async function send(textOverride = null) {
       const inputEl = document.getElementById('input');
       const sendBtn = document.getElementById('sendBtn');
       if (!inputEl || !sendBtn || chatBusy) return;
-      const text = String(inputEl.value || '').trim();
+      const baseText = textOverride == null ? inputEl.value : textOverride;
+      const text = String(baseText || '').trim();
       if (!text) return;
 
       inputEl.value = '';
       sendBtn.classList.remove('active');
       chatBusy = true;
       inputEl.disabled = true;
-      sendBtn.disabled = true;
+      updateChatControlState();
 
       chatHistory.push({ role: 'user', content: text });
       renderChatMessage('user', text);
       saveChatHistory();
 
       try {
-        const res = await fetch('/api/chat', {
+        const res = await fetch('/api/bracket-chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: chatHistory, bracketState })
@@ -1934,7 +2023,7 @@
 
       chatBusy = false;
       inputEl.disabled = false;
-      sendBtn.disabled = false;
+      updateChatControlState();
       inputEl.focus();
     }
 
@@ -1947,6 +2036,7 @@
       });
       loadChatHistory();
       renderChatHistory();
+      updateChatControlState();
     }
 
     function isNodePickable(node) {
@@ -2119,6 +2209,7 @@
     function saveState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bracketState));
       localStorage.setItem('bracketgpt_bracket_state', JSON.stringify(bracketState));
+      updateChatControlState();
     }
 
     function loadState() {
