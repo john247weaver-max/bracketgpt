@@ -2915,6 +2915,36 @@
       saveState();
     }
 
+    function clearBracketConnectors() {
+      document.querySelectorAll('.bracket-connector').forEach((el) => el.remove());
+    }
+
+    function drawConnectors(regionEl) {
+      if (!regionEl) return;
+      const pairs = regionEl.querySelectorAll('.matchup-pair[data-round="r64"]');
+      for (let i = 0; i < pairs.length; i += 2) {
+        const topPair = pairs[i];
+        const bottomPair = pairs[i + 1];
+        if (!topPair || !bottomPair) continue;
+        const topRect = topPair.getBoundingClientRect();
+        const bottomRect = bottomPair.getBoundingClientRect();
+        const colRect = regionEl.getBoundingClientRect();
+        const topMid = ((topRect.top + topRect.bottom) / 2) - colRect.top;
+        const bottomMid = ((bottomRect.top + bottomRect.bottom) / 2) - colRect.top;
+        if (!Number.isFinite(topMid) || !Number.isFinite(bottomMid) || bottomMid <= topMid) continue;
+        const connector = document.createElement('div');
+        connector.className = 'bracket-connector';
+        connector.style.top = topMid + 'px';
+        connector.style.height = (bottomMid - topMid) + 'px';
+        regionEl.appendChild(connector);
+      }
+    }
+
+    function redrawBracketConnectors() {
+      clearBracketConnectors();
+      document.querySelectorAll('.region-column').forEach((el) => drawConnectors(el));
+    }
+
     function renderAll() {
       const regionsEl = document.getElementById('regions');
       regionsEl.innerHTML = regions.map((region) => renderRegion(region)).join('');
@@ -2922,6 +2952,7 @@
       refreshAllSignals();
       renderProgress();
       applyMobileRoundVisibility();
+      requestAnimationFrame(redrawBracketConnectors);
     }
 
     function closeCard(instant = true, cancelAuto = false) {
