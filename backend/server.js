@@ -136,6 +136,7 @@ const DATA_FILES = {
   bracket: 'bracket_2025.json',
   bracket_ready: 'bracket_ready_2025.json',
   bracket_cache: 'bracket_cache_2025.json',
+  bracket_output: 'bracketgpt_bracket_output_2025.json',
   team_profiles: 'team_profiles_2025.json',
   seed_matchups: 'seed_matchup_all_rounds.json',
   archetype_summary: 'archetype_summary_v5.json',
@@ -3124,6 +3125,7 @@ app.get('/api/admin/data-status', auth, (req, res) => {
     archetypes: Object.keys(dataStore.archetype_summary?.archetype_descriptions || {}).length,
     bracket_lookup: Object.keys(dataStore.predictions?.bracket_lookup || bracketReady?.bracket_lookup || {}).length > 0,
     seed_rounds: Object.keys(dataStore.seed_matchups || bracketReady?.seed_matchup_history || {}).length,
+    bracket_output_strategies: Object.keys(store.bracketOutput?.strategies || {}).length,
   };
 
   return res.json({
@@ -3166,6 +3168,12 @@ app.get('/api/admin/data-status', auth, (req, res) => {
       archetype_history: {
         loaded: !!dataStore.archetype_history,
         entries: Object.keys(dataStore.archetype_history ?? {}).length,
+      },
+      bracket_output: {
+        loaded: !!store.bracketOutput,
+        strategies: Object.keys(store.bracketOutput?.strategies ?? {}).length,
+        team_ep_rankings: Object.keys(store.bracketOutput?.team_ep_rankings ?? {}).length,
+        champion_probs: Object.keys(store.bracketOutput?.bracket_structure?.champion_probs ?? {}).length,
       },
     },
   });
@@ -3251,6 +3259,7 @@ app.post('/admin/upload', auth, (req, res) => {
       bracket: 'bracket_2025.json',
       bracket_ready: 'bracket_ready_2025.json',
       bracket_cache: 'bracket_cache_2025.json',
+      bracket_output: 'bracketgpt_bracket_output_2025.json',
       team_profiles: 'team_profiles_2025.json',
       seed_matchups: 'seed_matchup_all_rounds.json',
       archetype_summary: 'archetype_summary_v5.json',
@@ -3264,6 +3273,10 @@ app.post('/admin/upload', auth, (req, res) => {
       bracketCache: 'bracket_cache',
       bracket_cache_2025: 'bracket_cache',
       cache: 'bracket_cache',
+      bracketOutput: 'bracket_output',
+      bracket_output_2025: 'bracket_output',
+      monte_carlo: 'bracket_output',
+      montecarlo: 'bracket_output',
       teams: 'team_profiles',
       upset: 'seed_matchups',
       floor: 'archetype_summary',
@@ -3289,6 +3302,7 @@ app.post('/admin/upload', auth, (req, res) => {
       if (key.includes('bracketready2025') || key.includes('bracketready')) return 'bracket_ready';
       if (key.includes('bracket2025') || key === 'bracket') return 'bracket';
       if (key.includes('bracketcache2025') || key.includes('bracketcache')) return 'bracket_cache';
+      if (key.includes('bracketgptbracketoutput2025') || key.includes('bracketoutput2025') || key.includes('bracketoutput') || key.includes('montecarlooutput') || key.includes('montecarlo')) return 'bracket_output';
       if (key.includes('teamprofiles2025') || key.includes('teamprofiles')) return 'team_profiles';
       if (key.includes('seedmatchupallrounds') || key.includes('seedmatchups') || key.includes('seedhistory')) return 'seed_matchups';
       if (key.includes('archetypesummaryv5') || key.includes('archetypesummary')) return 'archetype_summary';
@@ -3304,7 +3318,7 @@ app.post('/admin/upload', auth, (req, res) => {
     if (!resolvedType) {
       return res.status(400).json({
         success: false,
-        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_ready_2025*.json, bracket_2025*.json, bracket_cache_2025*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
+        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_ready_2025*.json, bracket_2025*.json, bracket_cache_2025*.json, bracketgpt_bracket_output_2025*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
       });
     }
 
