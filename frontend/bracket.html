@@ -518,11 +518,17 @@
     margin-bottom: 12px;
     overflow: hidden;
     cursor: pointer;
-    transition: border-color 0.12s;
+    transition: border-color 0.12s, transform 0.1s ease, box-shadow 0.12s;
     position: relative;
   }
   .matchup-pair:hover {
     border-color: var(--border-mid);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+  .matchup-pair:active {
+    transform: translateY(0);
+    box-shadow: none;
   }
   .matchup-pair::after {
     content: '';
@@ -553,6 +559,8 @@
   }
   .mp-team.picked {
     background: rgba(0,168,70,0.09);
+    border-left: 3px solid var(--green);
+    padding-left: 11px;
   }
   .mp-team.eliminated .mp-name {
     opacity: 0.35;
@@ -596,6 +604,10 @@
   }
   .mp-team.picked .mp-pct {
     color: var(--green);
+    font-weight: 900;
+  }
+  .mp-team.picked .mp-name {
+    color: var(--green) !important;
   }
   .mp-seed.top-seed { color: var(--gold); }
   .mp-seed.mid-seed { color: var(--muted); }
@@ -771,13 +783,14 @@
 
   .overlay {
     position: fixed; inset: 0;
-    background: rgba(0,0,0,0.70);
+    background: rgba(0,0,0,0);
     z-index: 200;
     display: none;
     align-items: center; justify-content: center;
     padding: 16px;
+    transition: background 0.15s ease;
   }
-  .overlay.open { display: flex; }
+  .overlay.open { background: rgba(0,0,0,0.70); }
 
   .pick-card {
     background: var(--bg);
@@ -786,6 +799,13 @@
     width: 100%; max-width: 440px;
     max-height: calc(100vh - 32px);
     overflow: auto;
+    transform: translateY(12px);
+    opacity: 0;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+  }
+  .overlay.open .pick-card {
+    transform: translateY(0);
+    opacity: 1;
   }
 
   .pc-header {
@@ -836,6 +856,20 @@
   .pc-team:hover { background: rgba(255,255,255,0.03); }
   .pc-team.picked { background: rgba(0,168,70,.08); }
   .pc-team.dimmed .pc-name { color: var(--muted); }
+  .pc-model-badge {
+    font-family: var(--fd);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    background: rgba(212, 168, 0, 0.12);
+    border: 1px solid rgba(212, 168, 0, 0.25);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-top: 4px;
+    display: inline-block;
+  }
 
   .pc-seed {
     font-family: var(--fd); font-size: 12px; font-weight: 700;
@@ -976,11 +1010,22 @@
     font-family: var(--fd); font-size: 16px; font-weight: 900;
     letter-spacing: .05em; text-transform: uppercase;
     cursor: pointer; color: #fff;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+  }
+  .pc-btn:hover {
+    transform: scale(1.02);
+  }
+  .pc-btn:active {
+    transform: scale(0.98);
   }
   .pc-btn.unchosen {
     background: var(--surface) !important;
-    color: var(--text);
+    color: var(--muted);
     border: 1px solid var(--border);
+    opacity: 0.6;
+  }
+  .pc-btn.unchosen:hover {
+    opacity: 0.85;
   }
 
   .mobile-tabs {
@@ -1046,7 +1091,18 @@
     .round-col { display: none; }
     .round-col.visible { display: block; }
     .mobile-tabs { display: grid; }
-    .pick-card { max-height: calc(100vh - 32px); }
+    .overlay {
+      padding: 8px;
+      align-items: flex-end;
+    }
+    .pick-card {
+      max-height: calc(100vh - 32px);
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 12px 12px 0 0;
+      max-width: 100%;
+    }
     .optimizer-toggle { top: auto; bottom: 92px; right: 12px; }
     .optimizer-panel {
       top: auto;
@@ -1315,6 +1371,8 @@
     const roundDataMap = { R64: '64', R32: '32', S16: '16', E8: '8', F4: '4', NCG: '2' };
     let autoAdvanceEnabled = true;
     let flowLocked = false;
+    let flowLockTimestamp = 0;
+    let flowLockSafetyBound = false;
     let guidedNodeId = '';
     let analysisToken = 0;
     let pickCardContext = { matchupId: '', teamA: '', teamB: '' };
@@ -1806,6 +1864,7 @@
 
     function setInteractionLock(locked) {
       flowLocked = !!locked;
+      flowLockTimestamp = locked ? Date.now() : 0;
       document.body.classList.toggle('flow-locked', !!locked);
     }
 
@@ -2815,15 +2874,48 @@
       }
     }
 
+    function flashPickConfirmation(side) {
+      const el = document.getElementById(side === 'a' ? 'pcTeamA' : 'pcTeamB');
+      if (!el) return Promise.resolve();
+      const prevTransition = el.style.transition;
+      const prevBackground = el.style.background;
+      el.style.transition = 'background 0.1s ease';
+      el.style.background = 'rgba(0, 168, 70, 0.20)';
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          el.style.background = prevBackground;
+          el.style.transition = prevTransition;
+          resolve();
+        }, 180);
+      });
+    }
+
     async function makePick(matchId, winnerName, opts = {}) {
       if ((matchId === 'a' || matchId === 'b') && !winnerName) {
         const winnerFromSide = matchId === 'a' ? pickCardContext.teamA : pickCardContext.teamB;
         const targetMatchId = pickCardContext.matchupId || guidedNodeId;
-        if (!targetMatchId || !winnerFromSide) return;
+        if (!targetMatchId || !winnerFromSide) {
+          console.warn('[makePick] No targetMatchId or winnerFromSide', {
+            matchId,
+            targetMatchId,
+            winnerFromSide,
+            pickCardContext,
+            guidedNodeId
+          });
+          return;
+        }
+        await flashPickConfirmation(matchId);
         return makePick(targetMatchId, winnerFromSide, opts);
       }
       const node = nodesById.get(matchId);
-      if (!node || !winnerName) return;
+      if (!node || !winnerName) {
+        console.warn('[makePick] Node not found or no winnerName', {
+          matchId,
+          winnerName,
+          nodeExists: !!node
+        });
+        return;
+      }
       bracketState.picks[matchId] = winnerName;
       if (activeStrategy && strategyBaselinePicks[matchId] && strategyBaselinePicks[matchId] !== winnerName) {
         customOverrideNodes.add(matchId);
@@ -3052,6 +3144,30 @@
       requestAnimationFrame(redrawBracketConnectors);
     }
 
+    function showOverlay() {
+      const overlay = document.getElementById('overlay');
+      if (!overlay) return;
+      overlay.style.display = 'flex';
+      void overlay.offsetHeight;
+      overlay.classList.add('open');
+    }
+
+    function hideOverlay(instant = false) {
+      const overlay = document.getElementById('overlay');
+      if (!overlay) return;
+      if (instant) {
+        overlay.classList.remove('open');
+        overlay.style.display = 'none';
+        return;
+      }
+      overlay.classList.remove('open');
+      setTimeout(() => {
+        if (!overlay.classList.contains('open')) {
+          overlay.style.display = 'none';
+        }
+      }, 200);
+    }
+
     function closeCard(instant = true, cancelAuto = false) {
       const overlay = document.getElementById('overlay');
       if (!overlay) return;
@@ -3067,11 +3183,7 @@
       guidedNodeId = '';
       analysisToken += 1;
       currentPickCardMatchup = null;
-      if (instant) overlay.classList.add('instant');
-      overlay.classList.remove('open');
-      setTimeout(() => {
-        overlay.classList.remove('instant');
-      }, instant ? 0 : 180);
+      hideOverlay(instant);
     }
 
     function onMatchClick(event, nodeId) {
@@ -3395,7 +3507,7 @@
         meta?.risk?.reason ||
         'Model analysis unavailable for this matchup.';
       return {
-        matchup_id: String(data?.matchup_id || node?.id || ''),
+        matchup_id: String(node?.id || data?.matchup_id || ''),
         region: String(data?.region || node?.region || ''),
         round: String(data?.round || node?.round || 'R64'),
         display_flag: String(data?.display_flag || data?.upset_flag || meta?.display_flag || meta?.upset_flag || ''),
@@ -3446,6 +3558,15 @@
 
       setTeam('A', tA, pctA, colorA, currentPick === 'a');
       setTeam('B', tB, pctB, colorB, currentPick === 'b');
+      const modelPick = pctA >= pctB ? 'A' : 'B';
+      const modelEl = document.getElementById('pcTeam' + modelPick);
+      document.querySelectorAll('.pc-model-badge').forEach((el) => el.remove());
+      if (modelEl) {
+        const badge = document.createElement('span');
+        badge.className = 'pc-model-badge';
+        badge.textContent = 'MODEL PICK';
+        modelEl.appendChild(badge);
+      }
 
       document.getElementById('pcBarA').style.cssText = `width:${pctA}%; background:${colorA}`;
       document.getElementById('pcBarB').style.cssText = `width:${pctB}%; background:${colorB}`;
@@ -3459,15 +3580,16 @@
 
       const btnA = document.getElementById('pcBtnA');
       const btnB = document.getElementById('pcBtnB');
-      btnA.textContent = getDisplayName(tA.name);
-      btnB.textContent = getDisplayName(tB.name);
+      const pickSide = getUserPick(m.matchup_id);
+      btnA.textContent = (pickSide === 'a' ? '\u2713 ' : '') + getDisplayName(tA.name);
+      btnB.textContent = (pickSide === 'b' ? '\u2713 ' : '') + getDisplayName(tB.name);
       btnA.style.background = colorA;
       btnB.style.background = colorB;
-      btnA.classList.toggle('unchosen', currentPick === 'b');
-      btnB.classList.toggle('unchosen', currentPick === 'a');
+      btnA.classList.toggle('unchosen', pickSide === 'b');
+      btnB.classList.toggle('unchosen', pickSide === 'a');
       updatePickCardSignal(m);
 
-      document.getElementById('overlay').classList.add('open');
+      showOverlay();
     }
 
     function setTeam(side, team, pct, color, isPicked) {
@@ -3585,12 +3707,26 @@
       if (!overlay) return;
       if (e && e.target !== overlay) return;
       currentPickCardMatchup = null;
-      overlay.classList.remove('open');
+      hideOverlay();
     }
 
     function initBracketDelegation() {
       const container = document.getElementById('bracketContainer');
       if (!container || container.dataset.clickBound === '1') return;
+      if (!flowLockSafetyBound) {
+        flowLockSafetyBound = true;
+        document.addEventListener('click', function() {
+          if (flowLocked && flowLockTimestamp && (Date.now() - flowLockTimestamp > 8000)) {
+            console.warn('[flowLock] Force-unlocking stale flow lock');
+            setInteractionLock(false);
+            const containerEl = document.querySelector('.container');
+            if (containerEl) containerEl.style.transform = 'scale(1)';
+            const banner = document.getElementById('flowBanner');
+            if (banner) banner.classList.remove('show');
+            clearPreviewTimers();
+          }
+        }, true);
+      }
       container.dataset.clickBound = '1';
       container.addEventListener('click', (e) => {
         const pair = e.target.closest('.matchup-pair');
@@ -3609,10 +3745,6 @@
       if (!t1 || !t2) return;
       if (opts.autoResume !== false) autoAdvanceEnabled = true;
       guidedNodeId = node.id;
-      const overlay = document.getElementById('overlay');
-      if (!overlay) return;
-      overlay.classList.add('open');
-      overlay.classList.remove('instant');
       const data = await getCardData(node);
       if (guidedNodeId !== node.id) return;
       openPickCard(toPickCardMatchup(data, node));
