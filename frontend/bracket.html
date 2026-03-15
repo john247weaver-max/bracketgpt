@@ -961,6 +961,23 @@
       return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
     }
 
+    function escHtml(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function md(text) {
+      const safe = escHtml(text || '');
+      return safe
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+    }
+
     function roundBannerLabel(roundKey, region) {
       return getRoundTitle(roundKey).split(' (')[0] + ' · ' + String(region || '').toUpperCase() + ' REGION';
     }
@@ -1552,6 +1569,34 @@
       return 1 / (1 + Math.pow(10, -diff / 11));
     }
 
+    function canonicalSeedPair(seedA, seedB) {
+      const a = Number(seedA);
+      const b = Number(seedB);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return '';
+      return Math.min(a, b) + 'v' + Math.max(a, b);
+    }
+
+    function orderRegionR64Matchups(rows) {
+      const list = Array.isArray(rows) ? rows.slice() : [];
+      const slotOrder = ['1v16', '8v9', '5v12', '4v13', '6v11', '3v14', '7v10', '2v15'];
+      const byPair = new Map();
+      for (const row of list) {
+        const key = canonicalSeedPair(row?.t1?.seed, row?.t2?.seed);
+        if (!key) continue;
+        if (!byPair.has(key)) byPair.set(key, []);
+        byPair.get(key).push(row);
+      }
+      const ordered = [];
+      for (const pair of slotOrder) {
+        const next = (byPair.get(pair) || []).shift();
+        if (next) ordered.push(next);
+      }
+      for (const row of list.sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))) {
+        if (!ordered.includes(row)) ordered.push(row);
+      }
+      return ordered;
+    }
+
     function linkParent(childId, parentId) {
       if (!parentMap.has(childId)) parentMap.set(childId, []);
       parentMap.get(childId).push(parentId);
@@ -1569,9 +1614,9 @@
       }
 
       for (const region of regions) {
-        const r64 = baseMatchups
-          .filter((m) => normalizeRegionName(m.region) === normalizeRegionName(region))
-          .sort((a, b) => Number(a.game_number || 0) - Number(b.game_number || 0));
+        const r64 = orderRegionR64Matchups(
+          baseMatchups.filter((m) => normalizeRegionName(m.region) === normalizeRegionName(region))
+        );
         const ids = { R64: [], R32: [], S16: [], E8: [] };
         for (const m of r64) {
           const id = m.matchup_id;
@@ -2195,7 +2240,7 @@
         const payload = await r.json();
         if (token !== analysisToken) return;
         el.classList.remove('loading');
-        el.textContent = String(payload.reply || 'Model data unavailable.');
+        el.innerHTML = md(String(payload.reply || 'Model data unavailable.'));
       } catch (e) {
         if (token !== analysisToken) return;
         el.classList.remove('loading');
@@ -2220,10 +2265,26 @@
       try {
         const m = await getMatchupForTeams(t1.name, t2.name);
         if (m) {
+          const mT1Name = normalizeName(m?.t1?.name);
+          const mT2Name = normalizeName(m?.t2?.name);
+          const wantedT1 = normalizeName(t1.name);
+          const wantedT2 = normalizeName(t2.name);
+          const t1FromApi = mT1Name === wantedT1 ? m?.t1 : (mT2Name === wantedT1 ? m?.t2 : null);
+          const t2FromApi = mT1Name === wantedT2 ? m?.t1 : (mT2Name === wantedT2 ? m?.t2 : null);
           data = {
             ...data,
-            t1: { ...(data.t1 || t1), name: t1.name, seed: m?.t1?.seed ?? t1.seed, win_probability: Number(m?.t1?.win_probability ?? 0) },
-            t2: { ...(data.t2 || t2), name: t2.name, seed: m?.t2?.seed ?? t2.seed, win_probability: Number(m?.t2?.win_probability ?? 0) },
+            t1: {
+              ...(data.t1 || t1),
+              name: t1.name,
+              seed: t1FromApi?.seed ?? t1.seed,
+              win_probability: Number(t1FromApi?.win_probability ?? data?.t1?.win_probability ?? 0),
+            },
+            t2: {
+              ...(data.t2 || t2),
+              name: t2.name,
+              seed: t2FromApi?.seed ?? t2.seed,
+              win_probability: Number(t2FromApi?.win_probability ?? data?.t2?.win_probability ?? 0),
+            },
             matchup_meta: {
               ...(data.matchup_meta || {}),
               predicted_winner: m?.matchup_meta?.predicted_winner || data?.matchup_meta?.predicted_winner || '',
@@ -2500,6 +2561,13 @@
           finalFourPairings = [['South', 'West'], ['East', 'Midwest']];
         }
         baseMatchups = Array.isArray(data.matchups) ? data.matchups : [];
+        console.log('=== BRACKET DEBUG ===');
+        console.log('Total matchups from API:', baseMatchups.length);
+        console.log('Unique seed pairings:', [...new Set(baseMatchups.map((m) => (m.t1?.seed ?? '?') + 'v' + (m.t2?.seed ?? '?')))]);
+        console.log('Unique regions:', [...new Set(baseMatchups.map((m) => m.region))]);
+        console.log('Unique rounds:', [...new Set(baseMatchups.map((m) => m.round))]);
+        console.log('First matchup:', JSON.stringify(baseMatchups[0] || {}, null, 2));
+        console.log('Last matchup:', JSON.stringify(baseMatchups[baseMatchups.length - 1] || {}, null, 2));
         if (baseMatchups.length === 0) {
           document.getElementById('regions').innerHTML = '';
           document.getElementById('finals').innerHTML = '';

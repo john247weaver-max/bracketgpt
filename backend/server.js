@@ -785,6 +785,8 @@ function buildCanonicalR64Payload() {
     }
   }
 
+  matchups = stabilizeR64Matchups(matchups);
+
   const regions = Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)));
   const season = Number(matchups[0]?.season || store.bracketMatchups?.season || dataStore.bracket?.season || bracketMatchupIndex.season || cfg.activeSeason || 2025);
   const finalFourPairings = getFinalFourPairingsArray();
@@ -795,6 +797,97 @@ function buildCanonicalR64Payload() {
     finalFourPairings,
     final_four_pairings: getFinalFourPairingsObject(finalFourPairings),
   };
+}
+
+function canonicalSeedPair(seedA, seedB) {
+  const a = Number(seedA);
+  const b = Number(seedB);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return '';
+  return `${Math.min(a, b)}v${Math.max(a, b)}`;
+}
+
+function orientHigherSeedFirst(matchup) {
+  const m = matchup || {};
+  const s1 = Number(m?.t1?.seed);
+  const s2 = Number(m?.t2?.seed);
+  if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 <= s2) return m;
+  return {
+    ...m,
+    t1: { ...(m.t2 || {}) },
+    t2: { ...(m.t1 || {}) },
+  };
+}
+
+function matchupUniqKey(matchup) {
+  const m = matchup || {};
+  const region = String(m?.region || '').toLowerCase();
+  const teamA = normalizeTeamName(m?.t1?.name);
+  const teamB = normalizeTeamName(m?.t2?.name);
+  const a = teamA <= teamB ? teamA : teamB;
+  const b = teamA <= teamB ? teamB : teamA;
+  const pair = canonicalSeedPair(m?.t1?.seed, m?.t2?.seed);
+  return `${region}|${pair}|${a}|${b}`;
+}
+
+function stabilizeR64Matchups(rows) {
+  const data = Array.isArray(rows) ? rows.map(orientHigherSeedFirst) : [];
+  if (!data.length) return [];
+  const regionOrder = Array.from(new Set(data.map((m) => String(m?.region || 'Unknown').trim() || 'Unknown')));
+  const targetPairs = ['1v16', '8v9', '5v12', '4v13', '6v11', '3v14', '7v10', '2v15'];
+  const out = [];
+  const seen = new Set();
+
+  for (const region of regionOrder) {
+    const regionRows = data
+      .filter((m) => String(m?.region || 'Unknown').trim() === region)
+      .sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0));
+
+    const byPair = new Map();
+    for (const row of regionRows) {
+      const key = canonicalSeedPair(row?.t1?.seed, row?.t2?.seed);
+      if (!key) continue;
+      if (!byPair.has(key)) byPair.set(key, []);
+      byPair.get(key).push(row);
+    }
+
+    const ordered = [];
+    for (const pair of targetPairs) {
+      const pick = (byPair.get(pair) || []).shift();
+      if (pick) ordered.push(pick);
+    }
+    for (const row of regionRows) {
+      if (!ordered.includes(row)) ordered.push(row);
+    }
+
+    for (let i = 0; i < ordered.length; i += 1) {
+      const row = ordered[i];
+      const uniq = matchupUniqKey(row);
+      if (seen.has(uniq)) continue;
+      seen.add(uniq);
+      out.push({
+        ...row,
+        region,
+        game_number: Number(row?.game_number || 0) || (i + 1),
+      });
+    }
+  }
+
+  return out;
+}
+
+function logBracketPayloadDiagnostics(context, payload) {
+  const rows = Array.isArray(payload?.matchups) ? payload.matchups : [];
+  const pairs = {};
+  const rounds = new Set();
+  const regions = new Set();
+  for (const row of rows) {
+    rounds.add(String(row?.round || ''));
+    regions.add(String(row?.region || ''));
+    const key = canonicalSeedPair(row?.t1?.seed, row?.t2?.seed) || 'unknown';
+    pairs[key] = (pairs[key] || 0) + 1;
+  }
+  console.log(`[bracket:${context}] total=${rows.length} regions=${Array.from(regions).join(',')} rounds=${Array.from(rounds).join(',')}`);
+  console.log(`[bracket:${context}] seedPairs=${Object.entries(pairs).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => `${k}:${v}`).join(',')}`);
 }
 
 function getProfileMap() {
@@ -825,6 +918,7 @@ let hasData = loadData();
 enrichBracketWithPlayers();
 buildHistoricalIndex();
 buildBracketMatchupIndex();
+logBracketPayloadDiagnostics('startup', buildCanonicalR64Payload());
 if (store.bracketOutput?.strategies) {
   console.log(`✅ Bracket output loaded: ${Object.keys(store.bracketOutput.strategies).length} strategies`);
 } else {
@@ -836,6 +930,7 @@ function reloadDataFromDisk(reason = 'reload') {
   enrichBracketWithPlayers();
   buildHistoricalIndex();
   buildBracketMatchupIndex();
+  logBracketPayloadDiagnostics(reason, buildCanonicalR64Payload());
   hasData = loaded;
   console.log(`[data] ${reason} | loaded:${loaded ? 'yes' : 'no'}`);
 }
@@ -2515,6 +2610,15 @@ app.get('/api/ready', (req, res) => {
 
 app.get('/api/bracket', (req, res) => {
   const payload = buildCanonicalR64Payload();
+  const allM = Array.isArray(store.bracketMatchups?.matchups)
+    ? store.bracketMatchups.matchups
+    : (Array.isArray(store.bracketMatchups?.predictions) ? store.bracketMatchups.predictions : []);
+  console.log('=== SERVER BRACKET DEBUG ===');
+  console.log('store.bracketMatchups type:', typeof store.bracketMatchups);
+  console.log('store.bracketMatchups keys:', Object.keys(store.bracketMatchups || {}));
+  console.log('Total matchups in store:', allM.length);
+  console.log('Unique rounds:', Array.from(new Set(allM.map((m) => m?.round))));
+  console.log('Unique seeds:', Array.from(new Set(allM.map((m) => canonicalSeedPair(m?.t1?.seed ?? m?.t1_seed, m?.t2?.seed ?? m?.t2_seed) || 'unknown'))));
   if (!Array.isArray(payload.matchups) || payload.matchups.length === 0) {
     return res.status(404).json({
       error: 'No bracket data loaded',
