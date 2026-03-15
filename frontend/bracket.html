@@ -1445,7 +1445,7 @@
     }
 
     function refreshAllSignals() {
-      document.querySelectorAll('.matchup-card[data-matchup-id]').forEach((cardEl) => {
+      document.querySelectorAll('.matchup-pair[data-matchup-id]').forEach((cardEl) => {
         const id = cardEl.dataset.matchupId;
         const node = nodesById.get(id);
         if (!node) return;
@@ -2838,8 +2838,9 @@
     function renderRegion(region) {
       const ids = regionRoundIds[region];
       if (!ids) return '';
-      return '<section class="region">' +
-        '<h2>' + region + '</h2>' +
+      const regionColor = escAttr(REGION_COLORS[region] || 'var(--accent)');
+      return '<section class="region region-column" data-region="' + escAttr(String(region || '').toLowerCase()) + '">' +
+        '<div class="region-header"><h2 class="region-title" style="color:' + regionColor + '">' + escHtml(region) + '</h2><div class="region-round-label">Regional Bracket</div></div>' +
         '<div class="round-col visible" data-round="R64"><div class="round-title">' + getRoundTitle('R64') + '</div>' + ids.R64.map((id) => renderMatch(nodesById.get(id))).join('') + roundSummary(ids.R64, 'R64') + '</div>' +
         '<div class="round-col" data-round="R32"><div class="round-title">' + getRoundTitle('R32') + '</div>' + ids.R32.map((id) => renderMatch(nodesById.get(id))).join('') + roundSummary(ids.R32, 'R32') + '</div>' +
         '<div class="round-col" data-round="S16"><div class="round-title">' + getRoundTitle('S16') + '</div>' + ids.S16.map((id) => renderMatch(nodesById.get(id))).join('') + roundSummary(ids.S16, 'S16') + '</div>' +
