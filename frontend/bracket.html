@@ -937,16 +937,24 @@
 
     let baseMatchups = [];
     let bracketData = null;
+    let matchups = [];
+    let teamDirectory = {};
     let allPredictions = [];
+    let bracketLookup = {};
+    let espnScoring = {};
+    let seedHistory = {};
+    let archetypeMatrix = {};
+    let archetypeHistory = {};
+    let displayNames = {};
     let matchupById = new Map();
     let nodesById = new Map();
     let parentMap = new Map();
     let regionRoundIds = {};
     let finalIds = { F4: [], NCG: [] };
     let matchupCache = new Map();
-    const bracketTeamIdByName = new Map();
     const teamIndex = new Map();
-    const predictionsByNames = new Map();
+    const predictionsByName = new Map();
+    const teamPowerIndex = new Map();
     let finalFourPairings = defaultFinalFourPairings.slice();
     let mobileRound = 'R64';
     let bracketOutput = null;
@@ -993,7 +1001,7 @@
     }
     function getDisplayName(v) {
       const name = String(v || '').trim();
-      return DISPLAY_NAMES[name] || name;
+      return displayNames[name] || DISPLAY_NAMES[name] || name;
     }
     function normalizeProbability(v, fallback = 0) {
       if (v == null) return fallback;
@@ -1314,43 +1322,78 @@
       return matchupCache.get(matchupKey(nameA, nameB)) || null;
     }
 
-    function indexBracketTeamDirectory() {
-      bracketTeamIdByName.clear();
-      const dir = bracketData?.team_directory || {};
-      for (const [id, team] of Object.entries(dir)) {
-        const key = normalizeName(team?.name);
-        if (key && !bracketTeamIdByName.has(key)) {
-          bracketTeamIdByName.set(key, String(id));
+    function buildPredictionIndex() {
+      predictionsByName.clear();
+      for (let i = 0; i < (allPredictions || []).length; i += 1) {
+        const p = allPredictions[i] || {};
+        const t1Name = String(p?.t1_name || '').trim();
+        const t2Name = String(p?.t2_name || '').trim();
+        if (!t1Name || !t2Name) continue;
+        predictionsByName.set(`${t1Name}|${t2Name}`, i);
+        predictionsByName.set(`${t2Name}|${t1Name}`, i);
+        const aNorm = normalizeName(t1Name);
+        const bNorm = normalizeName(t2Name);
+        if (aNorm && bNorm) {
+          predictionsByName.set(`${aNorm}|${bNorm}`, i);
+          predictionsByName.set(`${bNorm}|${aNorm}`, i);
         }
       }
     }
 
-    function buildPredictionIndex() {
-      predictionsByNames.clear();
-      for (const p of (allPredictions || [])) {
-        const a = normalizeName(p?.t1_name);
-        const b = normalizeName(p?.t2_name);
-        if (!a || !b) continue;
-        predictionsByNames.set(a + '|' + b, p);
-        predictionsByNames.set(b + '|' + a, p);
+    function buildTeamPowerIndex() {
+      teamPowerIndex.clear();
+      for (const [teamId, teamRaw] of Object.entries(teamDirectory || {})) {
+        const team = teamRaw || {};
+        const entry = {
+          ...team,
+          team_id: team?.team_id ?? team?.id ?? Number(teamId),
+          power: safeNum(team?.power ?? team?.bt_power ?? team?.bradley_terry_power, 0)
+        };
+        const name = String(entry?.name || '').trim();
+        if (name) {
+          teamPowerIndex.set(name, entry);
+          teamPowerIndex.set(normalizeName(name), entry);
+        }
+        const kaggleName = String(entry?.kaggle_name || '').trim();
+        if (kaggleName) {
+          teamPowerIndex.set(kaggleName, entry);
+          teamPowerIndex.set(normalizeName(kaggleName), entry);
+        }
       }
     }
 
     function findPredictionByTeams(teamAName, teamBName) {
-      const key = normalizeName(teamAName) + '|' + normalizeName(teamBName);
-      return predictionsByNames.get(key) || null;
+      const direct = predictionsByName.get(String(teamAName || '').trim() + '|' + String(teamBName || '').trim());
+      if (direct !== undefined && allPredictions[direct]) return allPredictions[direct];
+      const normalized = predictionsByName.get(normalizeName(teamAName) + '|' + normalizeName(teamBName));
+      if (normalized !== undefined && allPredictions[normalized]) return allPredictions[normalized];
+      return null;
     }
 
     async function loadBracketData() {
       try {
-        const res = await fetch('/api/bracket-cache');
-        if (!res.ok) return null;
+        const res = await fetch('/api/bracket');
+        if (!res.ok) {
+          showError('Bracket data not loaded. Check admin panel.');
+          return null;
+        }
         bracketData = await res.json();
-        allPredictions = Array.isArray(bracketData?.predictions) ? bracketData.predictions : [];
+        matchups = Array.isArray(bracketData?.matchups) ? bracketData.matchups : [];
+        baseMatchups = matchups.slice();
+        teamDirectory = bracketData?.team_directory || {};
+        allPredictions = Array.isArray(bracketData?.all_predictions) ? bracketData.all_predictions : [];
+        bracketLookup = bracketData?.bracket_lookup || {};
+        espnScoring = bracketData?.espn_scoring || {};
+        seedHistory = bracketData?.seed_matchup_history || {};
+        archetypeMatrix = bracketData?.archetype_matchup_matrix || {};
+        archetypeHistory = bracketData?.archetype_history || {};
+        displayNames = bracketData?.display_names || {};
+        applyEspnScoringMap(espnScoring);
         buildPredictionIndex();
-        indexBracketTeamDirectory();
+        buildTeamPowerIndex();
         return bracketData;
       } catch (e) {
+        showError('Bracket data not loaded. Check admin panel.');
         return null;
       }
     }
@@ -1601,14 +1644,8 @@
     }
 
     function getTeamProfileClient(teamName) {
-      const teams = Object.values(bracketData?.team_directory || {});
-      const exact = teams.find((t) => normalizeName(t?.name) === normalizeName(teamName));
-      if (exact) return exact;
-      const target = normalizeName(teamName);
-      return teams.find((t) => {
-        const n = normalizeName(t?.name);
-        return n && (n.includes(target) || target.includes(n));
-      }) || null;
+      if (!teamName) return null;
+      return teamPowerIndex.get(teamName) || teamPowerIndex.get(normalizeName(teamName)) || null;
     }
 
     function confidenceTierFromProb(prob) {
@@ -1621,151 +1658,98 @@
       return 'TOSS-UP';
     }
 
-    async function getMatchup(t1Id, t2Id) {
-      const t1 = String(t1Id);
-      const t2 = String(t2Id);
-      const lookup = bracketData?.bracket_lookup || {};
-      const idx = lookup[t1]?.[t2] ?? lookup[t2]?.[t1];
-      const numericIdx = Number(idx);
-      if (Number.isInteger(numericIdx) && numericIdx >= 0 && Array.isArray(bracketData?.predictions) && bracketData.predictions[numericIdx]) {
-        return bracketData.predictions[numericIdx];
+    function getPredictionIndex(teamAName, teamBName) {
+      const directKey = String(teamAName || '').trim() + '|' + String(teamBName || '').trim();
+      const direct = predictionsByName.get(directKey);
+      if (direct !== undefined) return direct;
+      const normKey = normalizeName(teamAName) + '|' + normalizeName(teamBName);
+      const norm = predictionsByName.get(normKey);
+      if (norm !== undefined) return norm;
+      const teamA = getTeamProfileClient(teamAName);
+      const teamB = getTeamProfileClient(teamBName);
+      if (teamA?.kaggle_name && teamB?.kaggle_name) {
+        const kaggleKey = String(teamA.kaggle_name) + '|' + String(teamB.kaggle_name);
+        const kaggleDirect = predictionsByName.get(kaggleKey);
+        if (kaggleDirect !== undefined) return kaggleDirect;
+        const kaggleNorm = predictionsByName.get(normalizeName(teamA.kaggle_name) + '|' + normalizeName(teamB.kaggle_name));
+        if (kaggleNorm !== undefined) return kaggleNorm;
       }
-      const res = await fetch('/api/matchup?t1=' + encodeURIComponent(t1) + '&t2=' + encodeURIComponent(t2));
-      return res.ok ? await res.json() : null;
+      return undefined;
     }
 
-    function toLegacyMatchupShape(prediction, teamAName, teamBName) {
-      if (!prediction) return null;
-      const pT1 = Number(prediction.model_win_prob);
-      const modelProb = Number.isFinite(pT1) ? pT1 : 0.5;
-      const predT1 = String(prediction.t1_name || '');
-      const predT2 = String(prediction.t2_name || '');
-      const wantsA = normalizeName(teamAName);
-      const aligned = normalizeName(predT1) === wantsA || (wantsA && normalizeName(predT2) !== wantsA);
-      const aSeed = aligned ? prediction.t1_seed : prediction.t2_seed;
-      const bSeed = aligned ? prediction.t2_seed : prediction.t1_seed;
-      const aProb = aligned ? modelProb : (1 - modelProb);
-      const bProb = 1 - aProb;
-      const profileA = getTeamProfileClient(teamAName) || {};
-      const profileB = getTeamProfileClient(teamBName) || {};
-      const sideA = aligned ? 't1' : 't2';
-      const sideB = aligned ? 't2' : 't1';
-      const predProfileA = prediction?.[sideA + '_profile'] || {};
-      const predProfileB = prediction?.[sideB + '_profile'] || {};
-      const predTopCompA = prediction?.[sideA + '_topComp'] || prediction?.[sideA + '_historical_comp'] || null;
-      const predTopCompB = prediction?.[sideB + '_topComp'] || prediction?.[sideB + '_historical_comp'] || null;
-      const upsetComputed = getUpsetFlag(aSeed, bSeed, aProb);
-      const upsetToken = String(prediction.upset_flag || '').trim().toLowerCase().replace(/\s+/g, '_') || upsetComputed || 'chalk';
-      return {
-        t1: {
-          ...profileA,
-          name: teamAName,
-          seed: aSeed,
-          win_probability: aProb,
-          archetype: profileA?.archetype || prediction?.[sideA + '_archetype'] || 'Unknown',
-          key_players: predProfileA?.key_players || profileA?.key_players || [],
-          topComp: predTopCompA || profileA?.historical_comp || null,
-          pool: predProfileA?.pool || profileA?.pool || null
-        },
-        t2: {
-          ...profileB,
-          name: teamBName,
-          seed: bSeed,
-          win_probability: bProb,
-          archetype: profileB?.archetype || prediction?.[sideB + '_archetype'] || 'Unknown',
-          key_players: predProfileB?.key_players || profileB?.key_players || [],
-          topComp: predTopCompB || profileB?.historical_comp || null,
-          pool: predProfileB?.pool || profileB?.pool || null
-        },
-        matchup_meta: {
-          predicted_winner: prediction.predicted_winner_name || (aProb >= 0.5 ? teamAName : teamBName),
-          upset_flag: upsetToken,
-          display_flag: upsetToken,
-          confidence: confidenceTierFromProb(aProb),
-          archetype_matchup: prediction.archetype_matchup || null,
-          key_factors: prediction.key_factors || null,
-          kenpom: prediction.kenpom || null,
-          form_and_risk: prediction.form_and_risk || null,
-          chatbot_responses: prediction.chatbot_responses || null,
-          seed_matchup: prediction.historical_seed_matchup || null,
-          pool_meta: {
-            leverage_delta: Number.isFinite(Number(prediction.value_score)) ? Number(prediction.value_score) : null,
-            contrarian_flag: Number(prediction.value_score || 0) > 0.03
-          }
-        }
-      };
+    function getLaterRoundCardData(teamAName, teamBName) {
+      const idx = getPredictionIndex(teamAName, teamBName);
+      if (idx === undefined) return null;
+      return allPredictions[idx] || null;
     }
 
-    async function getMatchupForTeams(teamAName, teamBName) {
-      const cached = getCachedMatchup(teamAName, teamBName);
-      if (cached) return cached;
-      const pred = findPredictionByTeams(teamAName, teamBName);
-      if (pred) {
-        const shapedPred = toLegacyMatchupShape(pred, teamAName, teamBName);
-        if (shapedPred) {
-          setCachedMatchup(teamAName, teamBName, shapedPred);
-          return shapedPred;
-        }
-      }
-      const idA = bracketTeamIdByName.get(normalizeName(teamAName));
-      const idB = bracketTeamIdByName.get(normalizeName(teamBName));
-      if (idA && idB) {
-        const pred = await getMatchup(idA, idB);
-        const shaped = toLegacyMatchupShape(pred, teamAName, teamBName);
-        if (shaped) {
-          setCachedMatchup(teamAName, teamBName, shaped);
-          return shaped;
-        }
-      }
-      try {
-        const r = await fetch('/api/matchup/by-teams/' + encodeURIComponent(teamAName) + '/' + encodeURIComponent(teamBName));
-        if (!r.ok) return null;
-        const data = await r.json();
-        setCachedMatchup(teamAName, teamBName, data);
-        return data;
-      } catch (e) {
-        return null;
-      }
+    function predictionProbForTeam(pred, teamName) {
+      if (!pred || !teamName) return null;
+      const model = normalizeProbability(pred?.model_win_prob, null);
+      if (!Number.isFinite(model)) return null;
+      const team = getTeamProfileClient(teamName);
+      const teamNorm = normalizeName(teamName);
+      const predT1 = normalizeName(pred?.t1_name);
+      const predT2 = normalizeName(pred?.t2_name);
+      const kaggle = normalizeName(team?.kaggle_name || '');
+      if (teamNorm === predT1 || (kaggle && kaggle === predT1)) return model;
+      if (teamNorm === predT2 || (kaggle && kaggle === predT2)) return 1 - model;
+      return null;
+    }
+
+    function getLaterRoundProb(teamAName, teamBName) {
+      const pred = getLaterRoundCardData(teamAName, teamBName);
+      const predProb = predictionProbForTeam(pred, teamAName);
+      if (Number.isFinite(predProb)) return normalizeProbability(predProb, 0.5);
+      const a = getTeamProfileClient(teamAName);
+      const b = getTeamProfileClient(teamBName);
+      if (!a || !b) return 0.5;
+      const diff = safeNum(a?.power, 0) - safeNum(b?.power, 0);
+      return 1.0 / (1.0 + Math.exp(-diff / 1.5));
     }
 
     function buildTeamIndex() {
       teamIndex.clear();
-      for (const m of baseMatchups) {
-        const t1 = m?.t1;
-        const t2 = m?.t2;
-        if (!t1?.name || !t2?.name) continue;
-        const p1 = normalizeProbability(t1?.win_probability, 0.5);
-        const p2 = normalizeProbability(t2?.win_probability, 1 - p1);
-        const p1Safe = Math.max(0.001, Math.min(0.999, p1));
-        const p2Safe = Math.max(0.001, Math.min(0.999, p2));
-        teamIndex.set(normalizeName(t1.name), {
-          ...t1,
-          region: m.region,
-          r64Opponent: t2.name,
-          power: Math.log(p1Safe / (1 - p1Safe)),
-          seedPower: (17 - Number(t1.seed || 16)) / 16
+      for (const team of Object.values(teamDirectory || {})) {
+        const name = String(team?.name || '').trim();
+        if (!name) continue;
+        teamIndex.set(normalizeName(name), {
+          ...team,
+          name,
+          power: safeNum(team?.power ?? team?.bt_power ?? team?.bradley_terry_power, 0),
+          seedPower: (17 - Number(team?.seed || 16)) / 16
         });
-        teamIndex.set(normalizeName(t2.name), {
-          ...t2,
-          region: m.region,
-          r64Opponent: t1.name,
-          power: Math.log(p2Safe / (1 - p2Safe)),
-          seedPower: (17 - Number(t2.seed || 16)) / 16
-        });
+      }
+      for (const m of baseMatchups || []) {
+        const t1 = m?.t1 || {};
+        const t2 = m?.t2 || {};
+        if (t1?.name) {
+          const key = normalizeName(t1.name);
+          teamIndex.set(key, {
+            ...(teamIndex.get(key) || {}),
+            ...t1,
+            name: t1.name,
+            region: m.region,
+            r64Opponent: t2?.name || null,
+            win_probability: normalizeProbability(t1?.win_probability, null)
+          });
+        }
+        if (t2?.name) {
+          const key = normalizeName(t2.name);
+          teamIndex.set(key, {
+            ...(teamIndex.get(key) || {}),
+            ...t2,
+            name: t2.name,
+            region: m.region,
+            r64Opponent: t1?.name || null,
+            win_probability: normalizeProbability(t2?.win_probability, null)
+          });
+        }
       }
     }
 
     function estimateWinProb(teamAName, teamBName) {
-      const direct = findPredictionByTeams(teamAName, teamBName);
-      if (direct) {
-        const p = normalizeProbability(direct?.model_win_prob, 0.5);
-        return normalizeName(direct?.t1_name) === normalizeName(teamAName) ? p : (1 - p);
-      }
-      const a = teamIndex.get(normalizeName(teamAName));
-      const b = teamIndex.get(normalizeName(teamBName));
-      if (!a || !b) return 0.5;
-      const diff = Number(a.power || 0) - Number(b.power || 0);
-      return 1 / (1 + Math.exp(-diff / 1.5));
+      return getLaterRoundProb(teamAName, teamBName);
     }
 
     function canonicalSeedPair(seedA, seedB) {
@@ -1961,12 +1945,6 @@
         if (!parentNode) continue;
         const [pt1, pt2] = getMatchTeams(parentNode);
         if (!pt1 || !pt2) continue;
-        if (getCachedMatchup(pt1.name, pt2.name)) continue;
-        try {
-          const data = await getMatchupForTeams(pt1.name, pt2.name);
-          if (!data) continue;
-          renderAll();
-        } catch (e) {}
       }
     }
 
@@ -2036,11 +2014,19 @@
       let metaHtml = '';
       if (validPickForNode(node)) {
         const matchMeta = node.source?.matchup_meta || {};
-        const ep = getNodeEp(node, pick);
+        const ep = (node.round === 'R64' && Number.isFinite(Number(node.source?.ep)))
+          ? Number(node.source.ep)
+          : getNodeEp(node, pick);
         const t1Prob = normalizeProbability(p1, 0.5);
         const favoredProb = Math.max(t1Prob, 1 - t1Prob);
-        const conf = getConfidenceLabel(favoredProb);
-        const upsetFlag = getDisplayFlag(matchMeta, t1Prob, t1?.seed, t2?.seed);
+        const sourceConfidence = node.source?.confidence || node.source?.confidence_label || node.source?.matchup_meta?.confidence || '';
+        const conf = node.round === 'R64' && sourceConfidence
+          ? getConfidenceBadge(sourceConfidence)
+          : getConfidenceLabel(favoredProb);
+        const upsetRaw = node.round === 'R64'
+          ? (node.source?.upset_flag || node.source?.matchup_meta?.upset_flag || node.source?.matchup_meta?.display_flag || '')
+          : getDisplayFlag(matchMeta, t1Prob, t1?.seed, t2?.seed);
+        const upsetFlag = String(upsetRaw || '').toLowerCase().replace(/\s+/g, '_');
         const upsetLabel = String(upsetFlag || '').replace(/_/g, ' ').toUpperCase();
         const showUpsetFlag = upsetFlag === 'upset_alert' || upsetFlag === 'upset_watch' || upsetFlag === 'competitive';
         metaHtml = '<div class="pick-meta ' + roundEpClass(node.round, ep) + '">' +
@@ -2288,24 +2274,43 @@
       const [t1, t2] = getMatchTeams(node);
       if (!t1 || !t2) return fallbackMeta(node);
       if (node.round === 'R64' && node.source) return node.source;
-      const tA = teamIndex.get(normalizeName(t1.name)) || {};
-      const tB = teamIndex.get(normalizeName(t2.name)) || {};
+      const tA = getTeamProfileClient(t1.name) || teamIndex.get(normalizeName(t1.name)) || {};
+      const tB = getTeamProfileClient(t2.name) || teamIndex.get(normalizeName(t2.name)) || {};
+      const pred = getLaterRoundCardData(t1.name, t2.name);
       const prob = estimateWinProb(t1.name, t2.name);
-      const pickPct1 = Number(tA.pool?.public_pick_pct);
-      const pickPct2 = Number(tB.pool?.public_pick_pct);
-      const synthetic = {
+      const predProbT1 = predictionProbForTeam(pred, t1.name);
+      const resolvedP1 = Number.isFinite(predProbT1) ? normalizeProbability(predProbT1, prob) : normalizeProbability(prob, 0.5);
+      const resolvedP2 = 1 - resolvedP1;
+      let sideA = 't1';
+      if (pred) {
+        const predT2 = normalizeName(pred?.t2_name);
+        const t1Norm = normalizeName(t1.name);
+        const t1Kaggle = normalizeName(tA?.kaggle_name || '');
+        if (predT2 && (t1Norm === predT2 || (t1Kaggle && t1Kaggle === predT2))) sideA = 't2';
+      }
+      const sideB = sideA === 't1' ? 't2' : 't1';
+      const predProfileA = pred?.[sideA + '_profile'] || {};
+      const predProfileB = pred?.[sideB + '_profile'] || {};
+      const syntheticMeta = buildSyntheticMeta(t1, t2, resolvedP1, tA, tB, node);
+      const upsetToken = String(pred?.upset_flag || syntheticMeta.display_flag || 'chalk').toLowerCase().replace(/\s+/g, '_');
+      const pickPct1 = Number(tA?.pool?.public_pick_pct ?? predProfileA?.pool?.public_pick_pct);
+      const pickPct2 = Number(tB?.pool?.public_pick_pct ?? predProfileB?.pool?.public_pick_pct);
+      const result = {
         matchup_id: node.id,
         round: node.round,
         region: node.region,
         t1: {
           ...tA,
           ...t1,
-          win_probability: prob,
-          archetypes: tA.archetypes || t1.archetypes || [],
-          archetype_icons: tA.archetype_icons || t1.archetype_icons || '',
-          key_players: tA.key_players || t1.key_players || [],
-          primary_comp: tA.primary_comp || t1.primary_comp || null,
-          pool: tA.pool || t1.pool || {
+          win_probability: resolvedP1,
+          archetype: t1?.archetype || pred?.[sideA + '_archetype'] || tA?.archetype || 'Unknown',
+          key_players: t1?.key_players || predProfileA?.key_players || tA?.key_players || [],
+          historical_comp: t1?.historical_comp || pred?.[sideA + '_historical_comp'] || pred?.[sideA + '_topComp'] || tA?.historical_comp || null,
+          topComp: t1?.topComp || pred?.[sideA + '_topComp'] || pred?.[sideA + '_historical_comp'] || tA?.historical_comp || null,
+          strengths: t1?.strengths || predProfileA?.strengths || tA?.strengths || [],
+          weaknesses: t1?.weaknesses || predProfileA?.weaknesses || tA?.weaknesses || [],
+          momentum: t1?.momentum || predProfileA?.momentum || tA?.momentum || null,
+          pool: t1?.pool || predProfileA?.pool || tA?.pool || {
             public_pick_pct: Number.isFinite(pickPct1) ? pickPct1 : null,
             public_pick_pct_source: 'projected'
           },
@@ -2314,57 +2319,50 @@
         t2: {
           ...tB,
           ...t2,
-          win_probability: 1 - prob,
-          archetypes: tB.archetypes || t2.archetypes || [],
-          archetype_icons: tB.archetype_icons || t2.archetype_icons || '',
-          key_players: tB.key_players || t2.key_players || [],
-          primary_comp: tB.primary_comp || t2.primary_comp || null,
-          pool: tB.pool || t2.pool || {
+          win_probability: resolvedP2,
+          archetype: t2?.archetype || pred?.[sideB + '_archetype'] || tB?.archetype || 'Unknown',
+          key_players: t2?.key_players || predProfileB?.key_players || tB?.key_players || [],
+          historical_comp: t2?.historical_comp || pred?.[sideB + '_historical_comp'] || pred?.[sideB + '_topComp'] || tB?.historical_comp || null,
+          topComp: t2?.topComp || pred?.[sideB + '_topComp'] || pred?.[sideB + '_historical_comp'] || tB?.historical_comp || null,
+          strengths: t2?.strengths || predProfileB?.strengths || tB?.strengths || [],
+          weaknesses: t2?.weaknesses || predProfileB?.weaknesses || tB?.weaknesses || [],
+          momentum: t2?.momentum || predProfileB?.momentum || tB?.momentum || null,
+          pool: t2?.pool || predProfileB?.pool || tB?.pool || {
             public_pick_pct: Number.isFinite(pickPct2) ? pickPct2 : null,
             public_pick_pct_source: 'projected'
           },
           color_primary: tB.color_primary || t2.color_primary || 'var(--text-muted)'
         },
-        matchup_meta: buildSyntheticMeta(t1, t2, prob, tA, tB, node)
+        prediction: pred || null,
+        ep: Number((Math.max(resolvedP1, resolvedP2) * (roundPoints[node.round] || 10)).toFixed(1)),
+        confidence: pred?.confidence || pred?.confidence_tier || confidenceTierFromProb(resolvedP1),
+        upset_flag: upsetToken,
+        matchup_meta: {
+          ...syntheticMeta,
+          confidence: pred?.confidence || pred?.confidence_tier || syntheticMeta.confidence,
+          display_flag: upsetToken || syntheticMeta.display_flag,
+          upset_flag: upsetToken || syntheticMeta.upset_flag,
+          predicted_winner: pred?.predicted_winner_name || syntheticMeta.predicted_winner,
+          archetype_matchup: pred?.archetype_matchup || null,
+          key_factors: pred?.key_factors || null,
+          kenpom: pred?.kenpom_matchup || pred?.kenpom || null,
+          form_and_risk: pred?.form_and_risk || null,
+          chatbot_responses: pred?.chatbot_responses || syntheticMeta.responses,
+          seed_matchup: pred?.historical_seed_matchup || syntheticMeta.seed_matchup,
+          pool_meta: {
+            ...(syntheticMeta.pool_meta || {}),
+            leverage_delta: Number.isFinite(Number(pred?.value_score)) ? Number(pred.value_score) : null,
+            contrarian_flag: Number(pred?.value_score || 0) > 0.03,
+            points_this_round: roundPoints[node.round] || 1
+          },
+          risk: pred?.form_and_risk?.matchup_risk_note
+            ? { tier: syntheticMeta?.risk?.tier || 'medium', reason: pred.form_and_risk.matchup_risk_note }
+            : syntheticMeta.risk,
+          chatbot_prompt: 'Compare ' + t1.name + ' vs ' + t2.name + ' in the ' + getRoundTitle(node.round).split(' (')[0],
+          responses: pred?.chatbot_responses || syntheticMeta.responses
+        }
       };
-      try {
-        const m = await getMatchupForTeams(t1.name, t2.name);
-        if (!m) return synthetic;
-        const mT1Name = normalizeName(m?.t1?.name);
-        const mT2Name = normalizeName(m?.t2?.name);
-        const wantedT1 = normalizeName(t1.name);
-        const wantedT2 = normalizeName(t2.name);
-        const apiT1 = mT1Name === wantedT1 ? m?.t1 : (mT2Name === wantedT1 ? m?.t2 : null);
-        const apiT2 = mT1Name === wantedT2 ? m?.t1 : (mT2Name === wantedT2 ? m?.t2 : null);
-        const p1 = toProb(apiT1?.win_probability, null);
-        const p2 = toProb(apiT2?.win_probability, null);
-        const resolvedP1 = Number.isFinite(p1) ? p1 : (Number.isFinite(p2) ? (1 - p2) : normalizeProbability(prob, 0.5));
-        const resolvedP2 = Number.isFinite(p2) ? p2 : (1 - resolvedP1);
-        return {
-          ...synthetic,
-          matchup_id: m?.matchup_id || synthetic.matchup_id,
-          t1: {
-            ...(synthetic.t1 || t1),
-            ...(apiT1 || {}),
-            name: t1.name,
-            seed: apiT1?.seed ?? t1.seed,
-            win_probability: resolvedP1
-          },
-          t2: {
-            ...(synthetic.t2 || t2),
-            ...(apiT2 || {}),
-            name: t2.name,
-            seed: apiT2?.seed ?? t2.seed,
-            win_probability: resolvedP2
-          },
-          matchup_meta: {
-            ...(synthetic.matchup_meta || {}),
-            ...(m?.matchup_meta || {})
-          }
-        };
-      } catch (e) {
-        return synthetic;
-      }
+      return result;
     }
 
     function applyMobileRoundVisibility() {
@@ -2468,6 +2466,7 @@
     function renderCard(data, node) {
       const card = document.getElementById('card');
       if (!card) return;
+      const pred = data?.prediction || null;
       const meta = data.matchup_meta || {};
       const t1 = data.t1 || {};
       const t2 = data.t2 || {};
@@ -2479,13 +2478,14 @@
       const t1DisplayName = getDisplayName(t1.name || 'TBD');
       const t2DisplayName = getDisplayName(t2.name || 'TBD');
       const modelIsT1 = modelName && modelName === t1.name;
-      const confidence = getConfidenceLabel(Math.max(t1p, t2p));
+      const confidenceSource = data?.confidence || data?.confidence_label || pred?.confidence_tier || meta?.confidence || '';
+      const confidence = confidenceSource ? getConfidenceBadge(confidenceSource) : getConfidenceLabel(Math.max(t1p, t2p));
       const displayFlag = getDisplayFlag(meta, t1p, t1?.seed, t2?.seed);
-      const metaFlag = String(meta.display_flag || meta.upset_flag || '').toLowerCase();
+      const metaFlag = String(data?.upset_flag || pred?.upset_flag || meta.display_flag || meta.upset_flag || '').toLowerCase().replace(/\s+/g, '_');
       const resolvedFlag = (metaFlag && metaFlag !== 'chalk' && badgeClass(metaFlag) !== 'chalk') ? metaFlag : displayFlag;
       const flagLabel = String(resolvedFlag || 'chalk').replace(/_/g, ' ').toUpperCase();
       const matchupPrompt = String(meta.chatbot_prompt || ('Compare ' + (t1.name || 'Team A') + ' vs ' + (t2.name || 'Team B') + ' in the ' + getRoundTitle(node.round).split(' (')[0]));
-      const responses = meta.chatbot_responses || meta.responses || {};
+      const responses = pred?.chatbot_responses || meta.chatbot_responses || meta.responses || {};
       const blurbParts = [
         responses.quick,
         responses.value,
@@ -2499,10 +2499,13 @@
         ? blurbParts.join('\n\n')
         : (meta?.risk?.reason || meta?.form_and_risk?.matchup_risk_note || 'Model analysis unavailable for this matchup.');
 
-      const archetypeMatchup = meta.archetype_matchup || meta.archetype_h2h || null;
-      const keyFactors = meta.key_factors || null;
-      const kenpom = meta.kenpom || null;
-      const formRisk = meta.form_and_risk || null;
+      const archetypeMatchup = pred?.archetype_matchup || meta.archetype_matchup || meta.archetype_h2h || null;
+      const keyFactors = pred?.key_factors || meta.key_factors || null;
+      const kenpom = pred?.kenpom_matchup || pred?.kenpom || meta.kenpom || null;
+      const formRisk = pred?.form_and_risk || meta.form_and_risk || {
+        t1_momentum: t1?.momentum || null,
+        t2_momentum: t2?.momentum || null
+      };
       const risk = riskBadge(meta?.risk?.tier || (formRisk?.matchup_risk_note ? 'medium' : 'low'));
 
       const toPct = (v) => {
@@ -2519,8 +2522,8 @@
       const pub1 = toPct(t1?.pool?.public_pick_pct);
       const pub2 = toPct(t2?.pool?.public_pick_pct);
       const leverage = meta?.pool_meta?.leverage_delta;
-      const compA = t1.topComp || t1.primary_comp || null;
-      const compB = t2.topComp || t2.primary_comp || null;
+      const compA = t1.historical_comp || t1.topComp || t1.primary_comp || null;
+      const compB = t2.historical_comp || t2.topComp || t2.primary_comp || null;
       const escPickA = String(t1?.name || '').replace(/'/g, "\\'");
       const escPickB = String(t2?.name || '').replace(/'/g, "\\'");
       const askHref = '/?q=' + encodeURIComponent(matchupPrompt);
@@ -2536,6 +2539,10 @@
             '<span class="player-note">' + escHtml(p?.note || '') + '</span></div>';
         }).join('');
       };
+      const strengthsA = Array.isArray(t1?.strengths) && t1.strengths.length ? t1.strengths.join(', ') : 'N/A';
+      const weaknessesA = Array.isArray(t1?.weaknesses) && t1.weaknesses.length ? t1.weaknesses.join(', ') : 'N/A';
+      const strengthsB = Array.isArray(t2?.strengths) && t2.strengths.length ? t2.strengths.join(', ') : 'N/A';
+      const weaknessesB = Array.isArray(t2?.weaknesses) && t2.weaknesses.length ? t2.weaknesses.join(', ') : 'N/A';
 
       card.innerHTML =
         '<div class="card-head">' +
@@ -2594,6 +2601,10 @@
           '</span></div>' +
           compLine(t1DisplayName || 'Team A', compA) +
           compLine(t2DisplayName || 'Team B', compB) +
+          '<div class="data-row"><span class="data-label">' + escHtml(t1DisplayName || 'Team A') + ' Strengths</span><span class="data-value">' + escHtml(strengthsA) + '</span></div>' +
+          '<div class="data-row"><span class="data-label">' + escHtml(t1DisplayName || 'Team A') + ' Weaknesses</span><span class="data-value">' + escHtml(weaknessesA) + '</span></div>' +
+          '<div class="data-row"><span class="data-label">' + escHtml(t2DisplayName || 'Team B') + ' Strengths</span><span class="data-value">' + escHtml(strengthsB) + '</span></div>' +
+          '<div class="data-row"><span class="data-label">' + escHtml(t2DisplayName || 'Team B') + ' Weaknesses</span><span class="data-value">' + escHtml(weaknessesB) + '</span></div>' +
           '<div class="data-row"><span class="data-label">' + escHtml(t1DisplayName || 'Team A') + ' Players</span><span class="data-value"></span></div>' +
           playersFor(t1) +
           '<div class="data-row"><span class="data-label">' + escHtml(t2DisplayName || 'Team B') + ' Players</span><span class="data-value"></span></div>' +
@@ -2686,11 +2697,34 @@
     }
 
     function updateStrategyBar() {
+      const fallback = buildOptimizerStrategies();
       for (const key of strategyKeys) {
-        const ep = safeNum(strategyMap[key]?.total_ep, 0);
+        const live = Number(strategyMap[key]?.total_ep);
+        const ep = Number.isFinite(live) ? live : safeNum(fallback[key], 0);
         const el = document.getElementById('ep-' + key);
-        if (el) el.textContent = (ep ? ep.toFixed(0) : '--') + ' EP';
+        if (el) el.textContent = ep.toFixed(1) + ' EP';
       }
+    }
+
+    function buildOptimizerStrategies() {
+      let chalkEP = 0;
+      let balancedEP = 0;
+      let upsetEP = 0;
+      for (const m of (matchups || [])) {
+        const pts = Number(espnScoring?.[m?.round] || roundPoints[m?.round] || 10);
+        const t1p = normalizeProbability(m?.t1?.win_probability, 0.5);
+        const t2p = normalizeProbability(m?.t2?.win_probability, 1 - t1p);
+        const chalkPick = Math.max(t1p, t2p);
+        chalkEP += chalkPick * pts;
+        balancedEP += chalkPick * pts;
+        const valueScore = safeNum(m?.prediction?.value_score, 0);
+        upsetEP += (valueScore < -0.05 ? Math.min(t1p, t2p) : chalkPick) * pts;
+      }
+      return {
+        chalk: Number(chalkEP.toFixed(1)),
+        balanced: Number(balancedEP.toFixed(1)),
+        upset: Number(upsetEP.toFixed(1))
+      };
     }
 
     function findStrategyNode(roundKey, entry, assigned) {
@@ -2739,6 +2773,15 @@
         }
       } catch (e) {}
       if (!strategyData) return;
+      if (!strategyData?.rounds || !Object.keys(strategyData.rounds).length) {
+        const fallback = optimizeBracket(key);
+        bracketState.picks = fallback.picks;
+        activeStrategy = key;
+        bracketState.activeStrategy = key;
+        saveState();
+        renderAll();
+        return;
+      }
       activeStrategy = key;
       strategyBaselinePicks = {};
       strategyEpByNode = {};
@@ -2878,29 +2921,11 @@
             bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
             continue;
           }
-          try {
-            const data = await getMatchupForTeams(t1.name, t2.name);
-            if (data) {
-              const d1key = normalizeName(data?.t1?.name);
-              const p1 = d1key === normalizeName(t1.name)
-                ? normalizeProbability(data?.t1?.win_probability, 0.5)
-                : normalizeProbability(data?.t2?.win_probability, 0.5);
-              bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
-            } else {
-              const est = Number(estimateWinProb(t1.name, t2.name));
-              if (Number.isFinite(est)) {
-                bracketState.picks[node.id] = est >= 0.5 ? t1.name : t2.name;
-              } else {
-                bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
-              }
-            }
-          } catch (e) {
-            const est = Number(estimateWinProb(t1.name, t2.name));
-            if (Number.isFinite(est)) {
-              bracketState.picks[node.id] = est >= 0.5 ? t1.name : t2.name;
-            } else {
-              bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
-            }
+          const est = Number(estimateWinProb(t1.name, t2.name));
+          if (Number.isFinite(est)) {
+            bracketState.picks[node.id] = est >= 0.5 ? t1.name : t2.name;
+          } else {
+            bracketState.picks[node.id] = Number(t1.seed || 99) <= Number(t2.seed || 99) ? t1.name : t2.name;
           }
         }
       }
@@ -2929,43 +2954,12 @@
     async function init() {
       showLoading();
       clearError();
-      let bracketHint = '';
       try {
-        await loadBracketData();
-        const [rBracket, rOutput] = await Promise.all([
-          fetch('/api/bracket'),
-          fetch('/api/bracket-output').catch(() => null),
-        ]);
-        let data = null;
-        if (rBracket && rBracket.ok) {
-          const raw = await rBracket.json();
-          data = normalizeBracketPayload(raw);
-        } else if (rBracket) {
-          const err = await rBracket.json().catch(() => ({}));
-          bracketHint = String(err?.hint || err?.error || '').trim();
+        const data = await loadBracketData();
+        if (!data || !Array.isArray(matchups) || matchups.length === 0) {
+          throw new Error('Bracket data not loaded. Check admin panel.');
         }
-        if (!Array.isArray(data?.matchups) || data.matchups.length === 0) {
-          try {
-            const bootstrapRes = await fetch('/api/bracket/bootstrap');
-            if (bootstrapRes.ok) {
-              const bootstrapData = await bootstrapRes.json();
-              const normalizedBootstrap = normalizeBracketPayload(bootstrapData);
-              if (Array.isArray(normalizedBootstrap?.matchups) && normalizedBootstrap.matchups.length) {
-                data = normalizedBootstrap;
-              }
-            } else {
-              const bootErr = await bootstrapRes.json().catch(() => ({}));
-              if (!bracketHint) bracketHint = String(bootErr?.hint || bootErr?.error || '').trim();
-            }
-          } catch (e) {}
-        }
-        if (!Array.isArray(data?.matchups) || data.matchups.length === 0) {
-          const fallbackData = await loadBracketFromUploadedJson();
-          if (fallbackData) data = normalizeBracketPayload(fallbackData);
-        }
-        if (!data || !Array.isArray(data.matchups) || data.matchups.length === 0) {
-          throw new Error(bracketHint || 'Could not load bracket data');
-        }
+        const rOutput = await fetch('/api/bracket-output').catch(() => null);
         if (rOutput && rOutput.ok) {
           bracketOutput = await rOutput.json();
           strategyMap = bracketOutput.strategies || {};
@@ -2979,23 +2973,24 @@
           teamEpRankings = {};
           championProbs = {};
         }
-        window._teamDir = data.teamDirectory || data.team_directory || {};
-        window._seedHistory = data.seedMatchupHistory || data.seed_matchup_all_rounds || {};
-        window._archetypeMatrix = data.archetypeMatrix || data.archetype_matchup_matrix || {};
-        window._espnScoring = data.espnScoring || data.espn_scoring || {};
-        applyEspnScoringMap(window._espnScoring);
-        allPredictions = Array.isArray(data.all_predictions) ? data.all_predictions
-          : (Array.isArray(data.predictions) ? data.predictions : allPredictions);
-        buildPredictionIndex();
-        const regionFromMatchups = Array.isArray(data.matchups)
-          ? Array.from(new Set(data.matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)))
+        const fallbackTotals = buildOptimizerStrategies();
+        for (const key of strategyKeys) {
+          if (!strategyMap[key]) strategyMap[key] = {};
+          const existing = Number(strategyMap[key]?.total_ep);
+          strategyMap[key].total_ep = Number.isFinite(existing) ? existing : safeNum(fallbackTotals[key], 0);
+        }
+        window._teamDir = teamDirectory;
+        window._seedHistory = seedHistory;
+        window._archetypeMatrix = archetypeMatrix;
+        window._espnScoring = espnScoring;
+        window._displayNames = displayNames;
+        const regionFromMatchups = Array.isArray(matchups)
+          ? Array.from(new Set(matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)))
           : [];
         if (Array.isArray(data.regions) && data.regions.length) {
           regions = data.regions.map((r) => String(r || '').trim()).filter(Boolean);
-        } else if (regionFromMatchups.length >= 2) {
+        } else if (regionFromMatchups.length) {
           regions = regionFromMatchups;
-        } else if (data.regions && !Array.isArray(data.regions) && typeof data.regions === 'object') {
-          regions = Object.keys(data.regions).map((r) => String(r || '').trim()).filter(Boolean);
         } else {
           regions = ['South', 'East', 'West', 'Midwest'];
         }
@@ -3010,11 +3005,11 @@
           finalFourPairings = defaultFinalFourPairings.slice();
         }
         window._f4Pairings = finalFourPairings;
-        baseMatchups = Array.isArray(data.matchups) ? data.matchups : [];
+        baseMatchups = Array.isArray(matchups) ? matchups.slice() : [];
         if (baseMatchups.length === 0) {
           document.getElementById('regions').innerHTML = '';
           document.getElementById('finals').innerHTML = '';
-          showError(bracketHint || 'No bracket data loaded from API or uploaded bracket JSON. Verify backend/data/bracket_2025.json and backend/data/chatbot_predictions_v5.json are present.');
+          showError('No bracket data loaded. Upload bracket_ready_2025.json in admin.');
           return;
         }
         const byRegion = {};
@@ -3033,8 +3028,9 @@
         buildTree(byRegion, regions);
         updateStrategyBar();
         renderOptimizer();
-        if (strategyKeys.includes(String(bracketState.activeStrategy || '').toLowerCase()) && strategyMap[String(bracketState.activeStrategy || '').toLowerCase()]) {
-          await applyStrategy(String(bracketState.activeStrategy || '').toLowerCase());
+        const activeKey = String(bracketState.activeStrategy || '').toLowerCase();
+        if (strategyKeys.includes(activeKey) && strategyMap[activeKey]?.rounds && Object.keys(strategyMap[activeKey].rounds).length) {
+          await applyStrategy(activeKey);
         }
         saveState();
         renderAll();
