@@ -937,6 +937,7 @@
 
     let baseMatchups = [];
     let bracketData = null;
+    let allPredictions = [];
     let matchupById = new Map();
     let nodesById = new Map();
     let parentMap = new Map();
@@ -945,6 +946,7 @@
     let matchupCache = new Map();
     const bracketTeamIdByName = new Map();
     const teamIndex = new Map();
+    const predictionsByNames = new Map();
     let finalFourPairings = defaultFinalFourPairings.slice();
     let mobileRound = 'R64';
     let bracketOutput = null;
@@ -971,7 +973,20 @@
     };
 
     function normalizeName(v) {
-      return String(v || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+      const cleaned = String(v || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+      const aliases = {
+        'ole miss': 'mississippi',
+        'uconn': 'connecticut',
+        'saint marys': 'st marys ca',
+        'mount st marys': 'mt st marys',
+        'omaha': 'ne omaha',
+        'siu edwardsville': 'siue',
+        'uncw': 'unc wilmington',
+        'colorado state': 'colorado st',
+        'norfolk state': 'norfolk st',
+        'utah state': 'utah st'
+      };
+      return aliases[cleaned] || cleaned;
     }
     function normalizeRegionName(v) {
       return String(v || '').toLowerCase().replace(/[^a-z]/g, '');
@@ -981,6 +996,8 @@
       return DISPLAY_NAMES[name] || name;
     }
     function normalizeProbability(v, fallback = 0) {
+      if (v == null) return fallback;
+      if (typeof v === 'string' && v.trim() === '') return fallback;
       const n = Number(v);
       if (!Number.isFinite(n)) return fallback;
       if (n <= 1) return Math.max(0, Math.min(1, n));
@@ -1166,6 +1183,16 @@
       return (names[roundKey] || roundKey) + ' (' + (roundPoints[roundKey] || 0) + ' pts)';
     }
 
+    function applyEspnScoringMap(map) {
+      const scoring = map || {};
+      roundPoints.R64 = safeNum(scoring.R64 ?? scoring.r64 ?? scoring[1], roundPoints.R64);
+      roundPoints.R32 = safeNum(scoring.R32 ?? scoring.r32 ?? scoring[2], roundPoints.R32);
+      roundPoints.S16 = safeNum(scoring.S16 ?? scoring.s16 ?? scoring[3], roundPoints.S16);
+      roundPoints.E8 = safeNum(scoring.E8 ?? scoring.e8 ?? scoring[4], roundPoints.E8);
+      roundPoints.F4 = safeNum(scoring.F4 ?? scoring.f4 ?? scoring[5], roundPoints.F4);
+      roundPoints.NCG = safeNum(scoring.NCG ?? scoring.Championship ?? scoring.championship ?? scoring[6], roundPoints.NCG);
+    }
+
     function safeNum(v, fallback) {
       const n = Number(v);
       return Number.isFinite(n) ? n : (fallback || 0);
@@ -1298,11 +1325,29 @@
       }
     }
 
+    function buildPredictionIndex() {
+      predictionsByNames.clear();
+      for (const p of (allPredictions || [])) {
+        const a = normalizeName(p?.t1_name);
+        const b = normalizeName(p?.t2_name);
+        if (!a || !b) continue;
+        predictionsByNames.set(a + '|' + b, p);
+        predictionsByNames.set(b + '|' + a, p);
+      }
+    }
+
+    function findPredictionByTeams(teamAName, teamBName) {
+      const key = normalizeName(teamAName) + '|' + normalizeName(teamBName);
+      return predictionsByNames.get(key) || null;
+    }
+
     async function loadBracketData() {
       try {
         const res = await fetch('/api/bracket-cache');
         if (!res.ok) return null;
         bracketData = await res.json();
+        allPredictions = Array.isArray(bracketData?.predictions) ? bracketData.predictions : [];
+        buildPredictionIndex();
         indexBracketTeamDirectory();
         return bracketData;
       } catch (e) {
@@ -1367,6 +1412,7 @@
         slot: Number.isFinite(inferredSlot) ? inferredSlot : (idx % 8),
         game_number: gameNo,
         t1: {
+          ...(t1 || {}),
           team_id: t1?.team_id ?? t1?.id ?? null,
           name: String(t1?.name || 'TBD'),
           seed: Number.isFinite(Number(t1?.seed)) ? Number(t1.seed) : null,
@@ -1376,6 +1422,7 @@
           color_primary: t1?.color_primary || null
         },
         t2: {
+          ...(t2 || {}),
           team_id: t2?.team_id ?? t2?.id ?? null,
           name: String(t2?.name || 'TBD'),
           seed: Number.isFinite(Number(t2?.seed)) ? Number(t2.seed) : null,
@@ -1389,7 +1436,11 @@
           upset_flag: String(m?.matchup_meta?.upset_flag || m?.matchup_meta?.display_flag || m?.upset_flag || 'chalk'),
           display_flag: String(m?.matchup_meta?.display_flag || m?.matchup_meta?.upset_flag || m?.upset_flag || 'chalk'),
           confidence: String(m?.matchup_meta?.confidence || m?.confidence || 'projected')
-        }
+        },
+        prediction: m?.prediction || null,
+        ep: Number(m?.ep),
+        confidence_label: String(m?.confidence_label || ''),
+        upset_label: String(m?.upset_label || '')
       };
     }
 
@@ -1549,13 +1600,35 @@
       return bracketData?.team_directory?.[String(teamId)] || null;
     }
 
+    function getTeamProfileClient(teamName) {
+      const teams = Object.values(bracketData?.team_directory || {});
+      const exact = teams.find((t) => normalizeName(t?.name) === normalizeName(teamName));
+      if (exact) return exact;
+      const target = normalizeName(teamName);
+      return teams.find((t) => {
+        const n = normalizeName(t?.name);
+        return n && (n.includes(target) || target.includes(n));
+      }) || null;
+    }
+
+    function confidenceTierFromProb(prob) {
+      const p = normalizeProbability(prob, 0.5);
+      const top = Math.max(p, 1 - p);
+      if (top >= 0.95) return 'LOCK';
+      if (top >= 0.80) return 'CONFIDENT';
+      if (top >= 0.65) return 'LEAN';
+      if (top >= 0.55) return 'SLIGHT EDGE';
+      return 'TOSS-UP';
+    }
+
     async function getMatchup(t1Id, t2Id) {
       const t1 = String(t1Id);
       const t2 = String(t2Id);
       const lookup = bracketData?.bracket_lookup || {};
       const idx = lookup[t1]?.[t2] ?? lookup[t2]?.[t1];
-      if (idx !== undefined && Array.isArray(bracketData?.predictions)) {
-        return bracketData.predictions[idx];
+      const numericIdx = Number(idx);
+      if (Number.isInteger(numericIdx) && numericIdx >= 0 && Array.isArray(bracketData?.predictions) && bracketData.predictions[numericIdx]) {
+        return bracketData.predictions[numericIdx];
       }
       const res = await fetch('/api/matchup?t1=' + encodeURIComponent(t1) + '&t2=' + encodeURIComponent(t2));
       return res.ok ? await res.json() : null;
@@ -1573,14 +1646,52 @@
       const bSeed = aligned ? prediction.t2_seed : prediction.t1_seed;
       const aProb = aligned ? modelProb : (1 - modelProb);
       const bProb = 1 - aProb;
+      const profileA = getTeamProfileClient(teamAName) || {};
+      const profileB = getTeamProfileClient(teamBName) || {};
+      const sideA = aligned ? 't1' : 't2';
+      const sideB = aligned ? 't2' : 't1';
+      const predProfileA = prediction?.[sideA + '_profile'] || {};
+      const predProfileB = prediction?.[sideB + '_profile'] || {};
+      const predTopCompA = prediction?.[sideA + '_topComp'] || prediction?.[sideA + '_historical_comp'] || null;
+      const predTopCompB = prediction?.[sideB + '_topComp'] || prediction?.[sideB + '_historical_comp'] || null;
+      const upsetComputed = getUpsetFlag(aSeed, bSeed, aProb);
+      const upsetToken = String(prediction.upset_flag || '').trim().toLowerCase().replace(/\s+/g, '_') || upsetComputed || 'chalk';
       return {
-        t1: { name: teamAName, seed: aSeed, win_probability: aProb },
-        t2: { name: teamBName, seed: bSeed, win_probability: bProb },
+        t1: {
+          ...profileA,
+          name: teamAName,
+          seed: aSeed,
+          win_probability: aProb,
+          archetype: profileA?.archetype || prediction?.[sideA + '_archetype'] || 'Unknown',
+          key_players: predProfileA?.key_players || profileA?.key_players || [],
+          topComp: predTopCompA || profileA?.historical_comp || null,
+          pool: predProfileA?.pool || profileA?.pool || null
+        },
+        t2: {
+          ...profileB,
+          name: teamBName,
+          seed: bSeed,
+          win_probability: bProb,
+          archetype: profileB?.archetype || prediction?.[sideB + '_archetype'] || 'Unknown',
+          key_players: predProfileB?.key_players || profileB?.key_players || [],
+          topComp: predTopCompB || profileB?.historical_comp || null,
+          pool: predProfileB?.pool || profileB?.pool || null
+        },
         matchup_meta: {
-          predicted_winner: prediction.predicted_winner_name || '',
-          upset_flag: prediction.upset_flag || 'chalk',
-          display_flag: prediction.upset_flag || 'chalk',
-          confidence: prediction.confidence || null
+          predicted_winner: prediction.predicted_winner_name || (aProb >= 0.5 ? teamAName : teamBName),
+          upset_flag: upsetToken,
+          display_flag: upsetToken,
+          confidence: confidenceTierFromProb(aProb),
+          archetype_matchup: prediction.archetype_matchup || null,
+          key_factors: prediction.key_factors || null,
+          kenpom: prediction.kenpom || null,
+          form_and_risk: prediction.form_and_risk || null,
+          chatbot_responses: prediction.chatbot_responses || null,
+          seed_matchup: prediction.historical_seed_matchup || null,
+          pool_meta: {
+            leverage_delta: Number.isFinite(Number(prediction.value_score)) ? Number(prediction.value_score) : null,
+            contrarian_flag: Number(prediction.value_score || 0) > 0.03
+          }
         }
       };
     }
@@ -1588,6 +1699,14 @@
     async function getMatchupForTeams(teamAName, teamBName) {
       const cached = getCachedMatchup(teamAName, teamBName);
       if (cached) return cached;
+      const pred = findPredictionByTeams(teamAName, teamBName);
+      if (pred) {
+        const shapedPred = toLegacyMatchupShape(pred, teamAName, teamBName);
+        if (shapedPred) {
+          setCachedMatchup(teamAName, teamBName, shapedPred);
+          return shapedPred;
+        }
+      }
       const idA = bracketTeamIdByName.get(normalizeName(teamAName));
       const idB = bracketTeamIdByName.get(normalizeName(teamBName));
       if (idA && idB) {
@@ -1610,45 +1729,43 @@
     }
 
     function buildTeamIndex() {
-      const seedBaseline = {
-        1: 28, 2: 23, 3: 20, 4: 17, 5: 15, 6: 13, 7: 11, 8: 9,
-        9: 7, 10: 5, 11: 4, 12: 2, 13: -1, 14: -4, 15: -8, 16: -14
-      };
       teamIndex.clear();
       for (const m of baseMatchups) {
         const t1 = m?.t1;
         const t2 = m?.t2;
         if (!t1?.name || !t2?.name) continue;
+        const p1 = normalizeProbability(t1?.win_probability, 0.5);
+        const p2 = normalizeProbability(t2?.win_probability, 1 - p1);
+        const p1Safe = Math.max(0.001, Math.min(0.999, p1));
+        const p2Safe = Math.max(0.001, Math.min(0.999, p2));
         teamIndex.set(normalizeName(t1.name), {
           ...t1,
           region: m.region,
           r64Opponent: t2.name,
-          r64Margin: Number.isFinite(Number(t1.predicted_margin)) ? Number(t1.predicted_margin) : 0
+          power: Math.log(p1Safe / (1 - p1Safe)),
+          seedPower: (17 - Number(t1.seed || 16)) / 16
         });
         teamIndex.set(normalizeName(t2.name), {
           ...t2,
           region: m.region,
           r64Opponent: t1.name,
-          r64Margin: Number.isFinite(Number(t2.predicted_margin)) ? Number(t2.predicted_margin) : 0
+          power: Math.log(p2Safe / (1 - p2Safe)),
+          seedPower: (17 - Number(t2.seed || 16)) / 16
         });
-      }
-      for (const team of teamIndex.values()) {
-        const opp = teamIndex.get(normalizeName(team.r64Opponent));
-        const oppSeed = Number(opp?.seed) || 16;
-        const oppBase = Number(seedBaseline[oppSeed] ?? -14);
-        const ownSeed = Number(team.seed) || 16;
-        const ownBase = Number(seedBaseline[ownSeed] ?? 0);
-        const marginPower = oppBase + Number(team.r64Margin || 0);
-        team.power = Number.isFinite(marginPower) ? marginPower : ownBase;
       }
     }
 
     function estimateWinProb(teamAName, teamBName) {
+      const direct = findPredictionByTeams(teamAName, teamBName);
+      if (direct) {
+        const p = normalizeProbability(direct?.model_win_prob, 0.5);
+        return normalizeName(direct?.t1_name) === normalizeName(teamAName) ? p : (1 - p);
+      }
       const a = teamIndex.get(normalizeName(teamAName));
       const b = teamIndex.get(normalizeName(teamBName));
       if (!a || !b) return 0.5;
       const diff = Number(a.power || 0) - Number(b.power || 0);
-      return 1 / (1 + Math.pow(10, -diff / 11));
+      return 1 / (1 + Math.exp(-diff / 1.5));
     }
 
     function canonicalSeedPair(seedA, seedB) {
@@ -2469,8 +2586,10 @@
           '</span></div>' +
           '<div class="data-row"><span class="data-label">KenPom</span><span class="data-value">' +
             (kenpom
-              ? (escHtml((t1.name || 'T1') + ': O ' + Number(kenpom.t1_ortg || 0).toFixed(1) + ' D ' + Number(kenpom.t1_drtg || 0).toFixed(1) +
-                ' | ' + (t2.name || 'T2') + ': O ' + Number(kenpom.t2_ortg || 0).toFixed(1) + ' D ' + Number(kenpom.t2_drtg || 0).toFixed(1)))
+              ? (escHtml((t1.name || 'T1') + ': O ' + Number(kenpom.t1_ortg ?? kenpom.t1_adj_oe ?? 0).toFixed(1) +
+                ' D ' + Number(kenpom.t1_drtg ?? kenpom.t1_adj_de ?? 0).toFixed(1) +
+                ' | ' + (t2.name || 'T2') + ': O ' + Number(kenpom.t2_ortg ?? kenpom.t2_adj_oe ?? 0).toFixed(1) +
+                ' D ' + Number(kenpom.t2_drtg ?? kenpom.t2_adj_de ?? 0).toFixed(1)))
               : 'No KenPom matchup metrics') +
           '</span></div>' +
           compLine(t1DisplayName || 'Team A', compA) +
@@ -2650,17 +2769,56 @@
       renderAll();
     }
 
+    function buildOptimizerFallback() {
+      const ranks = {};
+      const champs = {};
+      const entries = Array.from(teamIndex.values());
+      if (!entries.length) return { ranks, champs };
+      for (const team of entries) {
+        const p64 = normalizeProbability(team?.win_probability, 0.5);
+        const strength = 1 / (1 + Math.exp(-Number(team?.power || 0)));
+        const p32 = p64 * (0.35 + 0.5 * strength);
+        const p16 = p32 * (0.30 + 0.45 * strength);
+        const p8 = p16 * (0.28 + 0.42 * strength);
+        const p4 = p8 * (0.26 + 0.40 * strength);
+        const pc = p4 * (0.25 + 0.38 * strength);
+        const ep = (
+          p64 * (roundPoints.R64 || 10) +
+          p32 * (roundPoints.R32 || 20) +
+          p16 * (roundPoints.S16 || 40) +
+          p8 * (roundPoints.E8 || 80) +
+          p4 * (roundPoints.F4 || 160) +
+          pc * (roundPoints.NCG || 320)
+        );
+        ranks[team.name] = Number(ep.toFixed(1));
+      }
+      const weights = entries.map((team) => ({
+        name: team.name,
+        w: Math.exp(Number(team?.power || 0) / 2.2)
+      }));
+      const total = weights.reduce((sum, row) => sum + row.w, 0);
+      for (const row of weights) {
+        champs[row.name] = total > 0 ? row.w / total : 0;
+      }
+      return { ranks, champs };
+    }
+
     function renderOptimizer() {
       const rankEl = document.getElementById('optimizerRankings');
       const champsEl = document.getElementById('optimizerChamps');
       if (!rankEl || !champsEl) return;
+      if (!Object.keys(teamEpRankings || {}).length || !Object.keys(championProbs || {}).length) {
+        const fallback = buildOptimizerFallback();
+        if (!Object.keys(teamEpRankings || {}).length) teamEpRankings = fallback.ranks;
+        if (!Object.keys(championProbs || {}).length) championProbs = fallback.champs;
+      }
       const sortedEp = Object.entries(teamEpRankings || {}).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 20);
       rankEl.innerHTML = sortedEp.map((row, i) =>
-        '<div class="opt-row"><span>' + (i + 1) + '</span><span>' + row[0] + '</span><span>' + Number(row[1]).toFixed(1) + '</span></div>'
+        '<div class="opt-row"><span>' + (i + 1) + '</span><span>' + getDisplayName(row[0]) + '</span><span>' + Number(row[1]).toFixed(1) + '</span></div>'
       ).join('') || '<div class="tiny">No EP data loaded.</div>';
       const champs = Object.entries(championProbs || {}).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 10);
       champsEl.innerHTML = champs.map((row) =>
-        '<div class="champ-bar" style="--w:' + (Number(row[1]) * 100).toFixed(1) + '"><span>' + row[0] + '</span><span>' + (Number(row[1]) * 100).toFixed(1) + '%</span></div>'
+        '<div class="champ-bar" style="--w:' + (Number(row[1]) * 100).toFixed(1) + '"><span>' + getDisplayName(row[0]) + '</span><span>' + (Number(row[1]) * 100).toFixed(1) + '%</span></div>'
       ).join('') || '<div class="tiny">No champion probability data loaded.</div>';
     }
 
@@ -2814,12 +2972,7 @@
           teamEpRankings = bracketOutput.team_ep_rankings || {};
           championProbs = bracketOutput.bracket_structure?.champion_probs || {};
           if (bracketOutput.metadata?.scoring) {
-            roundPoints.R64 = safeNum(bracketOutput.metadata.scoring.R64, roundPoints.R64);
-            roundPoints.R32 = safeNum(bracketOutput.metadata.scoring.R32, roundPoints.R32);
-            roundPoints.S16 = safeNum(bracketOutput.metadata.scoring.S16, roundPoints.S16);
-            roundPoints.E8 = safeNum(bracketOutput.metadata.scoring.E8, roundPoints.E8);
-            roundPoints.F4 = safeNum(bracketOutput.metadata.scoring.F4, roundPoints.F4);
-            roundPoints.NCG = safeNum(bracketOutput.metadata.scoring.Championship, roundPoints.NCG);
+            applyEspnScoringMap(bracketOutput.metadata.scoring);
           }
         } else {
           strategyMap = {};
@@ -2830,6 +2983,10 @@
         window._seedHistory = data.seedMatchupHistory || data.seed_matchup_all_rounds || {};
         window._archetypeMatrix = data.archetypeMatrix || data.archetype_matchup_matrix || {};
         window._espnScoring = data.espnScoring || data.espn_scoring || {};
+        applyEspnScoringMap(window._espnScoring);
+        allPredictions = Array.isArray(data.all_predictions) ? data.all_predictions
+          : (Array.isArray(data.predictions) ? data.predictions : allPredictions);
+        buildPredictionIndex();
         const regionFromMatchups = Array.isArray(data.matchups)
           ? Array.from(new Set(data.matchups.map((m) => String(m?.region || '').trim()).filter(Boolean)))
           : [];

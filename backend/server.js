@@ -820,9 +820,9 @@ function confidenceTierFromProb(prob) {
   if (!Number.isFinite(p)) return 'TOSS-UP';
   const edge = Math.max(p, 1 - p);
   if (edge >= 0.95) return 'LOCK';
-  if (edge >= 0.85) return 'CONFIDENT';
-  if (edge >= 0.70) return 'LEAN';
-  if (edge >= 0.55) return 'SLIGHT';
+  if (edge >= 0.80) return 'CONFIDENT';
+  if (edge >= 0.65) return 'LEAN';
+  if (edge >= 0.55) return 'SLIGHT EDGE';
   return 'TOSS-UP';
 }
 
@@ -833,6 +833,27 @@ function fallbackWinProbBySeed(higherSeed, lowerSeed) {
   if (h === 1 && l === 16) return 0.99;
   const diff = Math.max(0, l - h);
   return Math.max(0.51, Math.min(0.95, 0.5 + diff * 0.03));
+}
+
+function upsetLabelFromSeeds(t1Seed, t2Seed, t1WinProb) {
+  const s1 = Number(t1Seed);
+  const s2 = Number(t2Seed);
+  if (!Number.isFinite(s1) || !Number.isFinite(s2)) return null;
+  const seedDiff = Math.abs(s1 - s2);
+  if (seedDiff <= 1) return null;
+  const p1 = Number(t1WinProb);
+  if (!Number.isFinite(p1)) return null;
+  const p2 = 1 - p1;
+  const underdogFavored = (s1 > s2 && p1 > 0.5) || (s2 > s1 && p2 > 0.5);
+  if (underdogFavored && seedDiff >= 2) return 'UPSET ALERT';
+  const favoredProb = Math.max(p1, p2);
+  if (seedDiff >= 3 && favoredProb < 0.65) return 'UPSET WATCH';
+  if (seedDiff >= 5 && favoredProb < 0.75) return 'COMPETITIVE';
+  return null;
+}
+
+function upsetFlagToken(label) {
+  return String(label || '').toLowerCase().replace(/\s+/g, '_');
 }
 
 function buildTeamDirectoryIndexes(teamDirectory) {
@@ -989,9 +1010,12 @@ function buildR64PayloadFromBracketCache() {
       const lowerProb = 1 - higherProb;
       const predictedWinner = pred?.predicted_winner_name || (higherProb >= 0.5 ? higherName : lowerName);
       const upsetFlag = String(pred?.upset_flag || '').trim();
-      const confidence = String(pred?.confidence || confidenceTierFromProb(higherProb)).toUpperCase();
+      const confidence = confidenceTierFromProb(higherProb);
       const seedHistory = cache?.seed_matchup_all_rounds?.R64?.[`${Math.min(game.hSeed, game.lSeed)}_vs_${Math.max(game.hSeed, game.lSeed)}`] || null;
       const leverageDelta = Number(pred?.value_score);
+      const upsetLabel = upsetLabelFromSeeds(game.hSeed, game.lSeed, higherProb);
+      const displayFlag = upsetFlag ? upsetFlagToken(upsetFlag) : (upsetFlagToken(upsetLabel) || (higherProb >= 0.55 ? 'chalk' : 'toss_up'));
+      const ep = Number((Math.max(higherProb, lowerProb) * Number(cache?.espn_scoring?.R64 || 10)).toFixed(1));
 
       const t1 = buildTeamPayloadFromCache({ ...higher, name: higherName, seed: game.hSeed, id: higherId }, pred, side === 't1' ? 't1' : 't2', higherProb);
       const t2 = buildTeamPayloadFromCache({ ...lower, name: lowerName, seed: game.lSeed, id: lowerId }, pred, side === 't1' ? 't2' : 't1', lowerProb);
@@ -1005,11 +1029,28 @@ function buildR64PayloadFromBracketCache() {
         game_number: Number.isFinite(slot) ? slot + 1 : null,
         t1,
         t2,
+        prediction: pred ? {
+          confidence_tier: confidence,
+          upset_flag: upsetFlag || null,
+          kenpom_matchup: pred?.kenpom || null,
+          historical_seed_matchup: pred?.historical_seed_matchup || seedHistory || null,
+          archetype_matchup: pred?.archetype_matchup || null,
+          pool_strategy: {
+            leverage_delta: Number.isFinite(leverageDelta) ? leverageDelta : null,
+            public_pick_pct_t1: Number.isFinite(Number(t1?.pool?.public_pick_pct)) ? Number(t1.pool.public_pick_pct) : null,
+            public_pick_pct_t2: Number.isFinite(Number(t2?.pool?.public_pick_pct)) ? Number(t2.pool.public_pick_pct) : null,
+          },
+          responses: pred?.chatbot_responses || null,
+          source_matchup: `${pred?.t1_name || higherName} vs ${pred?.t2_name || lowerName}`,
+        } : null,
+        ep,
+        confidence_label: confidence,
+        upset_label: upsetLabel,
         matchup_meta: {
           predicted_winner: predictedWinner,
           confidence,
-          upset_flag: upsetFlag || (higherProb >= 0.55 ? 'chalk' : 'toss_up'),
-          display_flag: upsetFlag || (higherProb >= 0.55 ? 'chalk' : 'toss_up'),
+          upset_flag: displayFlag,
+          display_flag: displayFlag,
           model_agrees_with_seed: pred?.model_agrees_with_seed ?? (higherProb >= 0.5),
           archetype_matchup: pred?.archetype_matchup || null,
           key_factors: pred?.key_factors || null,
@@ -1054,6 +1095,9 @@ function buildR64PayloadFromBracketCache() {
     archetype_matchup_matrix: cache?.archetype_matchup_matrix || {},
     espnScoring: cache?.espn_scoring || {},
     espn_scoring: cache?.espn_scoring || {},
+    all_predictions: predictions,
+    predictions,
+    bracket_lookup: cache?.bracket_lookup || {},
   };
 }
 
