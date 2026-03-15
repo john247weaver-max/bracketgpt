@@ -417,22 +417,50 @@
     color: var(--dim);
   }
 
-  .grid { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 12px; }
-  .region { background: var(--bg-surface); border: 1px solid var(--bg-line); border-radius: 2px; padding: 12px; }
-  .region h2 {
-    margin: 0 0 8px;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 18px;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--accent);
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 14px; align-items: start; }
+  .region {
+    background: var(--bg-surface);
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    padding: 12px 12px 12px 12px;
   }
-  .round-col { margin-bottom: 12px; }
+  .region-column {
+    position: relative;
+    min-width: 220px;
+    max-width: 320px;
+    padding-right: 20px;
+  }
+  .region-header {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+  }
+  .region-title {
+    margin: 0;
+    font-family: var(--fd);
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .region-round-label {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-top: 4px;
+  }
+  .round-col {
+    margin-bottom: 12px;
+    position: relative;
+  }
   .round-title {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
     border-bottom: 1px solid var(--bg-line);
-    padding-bottom: 4px;
+    padding-bottom: 5px;
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 11px;
     font-weight: 700;
@@ -441,55 +469,79 @@
     letter-spacing: 0.12em;
   }
   .round-summary {
-    margin: 8px 0;
-    padding-top: 8px;
+    margin: 8px 0 2px;
+    padding-top: 7px;
     border-top: 1px solid var(--bg-line);
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-muted);
     line-height: 1.4;
   }
 
-  .matchup-card {
+  .matchup-pair {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 8px;
-    margin-bottom: 6px;
+    margin-bottom: 12px;
     overflow: hidden;
     cursor: pointer;
     transition: border-color 0.12s;
     position: relative;
   }
-  .matchup-card:hover {
+  .matchup-pair:hover {
     border-color: var(--border-mid);
   }
-  .mc-team {
+  .matchup-pair::after {
+    content: '';
+    position: absolute;
+    right: -16px;
+    top: 50%;
+    width: 16px;
+    height: 1px;
+    background: var(--border-mid);
+    pointer-events: none;
+  }
+  .bracket-connector {
+    position: absolute;
+    right: -16px;
+    width: 1px;
+    background: var(--border-mid);
+    pointer-events: none;
+  }
+  .mp-team {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 9px 12px;
+    gap: 10px;
+    padding: 11px 14px;
     transition: background 0.1s;
   }
-  .mc-team:hover {
+  .mp-team:hover {
     background: rgba(255,255,255,0.03);
   }
-  .mc-team.picked {
-    background: rgba(0,168,70,0.08);
+  .mp-team.picked {
+    background: rgba(0,168,70,0.09);
   }
-  .mc-team.eliminated .mc-name {
-    color: var(--dim) !important;
-    text-decoration: line-through;
+  .mp-team.eliminated .mp-name {
+    opacity: 0.35;
   }
-  .mc-seed {
+  .mp-team.eliminated .mp-pct {
+    opacity: 0.35;
+  }
+  .mp-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0 14px;
+  }
+  .mp-seed {
     font-family: var(--fd);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
-    color: var(--muted);
-    min-width: 18px;
+    color: var(--dim);
+    min-width: 20px;
     flex-shrink: 0;
   }
-  .mc-name {
+  .mp-name {
     font-family: var(--fd);
-    font-size: 17px;
+    font-size: 18px;
     font-weight: 900;
     letter-spacing: 0.02em;
     text-transform: uppercase;
@@ -497,41 +549,27 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1;
   }
-  .mc-pct {
+  .mp-pct {
     font-family: var(--fd);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--muted);
     flex-shrink: 0;
-    min-width: 32px;
+    min-width: 36px;
     text-align: right;
   }
-  .path-grade {
-    font-family: var(--fd);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: .06em;
-    padding: 2px 5px;
-    border-radius: 3px;
-    border: 1px solid;
-    background: transparent;
-    flex-shrink: 0;
-    line-height: 1.4;
-    cursor: default;
-  }
-  .mc-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 0;
-  }
-  .mc-team.picked .mc-pct {
+  .mp-team.picked .mp-pct {
     color: var(--green);
   }
-  .matchup-card.signal-zag {
+  .mp-seed.top-seed { color: var(--gold); }
+  .mp-seed.mid-seed { color: var(--muted); }
+  .mp-seed.low-seed { color: var(--dim); }
+  .matchup-pair.signal-zag {
     border: 1.5px dashed var(--orange);
   }
-  .matchup-card.signal-zag::before {
+  .matchup-pair.signal-zag::before {
     content: 'ZAG';
     position: absolute;
     top: -1px;
@@ -546,10 +584,10 @@
     line-height: 1;
     transform: translateY(-50%);
   }
-  .matchup-card.signal-lean {
+  .matchup-pair.signal-lean {
     border: 1.5px dashed var(--gold);
   }
-  .matchup-card.signal-lean::before {
+  .matchup-pair.signal-lean::before {
     content: 'LEAN';
     position: absolute;
     top: -1px;
@@ -564,7 +602,7 @@
     line-height: 1;
     transform: translateY(-50%);
   }
-  .matchup-card.signal-none {
+  .matchup-pair.signal-none {
     border: 1px solid var(--border);
   }
   .signal-tag {
@@ -1182,6 +1220,12 @@
     const roundPoints = { R64: 10, R32: 20, S16: 40, E8: 80, F4: 160, NCG: 320 };
     const r64SlotByPair = { '1v16': 0, '8v9': 1, '5v12': 2, '4v13': 3, '6v11': 4, '3v14': 5, '7v10': 6, '2v15': 7 };
     const defaultFinalFourPairings = [['South', 'East'], ['West', 'Midwest']];
+    const REGION_COLORS = {
+      East: '#1A5CB5',
+      West: '#FF6B2B',
+      South: '#00C851',
+      Midwest: '#9B59B6'
+    };
     const strategyKeys = ['chalk', 'balanced', 'upset'];
     const seedColors = {
       1: 'var(--accent)', 2: 'var(--accent)', 3: 'var(--accent)', 4: 'var(--accent)',
@@ -2729,42 +2773,35 @@
       return childRound;
     }
 
-    function teamRow(node, team, pick, prob, side, isFavored) {
+    function seedClass(seed) {
+      const n = Number(seed);
+      if (Number.isFinite(n) && n <= 2) return 'top-seed';
+      if (Number.isFinite(n) && n <= 6) return 'mid-seed';
+      return 'low-seed';
+    }
+
+    function teamRow(node, team, pick, prob, side) {
       if (!team) {
-        return '<div class="mc-team">' +
-          '<span class="mc-seed">-</span>' +
-          '<span class="mc-name" style="color:#EEEEF3">TBD</span>' +
-          '<span class="mc-pct">&mdash;</span>' +
+        return '<div class="mp-team">' +
+          '<span class="mp-seed low-seed">-</span>' +
+          '<span class="mp-name" style="color:#EEEEF3">TBD</span>' +
+          '<span class="mp-pct">&mdash;</span>' +
         '</div>';
       }
       const picked = team && pick === team.name;
       const eliminated = !!pick && team && pick !== team.name;
-      const seedValue = Number.isFinite(Number(team?.seed)) ? Number(team.seed) : (team?.seed ?? '-');
+      const seedNum = Number(team?.seed);
+      const seedValue = Number.isFinite(seedNum) ? seedNum : (team?.seed ?? '-');
       const displayName = getDisplayName(team?.name || 'TBD');
       const normalizedProb = normalizeProbability(prob, null);
       const profile = getTeamProfileClient(team?.name || '');
       const teamColor = escAttr(String(team?.color_primary || profile?.color_primary || '#EEEEF3'));
       const pctText = Number.isFinite(normalizedProb) ? (Math.round(normalizedProb * 100) + '%') : '&mdash;';
-      const teamName = String(team?.name || '').replace(/'/g, "\\'");
-      const teamForPath = {
-        ...team,
-        region: team?.region || node?.region
-      };
-      let pathBadgeHtml = '';
-      if (isFavored) {
-        const grading = scoreToGrade(calcPathScore(teamForPath));
-        const border = escAttr(String(grading.color + '20'));
-        const color = escAttr(String(grading.color));
-        pathBadgeHtml = '<span class="path-grade" style="color:' + color + ';border-color:' + border + '"' +
-          ' title="Path difficulty: ' + escAttr(grading.label) + '">' + escHtml(grading.grade) + '</span>';
-      }
-      return '<div class="mc-team' + (picked ? ' picked' : '') + (eliminated ? ' eliminated' : '') + '"' +
-        ' data-side="' + side + '"' +
-        ' onclick="event.stopPropagation();makePick(\'' + node.id + '\',\'' + teamName + '\')">' +
-        '<span class="mc-seed">' + seedValue + '</span>' +
-        '<span class="mc-name" style="color:' + teamColor + '">' + escHtml(displayName) + '</span>' +
-        pathBadgeHtml +
-        '<span class="mc-pct">' + pctText + '</span>' +
+      return '<div class="mp-team' + (picked ? ' picked' : '') + (eliminated ? ' eliminated' : '') + '"' +
+        ' data-side="' + side + '">' +
+        '<span class="mp-seed ' + seedClass(seedNum) + '">' + seedValue + '</span>' +
+        '<span class="mp-name" style="color:' + teamColor + '">' + escHtml(displayName) + '</span>' +
+        '<span class="mp-pct">' + pctText + '</span>' +
       '</div>';
     }
 
@@ -2780,19 +2817,10 @@
         p1 = estimateWinProb(t1.name, t2.name);
         p2 = 1 - p1;
       }
-      let favoredSide = '';
-      const n1 = normalizeProbability(p1, null);
-      const n2 = normalizeProbability(p2, null);
-      if (Number.isFinite(n1) && Number.isFinite(n2)) {
-        favoredSide = n1 >= n2 ? 'a' : 'b';
-      } else {
-        const cmp = compareTeamsForProjection(t1, t2);
-        favoredSide = cmp <= 0 ? 'a' : 'b';
-      }
       const regionAttr = escAttr(String(node.region || '').toLowerCase());
-      const roundAttr = escAttr(roundDataValue(node.round));
+      const roundAttr = escAttr(String(node.round || '').toLowerCase());
       const matchupAttr = escAttr(String(node.id || ''));
-      return '<div class="matchup-card signal-none"' +
+      return '<div class="matchup-pair signal-none"' +
         ' data-region="' + regionAttr + '"' +
         ' data-round="' + roundAttr + '"' +
         ' data-matchup-id="' + matchupAttr + '"' +
@@ -2801,9 +2829,9 @@
         ' data-seed-a="' + escAttr(t1?.seed || '') + '"' +
         ' data-seed-b="' + escAttr(t2?.seed || '') + '"' +
         ' onclick="onMatchClick(event,\'' + node.id + '\')">' +
-        teamRow(node, t1, pick, p1, 'a', favoredSide === 'a') +
-        '<div class="mc-divider"></div>' +
-        teamRow(node, t2, pick, p2, 'b', favoredSide === 'b') +
+        teamRow(node, t1, pick, p1, 'a') +
+        '<div class="mp-divider"></div>' +
+        teamRow(node, t2, pick, p2, 'b') +
       '</div>';
     }
 
@@ -2846,18 +2874,18 @@
       const champId = finalIds.NCG[0];
       const winner = getWinnerTeam(champId);
       if (!winner) {
-        return '<div class="matchup-card signal-none"' +
+        return '<div class="matchup-pair signal-none"' +
           ' data-region="final-four" data-round="2" data-matchup-id="' + escAttr(champId || '') + '"' +
           ' data-team-a="" data-team-b="" data-seed-a="" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
-          '<div class="mc-team"><span class="mc-seed">-</span><span class="mc-name" style="color:#EEEEF3">TBD</span><span class="mc-pct">&mdash;</span></div>' +
+          '<div class="mp-team"><span class="mp-seed low-seed">-</span><span class="mp-name" style="color:#EEEEF3">TBD</span><span class="mp-pct">&mdash;</span></div>' +
         '</div>';
       }
       const profile = getTeamProfileClient(winner.name) || {};
       const color = escAttr(String(winner?.color_primary || profile?.color_primary || '#EEEEF3'));
-      return '<div class="matchup-card signal-none"' +
+      return '<div class="matchup-pair signal-none"' +
         ' data-region="final-four" data-round="2" data-matchup-id="' + escAttr(champId || '') + '"' +
         ' data-team-a="' + escAttr(winner.name) + '" data-team-b="" data-seed-a="' + escAttr(winner.seed || '') + '" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
-        '<div class="mc-team picked" onclick="event.stopPropagation();openCard(\'' + champId + '\')"><span class="mc-seed">' + (winner.seed ?? '-') + '</span><span class="mc-name" style="color:' + color + '">' + escHtml(getDisplayName(winner.name) + ' Champion') + '</span><span class="mc-pct">100%</span></div>' +
+        '<div class="mp-team picked" onclick="event.stopPropagation();openCard(\'' + champId + '\')"><span class="mp-seed ' + seedClass(winner.seed) + '">' + (winner.seed ?? '-') + '</span><span class="mp-name" style="color:' + color + '">' + escHtml(getDisplayName(winner.name) + ' Champion') + '</span><span class="mp-pct">100%</span></div>' +
       '</div>';
     }
 
