@@ -2369,7 +2369,7 @@
           '</span></div>' +
           '<div class="data-row"><span class="data-label">Key Factors</span><span class="data-value">' +
             (keyFactors
-              ? ('Elo Δ ' + (Number(keyFactors.elo_diff || 0)).toFixed(1) +
+              ? ('Elo Delta ' + (Number(keyFactors.elo_diff || 0)).toFixed(1) +
                  ' | Pyth ' + Number(keyFactors.t1_pyth || 0).toFixed(3) + ' vs ' + Number(keyFactors.t2_pyth || 0).toFixed(3) +
                  ' | NetEff ' + Number(keyFactors.t1_net_eff || 0).toFixed(1) + ' vs ' + Number(keyFactors.t2_net_eff || 0).toFixed(1))
               : 'No factor breakdown') +
