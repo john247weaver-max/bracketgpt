@@ -289,7 +289,7 @@
   .strategy-control {
     flex: 1 1 auto;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     border: 1px solid var(--bg-line);
     border-radius: 2px;
     overflow: hidden;
@@ -343,7 +343,7 @@
     padding: 0 6px;
   }
   .strategy-pill.active .strategy-ep { color: #0d0f12; background: rgba(13,15,18,.12); border-color: rgba(13,15,18,.35); }
-  .strategy-right { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .strategy-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .custom-ep-counter {
     display: inline-flex;
     align-items: center;
@@ -356,6 +356,39 @@
     color: var(--text-label);
   }
   .custom-ep-counter strong { color: var(--accent); }
+  .upset-rec {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+  }
+  .upset-rec-circle {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(0, 168, 70, 0.15);
+    border: 2px solid var(--green);
+    color: var(--green);
+    font-family: var(--fd);
+    font-size: 20px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+  .upset-rec-text {
+    font-family: var(--fb);
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--muted);
+    max-width: 160px;
+  }
+  .upset-rec-text strong {
+    color: var(--text);
+    font-weight: 600;
+  }
 
   .nav-inner {
     display: flex;
@@ -1006,6 +1039,7 @@
     .region-column { min-width: 0; max-width: none; padding-right: 20px; }
     .strategy-bar { flex-direction: column; align-items: stretch; }
     .strategy-right { justify-content: space-between; width: 100%; }
+    .upset-rec { padding: 0; margin-left: auto; }
     .nav-inner { align-items: stretch; flex-direction: column; gap: 6px; }
     .round-tabs { display: flex; width: 100%; }
     .pool-size-control { width: 100%; justify-content: flex-end; }
@@ -1057,22 +1091,18 @@
         </section>
         <section class="strategy-bar" id="strategyBar">
           <div class="strategy-control">
-            <button class="strategy-pill active" data-strategy="chalk" onclick="applyStrategy('chalk')">
-              <span class="strategy-inner"><i class="strategy-icon" data-lucide="target"></i><span class="strategy-name">CHALK</span></span>
-              <span class="strategy-ep" id="ep-chalk">-- EP</span>
-            </button>
-            <button class="strategy-pill" data-strategy="balanced" onclick="applyStrategy('balanced')">
+            <button class="strategy-pill active" data-strategy="balanced" onclick="applyStrategy('balanced')">
               <span class="strategy-inner"><i class="strategy-icon" data-lucide="scale"></i><span class="strategy-name">BALANCED</span></span>
               <span class="strategy-ep" id="ep-balanced">-- EP</span>
-            </button>
-            <button class="strategy-pill" data-strategy="upset" onclick="applyStrategy('upset')">
-              <span class="strategy-inner"><i class="strategy-icon" data-lucide="flame"></i><span class="strategy-name">UPSET</span></span>
-              <span class="strategy-ep" id="ep-upset">-- EP</span>
             </button>
           </div>
           <div class="strategy-right">
             <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
             <div class="custom-ep-counter"><span id="strategy-mode">Custom</span>: <strong id="custom-ep">0</strong> EP</div>
+            <div class="upset-rec" id="upsetRec">
+              <div class="upset-rec-circle" id="upsetRecCircle">0</div>
+              <div class="upset-rec-text" id="upsetRecText"></div>
+            </div>
           </div>
         </section>
         <div class="nav-inner">
@@ -1099,12 +1129,14 @@
         <div id="error"></div>
         <div id="loading" style="display:none"></div>
 
-        <section class="grid" id="regions"></section>
+        <div id="bracketContainer">
+          <section class="grid" id="regions"></section>
 
-        <section class="finals" id="finals-section">
-          <h2><i data-lucide="trophy"></i> Final Four + Championship</h2>
-          <div class="final-grid" id="finals"></div>
-        </section>
+          <section class="finals" id="finals-section">
+            <h2><i data-lucide="trophy"></i> Final Four + Championship</h2>
+            <div class="final-grid" id="finals"></div>
+          </section>
+        </div>
       </main>
     </div>
     <div class="chat-pane" id="chatPane">
@@ -1228,7 +1260,7 @@
       South: '#00C851',
       Midwest: '#9B59B6'
     };
-    const strategyKeys = ['chalk', 'balanced', 'upset'];
+    const strategyKeys = ['balanced'];
     const seedColors = {
       1: 'var(--accent)', 2: 'var(--accent)', 3: 'var(--accent)', 4: 'var(--accent)',
       5: 'var(--accent-dim)', 6: 'var(--accent-dim)', 7: 'var(--accent-dim)', 8: 'var(--accent-dim)',
@@ -1467,6 +1499,69 @@
       updatePoolInputValue();
       localStorage.setItem(POOL_SIZE_STORAGE_KEY, String(poolSize));
       refreshAllSignals();
+      updateUpsetRec();
+    }
+
+    function getUpsetRecommendation(size) {
+      let count;
+      let message;
+      if (size <= 15) {
+        count = 2;
+        message = '<strong>2 upsets</strong> recommended - play mostly chalk, one 12-over-5';
+      } else if (size <= 50) {
+        count = 4;
+        message = '<strong>4 upsets</strong> recommended - 2 in R64, 1-2 in R32/S16';
+      } else if (size <= 200) {
+        count = 6;
+        message = '<strong>6 upsets</strong> recommended - target ZAG picks across R64-S16';
+      } else {
+        count = 9;
+        message = '<strong>9 upsets</strong> recommended - need a contrarian Final Four';
+      }
+      return { count, message };
+    }
+
+    function countUserUpsets() {
+      let upsets = 0;
+      for (const [matchupId, pickName] of Object.entries(bracketState?.picks || {})) {
+        const node = nodesById.get(matchupId);
+        if (!node) continue;
+        const [t1, t2] = getMatchTeams(node);
+        if (!t1 || !t2) continue;
+        const normalizedPick = normalizeName(pickName);
+        const pickedT1 = normalizedPick === normalizeName(t1.name);
+        const pickedT2 = normalizedPick === normalizeName(t2.name);
+        if (!pickedT1 && !pickedT2) continue;
+        const p1 = node.source
+          ? normalizeProbability(node.source?.t1?.win_probability, NaN)
+          : normalizeProbability(estimateWinProb(t1.name, t2.name), NaN);
+        if (!Number.isFinite(p1)) continue;
+        const p2 = 1 - p1;
+        if (pickedT1 && p1 < 0.45) upsets += 1;
+        if (pickedT2 && p2 < 0.45) upsets += 1;
+      }
+      return upsets;
+    }
+
+    function updateUpsetRec() {
+      const rec = getUpsetRecommendation(poolSize);
+      const circle = document.getElementById('upsetRecCircle');
+      const text = document.getElementById('upsetRecText');
+      if (!circle || !text) return;
+
+      circle.textContent = String(rec.count);
+      text.innerHTML = rec.message;
+
+      const actualUpsets = countUserUpsets();
+      if (actualUpsets >= rec.count) {
+        circle.style.background = 'rgba(0, 168, 70, 0.25)';
+        circle.style.borderColor = 'var(--green)';
+        circle.style.color = 'var(--green)';
+      } else {
+        circle.style.background = 'rgba(0, 168, 70, 0.10)';
+        circle.style.borderColor = 'rgba(0, 168, 70, 0.4)';
+        circle.style.color = 'rgba(0, 168, 70, 0.7)';
+      }
     }
 
     function refreshIcons() {
@@ -2740,6 +2835,7 @@
       clearDescendantPicks(matchId);
       saveState();
       renderAll();
+      updateUpsetRec();
       if (!opts.keepCardOpen) closeCard(true, false);
       for (const parentId of (parentMap.get(matchId) || [])) {
         const parentNode = nodesById.get(parentId);
@@ -2829,8 +2925,7 @@
         ' data-team-a="' + escAttr(t1?.name || '') + '"' +
         ' data-team-b="' + escAttr(t2?.name || '') + '"' +
         ' data-seed-a="' + escAttr(t1?.seed || '') + '"' +
-        ' data-seed-b="' + escAttr(t2?.seed || '') + '"' +
-        ' onclick="onMatchClick(event,\'' + node.id + '\')">' +
+        ' data-seed-b="' + escAttr(t2?.seed || '') + '">' +
         teamRow(node, t1, pick, p1, 'a') +
         '<div class="mp-divider"></div>' +
         teamRow(node, t2, pick, p2, 'b') +
@@ -2879,7 +2974,7 @@
       if (!winner) {
         return '<div class="matchup-pair signal-none"' +
           ' data-region="final-four" data-round="2" data-matchup-id="' + escAttr(champId || '') + '"' +
-          ' data-team-a="" data-team-b="" data-seed-a="" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
+          ' data-team-a="" data-team-b="" data-seed-a="" data-seed-b="">' +
           '<div class="mp-team"><span class="mp-seed low-seed">-</span><span class="mp-name" style="color:#EEEEF3">TBD</span><span class="mp-pct">&mdash;</span></div>' +
         '</div>';
       }
@@ -2887,8 +2982,8 @@
       const color = escAttr(String(winner?.color_primary || profile?.color_primary || '#EEEEF3'));
       return '<div class="matchup-pair signal-none"' +
         ' data-region="final-four" data-round="2" data-matchup-id="' + escAttr(champId || '') + '"' +
-        ' data-team-a="' + escAttr(winner.name) + '" data-team-b="" data-seed-a="' + escAttr(winner.seed || '') + '" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
-        '<div class="mp-team picked" onclick="event.stopPropagation();openCard(\'' + champId + '\')"><span class="mp-seed ' + seedClass(winner.seed) + '">' + (winner.seed ?? '-') + '</span><span class="mp-name" style="color:' + color + '">' + escHtml(getDisplayName(winner.name) + ' Champion') + '</span><span class="mp-pct">100%</span></div>' +
+        ' data-team-a="' + escAttr(winner.name) + '" data-team-b="" data-seed-a="' + escAttr(winner.seed || '') + '" data-seed-b="">' +
+        '<div class="mp-team picked"><span class="mp-seed ' + seedClass(winner.seed) + '">' + (winner.seed ?? '-') + '</span><span class="mp-name" style="color:' + color + '">' + escHtml(getDisplayName(winner.name) + ' Champion') + '</span><span class="mp-pct">100%</span></div>' +
       '</div>';
     }
 
@@ -2984,7 +3079,7 @@
       const target = event?.target;
       if (target && target.closest && target.closest('button')) return;
       const node = nodesById.get(nodeId);
-      if (!node || !isNodePickable(node) || validPickForNode(node)) return;
+      if (!node || !isNodePickable(node)) return;
       autoAdvanceEnabled = true;
       openCard(nodeId, { manualResume: true, autoResume: true });
     }
@@ -3486,10 +3581,24 @@
     }
 
     function closeOverlay(e) {
-      if (e.target === document.getElementById('overlay')) {
-        currentPickCardMatchup = null;
-        document.getElementById('overlay').classList.remove('open');
-      }
+      const overlay = document.getElementById('overlay');
+      if (!overlay) return;
+      if (e && e.target !== overlay) return;
+      currentPickCardMatchup = null;
+      overlay.classList.remove('open');
+    }
+
+    function initBracketDelegation() {
+      const container = document.getElementById('bracketContainer');
+      if (!container || container.dataset.clickBound === '1') return;
+      container.dataset.clickBound = '1';
+      container.addEventListener('click', (e) => {
+        const pair = e.target.closest('.matchup-pair');
+        if (!pair || !container.contains(pair)) return;
+        const matchupId = pair.dataset.matchupId;
+        if (!matchupId) return;
+        onMatchClick(e, matchupId);
+      });
     }
 
     async function openCard(nodeId, opts = {}) {
@@ -3722,6 +3831,7 @@
       bracketState.activeStrategy = 'custom';
       saveState();
       renderAll();
+      updateUpsetRec();
     }
 
     async function autoFillModelPicks() {
@@ -3751,6 +3861,7 @@
       }
       saveState();
       renderAll();
+      updateUpsetRec();
     }
 
     async function autoFill() {
@@ -3859,6 +3970,7 @@
         }
         saveState();
         renderAll();
+        updateUpsetRec();
         const teamQ = new URLSearchParams(window.location.search).get('team');
         let openedFromQuery = false;
         if (teamQ) {
@@ -3890,6 +4002,7 @@
       requestAnimationFrame(redrawBracketConnectors);
     });
 
+    initBracketDelegation();
     refreshIcons();
     initChat();
     init();
