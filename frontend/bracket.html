@@ -309,6 +309,16 @@
   }
   .strategy-pill:last-child { border-right: 0; }
   .strategy-pill.active { background: var(--accent); color: #0d0f12; }
+  .strategy-pill.open-slot {
+    cursor: default;
+    opacity: 0.65;
+  }
+  .strategy-pill.open-slot .strategy-name {
+    color: var(--text-label);
+  }
+  .strategy-pill.open-slot .strategy-ep {
+    color: var(--muted);
+  }
   .strategy-pill .strategy-inner { display: inline-flex; align-items: center; gap: 8px; }
   .strategy-pill .strategy-icon,
   .strategy-pill .strategy-icon svg,
@@ -738,6 +748,23 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--accent);
+  }
+  .optimizer-upload {
+    margin: 10px 0 12px;
+    padding: 10px;
+    border: 1px dashed var(--bg-line);
+    border-radius: 4px;
+    background: var(--bg-surface);
+  }
+  .optimizer-upload .btn {
+    width: 100%;
+  }
+  .optimizer-upload-note {
+    margin-top: 6px;
+    font-family: var(--fb);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.35;
   }
   .opt-row { display: grid; grid-template-columns: 20px 1fr auto; gap: 8px; align-items: center; margin-bottom: 4px; font-size: 12px; }
   .champ-header {
@@ -1184,6 +1211,10 @@
               <span class="strategy-inner"><i class="strategy-icon" data-lucide="scale"></i><span class="strategy-name">BALANCED</span></span>
               <span class="strategy-ep" id="ep-balanced">-- EP</span>
             </button>
+            <button class="strategy-pill open-slot" type="button" disabled aria-disabled="true" title="Reserved for Monte Carlo optimizer strategy">
+              <span class="strategy-inner"><i class="strategy-icon" data-lucide="cpu"></i><span class="strategy-name">MONTE CARLO (OPEN SLOT)</span></span>
+              <span class="strategy-ep">COMING</span>
+            </button>
           </div>
           <div class="strategy-right">
             <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
@@ -1318,6 +1349,11 @@
   <aside class="optimizer-panel" id="optimizerPanel">
     <div class="opt-title"><i data-lucide="bar-chart-2"></i> Points Optimizer</div>
     <button class="btn btn-primary" onclick="autoFillOptimalBracket()">Auto-Fill Optimal Bracket</button>
+    <div class="optimizer-upload">
+      <button class="btn btn-secondary" type="button" onclick="triggerMonteCarloUpload()"><i data-lucide="upload"></i> Upload Monte Carlo Output</button>
+      <input type="file" id="mcUploadInput" accept=".json,application/json" style="display:none">
+      <div class="optimizer-upload-note" id="mcUploadStatus">Open slot: upload sim JSON for Final Four/champion odds, team stats, and upset recommendations.</div>
+    </div>
     <div id="optimizerRankings"></div>
     <div class="champ-header"><i data-lucide="trophy"></i> Champion Probabilities</div>
     <div id="optimizerChamps"></div>
@@ -4077,6 +4113,50 @@
       refreshIcons();
     }
 
+    function triggerMonteCarloUpload() {
+      const input = document.getElementById('mcUploadInput');
+      if (input) input.click();
+    }
+
+    function applyMonteCarloPayload(payload) {
+      const data = payload || {};
+      if (data.team_stats && typeof data.team_stats === 'object') teamStats = data.team_stats;
+      if (data.round_advance_probs && typeof data.round_advance_probs === 'object') roundAdvanceProbs = data.round_advance_probs;
+      if (Array.isArray(data.upset_scores)) upsetScoresData = data.upset_scores;
+      if (Array.isArray(data.upset_thresholds)) upsetThresholdsData = data.upset_thresholds;
+      if (data.team_ep_rankings && typeof data.team_ep_rankings === 'object') teamEpRankings = data.team_ep_rankings;
+      const champs = data?.bracket_structure?.champion_probs || data?.champion_probs;
+      if (champs && typeof champs === 'object') championProbs = champs;
+      if (data?.metadata?.scoring) applyEspnScoringMap(data.metadata.scoring);
+      updateStrategyBar();
+      renderOptimizer();
+      renderAll();
+      updateUpsetRec();
+      refreshAllSignals();
+    }
+
+    function initMonteCarloUpload() {
+      const input = document.getElementById('mcUploadInput');
+      const status = document.getElementById('mcUploadStatus');
+      if (!input || !status || input.dataset.bound === '1') return;
+      input.dataset.bound = '1';
+      input.addEventListener('change', async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const json = JSON.parse(text);
+          applyMonteCarloPayload(json);
+          status.textContent = 'Loaded Monte Carlo data from ' + file.name;
+        } catch (err) {
+          status.textContent = 'Upload failed: invalid JSON or unsupported structure.';
+          console.warn('[optimizer-upload] Failed to load Monte Carlo JSON', err);
+        } finally {
+          input.value = '';
+        }
+      });
+    }
+
     function toggleOptimizer() {
       const panel = document.getElementById('optimizerPanel');
       if (!panel) return;
@@ -4295,6 +4375,7 @@
 
     initBracketDelegation();
     refreshIcons();
+    initMonteCarloUpload();
     initChat();
     init();
   </script>
