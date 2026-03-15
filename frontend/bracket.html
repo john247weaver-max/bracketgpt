@@ -3197,6 +3197,7 @@
       } else {
         finalsEl.style.display = 'block';
       }
+      requestAnimationFrame(redrawBracketConnectors);
     }
 
     function getConfidenceLabel(winProb) {
@@ -3882,7 +3883,10 @@
       mobileRound = e.target.dataset.round || 'R64';
       applyMobileRoundVisibility();
     });
-    window.addEventListener('resize', applyMobileRoundVisibility);
+    window.addEventListener('resize', () => {
+      applyMobileRoundVisibility();
+      requestAnimationFrame(redrawBracketConnectors);
+    });
 
     refreshIcons();
     initChat();
