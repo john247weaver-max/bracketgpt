@@ -350,6 +350,16 @@
   .pick-meta.ep-good { border-color: var(--accent); color: var(--accent); }
   .pick-meta.ep-mid { color: var(--accent-dim); }
   .pick-meta.ep-low { color: var(--accent-hot); }
+  .pick-meta .upset-flag { margin-left: auto; }
+  .pick-meta .upset-flag.upset_alert { color: #d9534f; }
+  .pick-meta .upset-flag.upset_watch { color: #f0ad4e; }
+  .pick-meta .upset-flag.competitive { color: #d4af37; }
+
+  .confidence-label.slight-edge { color: #b0b0b0; }
+  .confidence-label.lean { color: #f0ad4e; }
+  .confidence-label.confident { color: #5cb85c; }
+  .confidence-label.lock { color: #d4af37; }
+  .confidence-label.toss-up { color: #d9534f; }
 
   .finals { margin-top: 12px; border: 1px solid var(--bg-line); border-radius: 2px; background: var(--bg-surface); padding: 12px; }
   .finals h2 {
@@ -884,6 +894,7 @@
   <button class="btn btn-secondary optimizer-toggle" onclick="toggleOptimizer()"><i class="strategy-icon" data-lucide="bar-chart-2"></i> Optimizer</button>
   <aside class="optimizer-panel" id="optimizerPanel">
     <div class="opt-title"><i data-lucide="bar-chart-2"></i> Points Optimizer</div>
+    <button class="btn btn-primary" onclick="autoFillOptimalBracket()">Auto-Fill Optimal Bracket</button>
     <div id="optimizerRankings"></div>
     <div class="champ-header"><i data-lucide="trophy"></i> Champion Probabilities</div>
     <div id="optimizerChamps"></div>
@@ -909,6 +920,19 @@
       5: 'var(--accent-dim)', 6: 'var(--accent-dim)', 7: 'var(--accent-dim)', 8: 'var(--accent-dim)',
       9: 'var(--text-label)', 10: 'var(--text-label)', 11: 'var(--text-label)', 12: 'var(--text-label)',
       13: 'var(--text-muted)', 14: 'var(--text-muted)', 15: 'var(--text-muted)', 16: 'var(--text-muted)'
+    };
+    const DISPLAY_NAMES = {
+      'Mississippi': 'Ole Miss',
+      'Connecticut': 'UConn',
+      'St Mary\'s CA': 'St. Mary\'s',
+      'Saint Mary\'s': 'St. Mary\'s',
+      'Mt St Mary\'s': 'Mt. St. Mary\'s',
+      'Mount St. Mary\'s': 'Mt. St. Mary\'s',
+      'SIUE': 'SIUE',
+      'SIU Edwardsville': 'SIUE',
+      'UNC Wilmington': 'UNCW',
+      'Colorado St': 'Colorado St.',
+      'Mississippi St': 'Miss. State',
     };
 
     let baseMatchups = [];
@@ -951,6 +975,17 @@
     }
     function normalizeRegionName(v) {
       return String(v || '').toLowerCase().replace(/[^a-z]/g, '');
+    }
+    function getDisplayName(v) {
+      const name = String(v || '').trim();
+      return DISPLAY_NAMES[name] || name;
+    }
+    function normalizeProbability(v, fallback = 0) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return fallback;
+      if (n <= 1) return Math.max(0, Math.min(1, n));
+      if (n <= 100) return Math.max(0, Math.min(1, n / 100));
+      return fallback;
     }
 
     function refreshIcons() {
@@ -1135,6 +1170,11 @@
       const n = Number(v);
       return Number.isFinite(n) ? n : (fallback || 0);
     }
+    function calculateEP(winProbability, round) {
+      const prob = normalizeProbability(winProbability, 0);
+      const points = roundPoints[round] || roundPoints.R64 || 10;
+      return Number((prob * points).toFixed(1));
+    }
 
     function roundEpClass(round, ep) {
       const max = roundPoints[round] || 10;
@@ -1146,13 +1186,15 @@
     function getConfidenceBadge(conf) {
       const c = String(conf || '').toLowerCase();
       const map = {
-        lock: { label: 'LOCK', color: 'var(--accent)' },
-        confident: { label: 'CONFIDENT', color: 'var(--accent)' },
-        lean: { label: 'LEAN', color: 'var(--accent-dim)' },
-        slight: { label: 'SLIGHT', color: 'var(--accent-dim)' },
-        'toss-up': { label: 'TOSS-UP', color: 'var(--accent-dim)' },
-        toss_up: { label: 'TOSS-UP', color: 'var(--accent-dim)' },
-        underdog: { label: 'UNDERDOG', color: 'var(--accent-hot)' },
+        lock: { label: 'LOCK', color: '#d4af37' },
+        confident: { label: 'CONFIDENT', color: '#5cb85c' },
+        lean: { label: 'LEAN', color: '#f0ad4e' },
+        slight: { label: 'SLIGHT EDGE', color: '#b0b0b0' },
+        slight_edge: { label: 'SLIGHT EDGE', color: '#b0b0b0' },
+        'slight edge': { label: 'SLIGHT EDGE', color: '#b0b0b0' },
+        'toss-up': { label: 'TOSS-UP', color: '#d9534f' },
+        toss_up: { label: 'TOSS-UP', color: '#d9534f' },
+        underdog: { label: 'UNDERDOG', color: '#d9534f' },
       };
       if (map[c]) return map[c];
       if (c === 'strong') return map.confident;
@@ -1192,9 +1234,29 @@
       return Math.min(roundPoints[round] || 0, total * ((roundPoints[round] || 0) / maxRound));
     }
 
+    function getPickWinProbability(node, pickName) {
+      const [t1, t2] = getMatchTeams(node);
+      if (!t1 || !t2) return null;
+      const pickKey = normalizeName(pickName);
+      const t1Key = normalizeName(t1.name);
+      const t2Key = normalizeName(t2.name);
+      if (!pickKey || (pickKey !== t1Key && pickKey !== t2Key)) return null;
+      if (node.round === 'R64' && node.source) {
+        const p1 = normalizeProbability(node.source.t1?.win_probability, null);
+        const p2 = normalizeProbability(node.source.t2?.win_probability, null);
+        const resolvedP1 = Number.isFinite(p1) ? p1 : (Number.isFinite(p2) ? (1 - p2) : 0.5);
+        return pickKey === t1Key ? resolvedP1 : (1 - resolvedP1);
+      }
+      const p1 = estimateWinProb(t1.name, t2.name);
+      if (!Number.isFinite(p1)) return null;
+      return pickKey === t1Key ? p1 : (1 - p1);
+    }
+
     function getNodeEp(node, pickName) {
       const baseline = strategyEpByNode[node.id];
       if (baseline && strategyBaselinePicks[node.id] === pickName) return safeNum(baseline, 0);
+      const winProb = getPickWinProbability(node, pickName);
+      if (Number.isFinite(winProb)) return calculateEP(winProb, node.round);
       return estimateEpFromTeam(node.round, pickName);
     }
 
@@ -1830,10 +1892,12 @@
       const disabled = '';
       const winner = team && pick === team.name ? 'winner' : '';
       const seedValue = Number.isFinite(Number(team?.seed)) ? Number(team.seed) : (team?.seed ?? '-');
+      const displayName = getDisplayName(team?.name || 'TBD');
+      const normalizedProb = normalizeProbability(prob, null);
       return '<div class="team-row">' +
         '<span class="seed">' + seedValue + '</span>' +
-        '<button class="team-btn ' + winner + '" ' + disabled + ' onclick="makePick(\'' + node.id + '\',\'' + (team?.name || '').replace(/'/g, "\\'") + '\')">' + (team?.name || 'TBD') + '</button>' +
-        '<span class="prob">' + (Number.isFinite(prob) ? (prob * 100).toFixed(1) + '%' : '--') + '</span>' +
+        '<button class="team-btn ' + winner + '" ' + disabled + ' onclick="makePick(\'' + node.id + '\',\'' + (team?.name || '').replace(/'/g, "\\'") + '\')">' + displayName + '</button>' +
+        '<span class="prob">' + (Number.isFinite(normalizedProb) ? (normalizedProb * 100).toFixed(1) + '%' : '--') + '</span>' +
         '<button class="info" onclick="openCard(\'' + node.id + '\')">i</button>' +
       '</div>';
     }
@@ -1856,10 +1920,16 @@
       if (validPickForNode(node)) {
         const matchMeta = node.source?.matchup_meta || {};
         const ep = getNodeEp(node, pick);
-        const conf = getConfidenceBadge(matchMeta.confidence);
+        const t1Prob = normalizeProbability(p1, 0.5);
+        const favoredProb = Math.max(t1Prob, 1 - t1Prob);
+        const conf = getConfidenceLabel(favoredProb);
+        const upsetFlag = getDisplayFlag(matchMeta, t1Prob, t1?.seed, t2?.seed);
+        const upsetLabel = String(upsetFlag || '').replace(/_/g, ' ').toUpperCase();
+        const showUpsetFlag = upsetFlag === 'upset_alert' || upsetFlag === 'upset_watch' || upsetFlag === 'competitive';
         metaHtml = '<div class="pick-meta ' + roundEpClass(node.round, ep) + '">' +
           '<span>EP: ' + ep.toFixed(1) + '</span>' +
           '<span style="color:' + conf.color + '">' + conf.label + '</span>' +
+          (showUpsetFlag ? ('<span class="upset-flag ' + upsetFlag + '">' + upsetLabel + '</span>') : '') +
         '</div>';
       }
       const regionAttr = escAttr(String(node.region || '').toLowerCase());
@@ -2047,19 +2117,19 @@
     }
 
     function buildSyntheticMeta(t1, t2, prob, tA, tB, node) {
-      const bestP = Math.max(prob, 1 - prob);
-      const t1Favored = prob >= 0.5;
+      const normProb = normalizeProbability(prob, 0.5);
+      const bestP = Math.max(normProb, 1 - normProb);
+      const t1Favored = normProb >= 0.5;
       const bestTeam = t1Favored ? t1 : t2;
       const bestData = t1Favored ? tA : tB;
       const otherData = t1Favored ? tB : tA;
       let confidence = 'toss_up';
       if (bestP >= 0.95) confidence = 'lock';
-      else if (bestP >= 0.85) confidence = 'confident';
-      else if (bestP >= 0.70) confidence = 'lean';
-      else if (bestP >= 0.55) confidence = 'slight';
-      let displayFlag = 'chalk';
-      if (bestP < 0.60) displayFlag = 'toss_up';
-      else if (bestP < 0.70) displayFlag = 'competitive';
+      else if (bestP >= 0.80) confidence = 'confident';
+      else if (bestP >= 0.65) confidence = 'lean';
+      else if (bestP >= 0.55) confidence = 'slight_edge';
+      let displayFlag = getUpsetFlag(t1?.seed, t2?.seed, normProb) || 'chalk';
+      if (displayFlag === 'chalk' && bestP < 0.55) displayFlag = 'toss_up';
       const roundLabel = { R32: 'Round of 32', S16: 'Sweet 16', E8: 'Elite 8', F4: 'Final Four', NCG: 'Championship' }[node.round] || node.round;
       let archetype_h2h = null;
       if (Array.isArray(tA?.archetypes) && Array.isArray(tB?.archetypes) && tA.archetypes[0] && tB.archetypes[0]) {
@@ -2149,9 +2219,9 @@
         const wantedT2 = normalizeName(t2.name);
         const apiT1 = mT1Name === wantedT1 ? m?.t1 : (mT2Name === wantedT1 ? m?.t2 : null);
         const apiT2 = mT1Name === wantedT2 ? m?.t1 : (mT2Name === wantedT2 ? m?.t2 : null);
-        const p1 = Number(apiT1?.win_probability);
-        const p2 = Number(apiT2?.win_probability);
-        const resolvedP1 = Number.isFinite(p1) ? p1 : (Number.isFinite(p2) ? (1 - p2) : prob);
+        const p1 = toProb(apiT1?.win_probability, null);
+        const p2 = toProb(apiT2?.win_probability, null);
+        const resolvedP1 = Number.isFinite(p1) ? p1 : (Number.isFinite(p2) ? (1 - p2) : normalizeProbability(prob, 0.5));
         const resolvedP2 = Number.isFinite(p2) ? p2 : (1 - resolvedP1);
         return {
           ...synthetic,
@@ -2197,22 +2267,40 @@
     }
 
     function getConfidenceLabel(winProb) {
-      const p = Math.max(Number(winProb || 0), 1 - Number(winProb || 0));
-      if (p >= 0.95) return { label: 'Lock', color: 'var(--green)' };
-      if (p >= 0.85) return { label: 'Confident', color: 'var(--green)' };
-      if (p >= 0.70) return { label: 'Lean', color: 'var(--yellow)' };
-      if (p >= 0.55) return { label: 'Slight edge', color: 'var(--yellow)' };
-      return { label: 'Toss-up', color: 'var(--orange)' };
+      const p = normalizeProbability(winProb, 0);
+      const pct = p * 100;
+      if (pct >= 95) return { label: 'LOCK', color: '#d4af37' };
+      if (pct >= 80) return { label: 'CONFIDENT', color: '#5cb85c' };
+      if (pct >= 65) return { label: 'LEAN', color: '#f0ad4e' };
+      if (pct >= 55) return { label: 'SLIGHT EDGE', color: '#b0b0b0' };
+      return { label: 'TOSS-UP', color: '#d9534f' };
     }
 
-    function getDisplayFlag(meta, t1p) {
-      const upsetPct = Number(meta?.seed_matchup?.upset_pct || 0);
-      const p = Math.max(Number(t1p || 0), 1 - Number(t1p || 0));
+    function getUpsetFlag(t1Seed, t2Seed, t1WinProb) {
+      const s1 = Number(t1Seed);
+      const s2 = Number(t2Seed);
+      if (!Number.isFinite(s1) || !Number.isFinite(s2)) return null;
+      const higherSeed = Math.min(s1, s2);
+      const lowerSeed = Math.max(s1, s2);
+      const seedDiff = lowerSeed - higherSeed;
+      if (seedDiff <= 1) return null;
+      const t1Prob = normalizeProbability(t1WinProb, 0.5);
+      const t2Prob = 1 - t1Prob;
+      const underdogFavored = (s1 > s2 && t1Prob > 0.5) || (s2 > s1 && t2Prob > 0.5);
+      if (underdogFavored) return 'upset_alert';
+      const favoredProb = Math.max(t1Prob, t2Prob);
+      if (seedDiff >= 3 && favoredProb < 0.65) return 'upset_watch';
+      if (seedDiff >= 5 && favoredProb < 0.75) return 'competitive';
+      return null;
+    }
+
+    function getDisplayFlag(meta, t1p, t1Seed, t2Seed) {
+      const upset = getUpsetFlag(t1Seed, t2Seed, t1p);
+      if (upset) return upset;
+      const p = Math.max(normalizeProbability(t1p, 0.5), 1 - normalizeProbability(t1p, 0.5));
       if (p >= 0.95) return 'lock';
-      if (upsetPct >= 0.35) return 'upset_watch';
-      if (upsetPct >= 0.25) return 'competitive';
       if (meta?.pool_meta?.contrarian_flag) return 'leverage_play';
-      if (p < 0.60) return 'toss_up';
+      if (p < 0.55) return 'toss_up';
       return 'chalk';
     }
 
@@ -2266,14 +2354,19 @@
       const meta = data.matchup_meta || {};
       const t1 = data.t1 || {};
       const t2 = data.t2 || {};
-      const t1p = Number(t1.win_probability || 0);
-      const t2p = Number(t2.win_probability || 0);
+      const t1p = normalizeProbability(t1.win_probability, 0.5);
+      const t2p = normalizeProbability(t2.win_probability, 1 - t1p);
       const modelTeam = t1p >= t2p ? t1 : t2;
       const modelName = modelTeam?.name || 'TBD';
+      const modelDisplayName = getDisplayName(modelName);
+      const t1DisplayName = getDisplayName(t1.name || 'TBD');
+      const t2DisplayName = getDisplayName(t2.name || 'TBD');
       const modelIsT1 = modelName && modelName === t1.name;
-      const confidence = getConfidenceBadge(meta.confidence || getConfidenceLabel(t1p).label);
-      const displayFlag = getDisplayFlag(meta, t1p);
-      const flagLabel = String(meta.display_flag || meta.upset_flag || displayFlag || 'chalk').replace(/_/g, ' ').toUpperCase();
+      const confidence = getConfidenceLabel(Math.max(t1p, t2p));
+      const displayFlag = getDisplayFlag(meta, t1p, t1?.seed, t2?.seed);
+      const metaFlag = String(meta.display_flag || meta.upset_flag || '').toLowerCase();
+      const resolvedFlag = (metaFlag && metaFlag !== 'chalk' && badgeClass(metaFlag) !== 'chalk') ? metaFlag : displayFlag;
+      const flagLabel = String(resolvedFlag || 'chalk').replace(/_/g, ' ').toUpperCase();
       const matchupPrompt = String(meta.chatbot_prompt || ('Compare ' + (t1.name || 'Team A') + ' vs ' + (t2.name || 'Team B') + ' in the ' + getRoundTitle(node.round).split(' (')[0]));
       const responses = meta.chatbot_responses || meta.responses || {};
       const blurbParts = [
@@ -2335,24 +2428,24 @@
         '<div class="guided-matchup">' +
           '<div class="guided-team-row ' + (modelIsT1 ? 'model' : '') + '">' +
             '<span class="guided-team-seed">' + (t1.seed ?? '-') + '</span>' +
-            '<span class="guided-team-name">' + (t1.name || 'TBD') + '</span>' +
+            '<span class="guided-team-name">' + t1DisplayName + '</span>' +
             '<span class="guided-team-prob">' + pctText(t1p) + '</span>' +
           '</div>' +
           '<div class="guided-divider"></div>' +
           '<div class="guided-team-row ' + (!modelIsT1 ? 'model' : '') + '">' +
             '<span class="guided-team-seed">' + (t2.seed ?? '-') + '</span>' +
-            '<span class="guided-team-name">' + (t2.name || 'TBD') + '</span>' +
+            '<span class="guided-team-name">' + t2DisplayName + '</span>' +
             '<span class="guided-team-prob">' + pctText(t2p) + '</span>' +
           '</div>' +
         '</div>' +
         '<div class="model-pick">' +
           '<span class="model-pick-label">Model Pick</span>' +
-          '<span class="model-pick-team">' + escHtml(modelName) + '</span>' +
+          '<span class="model-pick-team">' + escHtml(modelDisplayName) + '</span>' +
           '<span class="model-pick-prob">' + pctText(Math.max(t1p, t2p)) + '</span>' +
           '<span class="model-pick-conf" style="color:' + confidence.color + '">' + confidence.label + '</span>' +
         '</div>' +
         '<div class="guided-model">' +
-          '<span class="guided-badge ' + badgeClass(displayFlag) + '">' + escHtml(flagLabel) + '</span>' +
+          '<span class="guided-badge ' + badgeClass(resolvedFlag) + '">' + escHtml(flagLabel) + '</span>' +
           '<span class="tiny">Archetypes: ' + escHtml(archA) + ' vs ' + escHtml(archB) + '</span>' +
         '</div>' +
         '<div class="guided-analysis" id="guided-analysis">' + md(blurb) + '</div>' +
@@ -2380,19 +2473,19 @@
                 ' | ' + (t2.name || 'T2') + ': O ' + Number(kenpom.t2_ortg || 0).toFixed(1) + ' D ' + Number(kenpom.t2_drtg || 0).toFixed(1)))
               : 'No KenPom matchup metrics') +
           '</span></div>' +
-          compLine(t1.name || 'Team A', compA) +
-          compLine(t2.name || 'Team B', compB) +
-          '<div class="data-row"><span class="data-label">' + escHtml(t1.name || 'Team A') + ' Players</span><span class="data-value"></span></div>' +
+          compLine(t1DisplayName || 'Team A', compA) +
+          compLine(t2DisplayName || 'Team B', compB) +
+          '<div class="data-row"><span class="data-label">' + escHtml(t1DisplayName || 'Team A') + ' Players</span><span class="data-value"></span></div>' +
           playersFor(t1) +
-          '<div class="data-row"><span class="data-label">' + escHtml(t2.name || 'Team B') + ' Players</span><span class="data-value"></span></div>' +
+          '<div class="data-row"><span class="data-label">' + escHtml(t2DisplayName || 'Team B') + ' Players</span><span class="data-value"></span></div>' +
           playersFor(t2) +
         '</div>' +
 
         '<div class="section">' +
           '<h3>Pool</h3>' +
           '<div class="data-row"><span class="data-label">Public Picks</span><span class="data-value">' +
-            escHtml((t1.name || 'T1') + ': ' + (pub1 == null ? 'N/A' : pub1.toFixed(1) + '%') + ' | ' +
-              (t2.name || 'T2') + ': ' + (pub2 == null ? 'N/A' : pub2.toFixed(1) + '%')) +
+            escHtml((t1DisplayName || 'T1') + ': ' + (pub1 == null ? 'N/A' : pub1.toFixed(1) + '%') + ' | ' +
+              (t2DisplayName || 'T2') + ': ' + (pub2 == null ? 'N/A' : pub2.toFixed(1) + '%')) +
           '</span></div>' +
           '<div class="data-row"><span class="data-label">Leverage</span><span class="data-value">' + escHtml(leverageText(leverage)) + '</span></div>' +
           '<div class="data-row"><span class="data-label">Round Value</span><span class="data-value">' + escHtml(exposureText(node.round, meta)) + '</span></div>' +
@@ -2408,15 +2501,15 @@
               ' | L10 ' + (formRisk?.t1_last10_win_rate ?? 'n/a') + ' / ' + (formRisk?.t2_last10_win_rate ?? 'n/a')) +
           '</span></div>' +
           '<div class="data-row"><span class="data-label">Injury Flags</span><span class="data-value">' +
-            escHtml((formRisk?.t1_injury_alert ? (t1.name + ': yes') : (t1.name + ': no')) + ' | ' +
-              (formRisk?.t2_injury_alert ? (t2.name + ': yes') : (t2.name + ': no'))) +
+            escHtml((formRisk?.t1_injury_alert ? (t1DisplayName + ': yes') : (t1DisplayName + ': no')) + ' | ' +
+              (formRisk?.t2_injury_alert ? (t2DisplayName + ': yes') : (t2DisplayName + ': no'))) +
           '</span></div>' +
         '</div>' +
 
-        '<button class="guided-pick-btn" id="guided-pick-btn" onclick="makePick(\'' + node.id + '\',\'' + (modelName || '').replace(/'/g, "\\'") + '\')">Pick ' + escHtml(modelName) + ' (Model)</button>' +
+        '<button class="guided-pick-btn" id="guided-pick-btn" onclick="makePick(\'' + node.id + '\',\'' + (modelName || '').replace(/'/g, "\\'") + '\')">Pick ' + escHtml(modelDisplayName) + ' (Model)</button>' +
         '<div class="pick-actions">' +
-          '<button class="pick-btn ' + (modelIsT1 ? 'recommended' : '') + '" onclick="makePick(\'' + node.id + '\',\'' + escPickA + '\')">' + escHtml(t1.name || 'Team 1') + '</button>' +
-          '<button class="pick-btn ' + (!modelIsT1 ? 'recommended' : '') + '" onclick="makePick(\'' + node.id + '\',\'' + escPickB + '\')">' + escHtml(t2.name || 'Team 2') + '</button>' +
+          '<button class="pick-btn ' + (modelIsT1 ? 'recommended' : '') + '" onclick="makePick(\'' + node.id + '\',\'' + escPickA + '\')">' + escHtml(t1DisplayName || 'Team 1') + '</button>' +
+          '<button class="pick-btn ' + (!modelIsT1 ? 'recommended' : '') + '" onclick="makePick(\'' + node.id + '\',\'' + escPickB + '\')">' + escHtml(t2DisplayName || 'Team 2') + '</button>' +
         '</div>' +
         '<a class="ask-btn" href="' + askHref + '" target="_blank" rel="noopener">Ask BracketGPT</a>';
     }
@@ -2573,7 +2666,29 @@
 
     function toggleOptimizer() {
       const panel = document.getElementById('optimizerPanel');
-      if (panel) panel.classList.toggle('open');
+      if (!panel) return;
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) renderOptimizer();
+    }
+
+    function optimizeBracket(strategy = 'balanced') {
+      const picks = {};
+      for (const round of roundOrder) {
+        for (const node of nodesById.values()) {
+          if (node.round !== round) continue;
+          const [t1, t2] = getMatchTeams(node);
+          if (!t1 || !t2) continue;
+          const p1 = node.source
+            ? normalizeProbability(node.source.t1?.win_probability, 0.5)
+            : normalizeProbability(estimateWinProb(t1.name, t2.name), 0.5);
+          picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
+        }
+      }
+      return { strategy, picks };
+    }
+
+    async function autoFillOptimalBracket() {
+      return autoFillModelPicks();
     }
 
     function resetBracket() {
@@ -2601,7 +2716,7 @@
           const [t1, t2] = getMatchTeams(node);
           if (!t1 || !t2) continue;
           if (node.source) {
-            const p1 = Number(node.source.t1?.win_probability || 0.5);
+            const p1 = normalizeProbability(node.source.t1?.win_probability, 0.5);
             bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
             continue;
           }
@@ -2610,8 +2725,8 @@
             if (data) {
               const d1key = normalizeName(data?.t1?.name);
               const p1 = d1key === normalizeName(t1.name)
-                ? Number(data?.t1?.win_probability || 0.5)
-                : Number(data?.t2?.win_probability || 0.5);
+                ? normalizeProbability(data?.t1?.win_probability, 0.5)
+                : normalizeProbability(data?.t2?.win_probability, 0.5);
               bracketState.picks[node.id] = p1 >= 0.5 ? t1.name : t2.name;
             } else {
               const est = Number(estimateWinProb(t1.name, t2.name));

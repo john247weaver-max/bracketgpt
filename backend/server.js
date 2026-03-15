@@ -162,7 +162,7 @@ const BRACKET_2025 = {
     { higher: 'Michigan', hSeed: 5, lower: 'UC San Diego', lSeed: 12 },
     { higher: 'Mississippi', hSeed: 6, lower: 'North Carolina', lSeed: 11 },
     { higher: 'Marquette', hSeed: 7, lower: 'New Mexico', lSeed: 10 },
-    { higher: 'Mississippi St', hSeed: 8, lower: 'Baylor', lSeed: 9 },
+    { higher: 'Louisville', hSeed: 8, lower: 'Creighton', lSeed: 9 },
   ],
   East: [
     { higher: 'Duke', hSeed: 1, lower: 'Mt St Mary\'s', lSeed: 16 },
@@ -172,7 +172,7 @@ const BRACKET_2025 = {
     { higher: 'Oregon', hSeed: 5, lower: 'Liberty', lSeed: 12 },
     { higher: 'BYU', hSeed: 6, lower: 'VCU', lSeed: 11 },
     { higher: 'St Mary\'s CA', hSeed: 7, lower: 'Vanderbilt', lSeed: 10 },
-    { higher: 'Louisville', hSeed: 8, lower: 'Creighton', lSeed: 9 },
+    { higher: 'Mississippi St', hSeed: 8, lower: 'Baylor', lSeed: 9 },
   ],
   West: [
     { higher: 'Florida', hSeed: 1, lower: 'Norfolk St', lSeed: 16 },
