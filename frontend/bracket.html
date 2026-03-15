@@ -1997,7 +1997,7 @@
       return '<div class="match picked"' +
         ' data-region="final-four" data-round="2" data-matchup-id="championship"' +
         ' data-team-a="' + escAttr(winner.name) + '" data-team-b="" data-seed-a="' + escAttr(winner.seed || '') + '" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
-        '<div class="team-row"><span class="seed">' + (winner.seed ?? '-') + '</span><button class="team-btn winner" onclick="openCard(\'' + champId + '\')">' + winner.name + ' Champion</button><span class="prob">100%</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
+        '<div class="team-row"><span class="seed">' + (winner.seed ?? '-') + '</span><button class="team-btn winner" onclick="openCard(\'' + champId + '\')">' + getDisplayName(winner.name) + ' Champion</button><span class="prob">100%</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
     }
 
     function renderProgress() {
