@@ -24,7 +24,9 @@
     --bg-base: var(--bg);
     --bg-surface: var(--surface);
     --bg-surface-2: #20202a;
+    --bg-card: var(--bg-surface);
     --bg-line: var(--border);
+    --border-mid: rgba(255,255,255,0.22);
     --accent: var(--gold);
     --accent-hot: var(--orange);
     --accent-dim: rgba(46,116,212,0.12);
@@ -447,104 +449,110 @@
     line-height: 1.4;
   }
 
-  .match {
-    background: var(--bg-surface);
-    border: 1px solid var(--bg-line);
-    border-left: 3px solid transparent;
-    border-radius: 2px;
-    padding: 4px;
-    margin-bottom: 8px;
-    transition: background .12s, border-left-color .12s;
-  }
-  .match:hover { background: var(--bg-surface-2); cursor: pointer; }
-  .match.picked { border-left-color: var(--accent); }
-  .match.strategy-overridden { border-style: dashed; border-left-color: var(--accent-dim); }
-  .team-row { display: grid; grid-template-columns: 18px 1fr auto auto; gap: 8px; align-items: center; margin-bottom: 4px; }
-  .team-row:last-child { margin-bottom: 0; }
-  .seed {
-    width: 18px;
-    text-align: center;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 9px;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-  }
-  .team-btn {
-    border: 0;
-    background: transparent;
-    color: var(--text-label);
-    padding: 6px 0;
-    text-align: left;
+  .matchup-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    overflow: hidden;
     cursor: pointer;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    line-height: 1.1;
+    transition: border-color 0.12s;
+    position: relative;
   }
-  .team-btn:hover { color: var(--text-primary); }
-  .team-btn.winner { color: var(--text-primary); font-weight: 700; }
-  .team-btn:disabled { color: var(--text-muted); opacity: 1; cursor: default; font-style: italic; }
-  .prob { min-width: 44px; text-align: right; font-size: 11px; font-weight: 400; color: var(--text-muted); }
-  .info {
-    width: 24px;
-    height: 24px;
-    border: 1px solid var(--bg-line);
-    border-radius: 2px;
-    background: transparent;
-    color: var(--text-label);
-    cursor: pointer;
-    display: inline-flex;
+  .matchup-card:hover {
+    border-color: var(--border-mid);
+  }
+  .mc-team {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    font-family: 'Barlow Condensed', sans-serif;
+    gap: 8px;
+    padding: 9px 12px;
+    transition: background 0.1s;
+  }
+  .mc-team:hover {
+    background: rgba(255,255,255,0.03);
+  }
+  .mc-team.picked {
+    background: rgba(0,168,70,0.08);
+  }
+  .mc-team.eliminated .mc-name {
+    color: var(--dim) !important;
+    text-decoration: line-through;
+  }
+  .mc-seed {
+    font-family: var(--fd);
     font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--muted);
+    min-width: 18px;
+    flex-shrink: 0;
   }
-  .info:hover { border-color: var(--accent); color: var(--accent); }
-  .info:disabled { opacity: .45; cursor: default; }
-
-  .pick-meta {
-    margin-top: 4px;
-    border: 1px solid var(--bg-line);
-    border-radius: 2px;
-    background: var(--bg-surface-2);
-    padding: 4px 8px;
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-label);
-  }
-  .pick-meta.ep-good { border-color: var(--accent); color: var(--accent); }
-  .pick-meta.ep-mid { color: var(--accent-dim); }
-  .pick-meta.ep-low { color: var(--accent-hot); }
-  .pick-meta .upset-flag { margin-left: auto; }
-  .pick-meta .upset-flag.upset_alert { color: #d9534f; }
-  .pick-meta .upset-flag.upset_watch { color: #f0ad4e; }
-  .pick-meta .upset-flag.competitive { color: #d4af37; }
-  .matchup-footer {
-    margin-top: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .matchup-round-label {
+  .mc-name {
     font-family: var(--fd);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .10em;
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
-    color: var(--text-label);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mc-pct {
+    font-family: var(--fd);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    flex-shrink: 0;
+    min-width: 32px;
+    text-align: right;
+  }
+  .mc-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0;
+  }
+  .mc-team.picked .mc-pct {
+    color: var(--green);
+  }
+  .matchup-card.signal-zag {
+    border: 1.5px dashed var(--orange);
+  }
+  .matchup-card.signal-zag::before {
+    content: 'ZAG';
+    position: absolute;
+    top: -1px;
+    right: 8px;
+    font-family: var(--fd);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .10em;
+    color: var(--orange);
+    background: var(--bg-card);
+    padding: 0 4px;
+    line-height: 1;
+    transform: translateY(-50%);
+  }
+  .matchup-card.signal-lean {
+    border: 1.5px dashed var(--gold);
+  }
+  .matchup-card.signal-lean::before {
+    content: 'LEAN';
+    position: absolute;
+    top: -1px;
+    right: 8px;
+    font-family: var(--fd);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .10em;
+    color: var(--gold);
+    background: var(--bg-card);
+    padding: 0 4px;
+    line-height: 1;
+    transform: translateY(-50%);
+  }
+  .matchup-card.signal-none {
+    border: 1px solid var(--border);
   }
   .signal-tag {
     font-family: var(--fd);
@@ -553,12 +561,12 @@
     padding: 2px 7px; border-radius: 3px;
     line-height: 1.4;
   }
-  .signal-zag {
+  .signal-tag.signal-zag {
     color: var(--orange);
     background: rgba(232, 96, 31, .12);
     border: 1px solid rgba(232, 96, 31, .28);
   }
-  .signal-lean {
+  .signal-tag.signal-lean {
     color: var(--gold);
     background: rgba(212, 168, 0, .10);
     border: 1px solid rgba(212, 168, 0, .25);
@@ -1364,20 +1372,15 @@
     }
 
     function refreshAllSignals() {
-      document.querySelectorAll('.match[data-matchup-id]').forEach((cardEl) => {
+      document.querySelectorAll('.matchup-card[data-matchup-id]').forEach((cardEl) => {
         const id = cardEl.dataset.matchupId;
         const node = nodesById.get(id);
         if (!node) return;
-        const old = cardEl.querySelector('.signal-tag');
-        if (old) old.remove();
         const signal = getSignal(getSignalMatchupForNode(node));
-        if (!signal) return;
-        const footer = cardEl.querySelector('.matchup-footer');
-        if (!footer) return;
-        const tag = document.createElement('span');
-        tag.className = `signal-tag signal-${signal}`;
-        tag.textContent = signal === 'zag' ? 'ZAG' : 'LEAN';
-        footer.appendChild(tag);
+        cardEl.classList.remove('signal-zag', 'signal-lean', 'signal-none');
+        if (signal === 'zag') cardEl.classList.add('signal-zag');
+        else if (signal === 'lean') cardEl.classList.add('signal-lean');
+        else cardEl.classList.add('signal-none');
       });
       if (document.getElementById('overlay')?.classList.contains('open') && currentPickCardMatchup) {
         updatePickCardSignal(currentPickCardMatchup);
@@ -1410,9 +1413,9 @@
         .replace(/'/g, '&#39;');
     }
 
-    function md(text) {
-      const safe = escHtml(text || '');
-      const withInline = safe
+    function formatBot(text) {
+      const raw = String(text || '');
+      const withInline = raw
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -1429,10 +1432,44 @@
       row.className = 'msg ' + safeRole;
       const bubble = document.createElement('div');
       bubble.className = 'msg-bubble';
-      bubble.innerHTML = safeRole === 'bot' ? md(String(content || '')) : escHtml(String(content || ''));
+      bubble.innerHTML = safeRole === 'bot' ? formatBot(String(content || '')) : escHtml(String(content || ''));
       row.appendChild(bubble);
       messagesEl.appendChild(row);
       messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function delay(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function streamParagraphs(fullText, bubbleEl) {
+      const messagesEl = document.getElementById('messages');
+      const paragraphs = String(fullText || '')
+        .split(/\n\n+/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+
+      bubbleEl.innerHTML = '';
+
+      for (let i = 0; i < paragraphs.length; i += 1) {
+        const p = document.createElement('p');
+        p.innerHTML = formatBot(paragraphs[i]);
+        p.style.opacity = '0';
+        p.style.transition = 'opacity 0.4s ease';
+        bubbleEl.appendChild(p);
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            p.style.opacity = '1';
+          });
+        });
+
+        if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        if (i < paragraphs.length - 1) {
+          await delay(1800);
+        }
+      }
     }
 
     function saveChatHistory() {
@@ -1472,6 +1509,7 @@
       inputEl.value = '';
       sendBtn.classList.remove('active');
       chatBusy = true;
+      inputEl.disabled = true;
       sendBtn.disabled = true;
 
       chatHistory.push({ role: 'user', content: text });
@@ -1485,9 +1523,23 @@
           body: JSON.stringify({ messages: chatHistory, bracketState })
         });
         const data = await res.json();
-        const reply = data.reply || data.error || 'Something went wrong.';
+        const rawReply = typeof data.reply === 'string' ? data.reply : (typeof data.error === 'string' ? data.error : '');
+        const reply = rawReply.trim() ? rawReply : 'Something went wrong.';
         chatHistory.push({ role: 'assistant', content: reply });
-        renderChatMessage('bot', reply);
+
+        const messagesEl = document.getElementById('messages');
+        if (messagesEl && rawReply.trim()) {
+          const row = document.createElement('div');
+          row.className = 'msg bot';
+          const bubble = document.createElement('div');
+          bubble.className = 'msg-bubble';
+          row.appendChild(bubble);
+          messagesEl.appendChild(row);
+          await streamParagraphs(reply, bubble);
+        } else {
+          renderChatMessage('bot', reply);
+        }
+
         saveChatHistory();
       } catch (e) {
         const fallback = 'Lost connection. Try again.';
@@ -1497,6 +1549,7 @@
       }
 
       chatBusy = false;
+      inputEl.disabled = false;
       sendBtn.disabled = false;
       inputEl.focus();
     }
@@ -2449,26 +2502,29 @@
       return childRound;
     }
 
-    function teamRow(node, team, pick, prob) {
+    function teamRow(node, team, pick, prob, side) {
       if (!team) {
-        const prereq = prerequisiteRound(node);
-        return '<div class="team-row">' +
-          '<span class="seed">-</span>' +
-          '<button class="team-btn" disabled>Pick ' + prereq + ' to unlock</button>' +
-          '<span class="prob">--</span>' +
-          '<button class="info" disabled>i</button>' +
+        return '<div class="mc-team">' +
+          '<span class="mc-seed">-</span>' +
+          '<span class="mc-name" style="color:#EEEEF3">TBD</span>' +
+          '<span class="mc-pct">&mdash;</span>' +
         '</div>';
       }
-      const disabled = '';
-      const winner = team && pick === team.name ? 'winner' : '';
+      const picked = team && pick === team.name;
+      const eliminated = !!pick && team && pick !== team.name;
       const seedValue = Number.isFinite(Number(team?.seed)) ? Number(team.seed) : (team?.seed ?? '-');
       const displayName = getDisplayName(team?.name || 'TBD');
       const normalizedProb = normalizeProbability(prob, null);
-      return '<div class="team-row">' +
-        '<span class="seed">' + seedValue + '</span>' +
-        '<button class="team-btn ' + winner + '" ' + disabled + ' onclick="makePick(\'' + node.id + '\',\'' + (team?.name || '').replace(/'/g, "\\'") + '\')">' + displayName + '</button>' +
-        '<span class="prob">' + (Number.isFinite(normalizedProb) ? (normalizedProb * 100).toFixed(1) + '%' : '--') + '</span>' +
-        '<button class="info" onclick="openCard(\'' + node.id + '\')">i</button>' +
+      const profile = getTeamProfileClient(team?.name || '');
+      const teamColor = escAttr(String(team?.color_primary || profile?.color_primary || '#EEEEF3'));
+      const pctText = Number.isFinite(normalizedProb) ? (Math.round(normalizedProb * 100) + '%') : '&mdash;';
+      const teamName = String(team?.name || '').replace(/'/g, "\\'");
+      return '<div class="mc-team' + (picked ? ' picked' : '') + (eliminated ? ' eliminated' : '') + '"' +
+        ' data-side="' + side + '"' +
+        ' onclick="event.stopPropagation();makePick(\'' + node.id + '\',\'' + teamName + '\')">' +
+        '<span class="mc-seed">' + seedValue + '</span>' +
+        '<span class="mc-name" style="color:' + teamColor + '">' + escHtml(displayName) + '</span>' +
+        '<span class="mc-pct">' + pctText + '</span>' +
       '</div>';
     }
 
@@ -2484,37 +2540,10 @@
         p1 = estimateWinProb(t1.name, t2.name);
         p2 = 1 - p1;
       }
-      const pickedClass = validPickForNode(node) ? 'picked' : '';
-      const overrideClass = customOverrideNodes.has(node.id) ? 'strategy-overridden' : '';
-      let metaHtml = '';
-      if (validPickForNode(node)) {
-        const matchMeta = node.source?.matchup_meta || {};
-        const ep = (node.round === 'R64' && Number.isFinite(Number(node.source?.ep)))
-          ? Number(node.source.ep)
-          : getNodeEp(node, pick);
-        const t1Prob = normalizeProbability(p1, 0.5);
-        const favoredProb = Math.max(t1Prob, 1 - t1Prob);
-        const sourceConfidence = node.source?.confidence || node.source?.confidence_label || node.source?.matchup_meta?.confidence || '';
-        const conf = node.round === 'R64' && sourceConfidence
-          ? getConfidenceBadge(sourceConfidence)
-          : getConfidenceLabel(favoredProb);
-        const upsetRaw = node.round === 'R64'
-          ? (node.source?.upset_flag || node.source?.matchup_meta?.upset_flag || node.source?.matchup_meta?.display_flag || '')
-          : getDisplayFlag(matchMeta, t1Prob, t1?.seed, t2?.seed);
-        const upsetFlag = String(upsetRaw || '').toLowerCase().replace(/\s+/g, '_');
-        const upsetLabel = String(upsetFlag || '').replace(/_/g, ' ').toUpperCase();
-        const showUpsetFlag = upsetFlag === 'upset_alert' || upsetFlag === 'upset_watch' || upsetFlag === 'competitive';
-        metaHtml = '<div class="pick-meta ' + roundEpClass(node.round, ep) + '">' +
-          '<span>EP: ' + ep.toFixed(1) + '</span>' +
-          '<span style="color:' + conf.color + '">' + conf.label + '</span>' +
-          (showUpsetFlag ? ('<span class="upset-flag ' + upsetFlag + '">' + upsetLabel + '</span>') : '') +
-        '</div>';
-      }
       const regionAttr = escAttr(String(node.region || '').toLowerCase());
       const roundAttr = escAttr(roundDataValue(node.round));
       const matchupAttr = escAttr(String(node.id || ''));
-      const roundLabel = getRoundTitle(node.round).split(' (')[0];
-      return '<div class="match ' + pickedClass + ' ' + overrideClass + '"' +
+      return '<div class="matchup-card signal-none"' +
         ' data-region="' + regionAttr + '"' +
         ' data-round="' + roundAttr + '"' +
         ' data-matchup-id="' + matchupAttr + '"' +
@@ -2523,10 +2552,9 @@
         ' data-seed-a="' + escAttr(t1?.seed || '') + '"' +
         ' data-seed-b="' + escAttr(t2?.seed || '') + '"' +
         ' onclick="onMatchClick(event,\'' + node.id + '\')">' +
-        teamRow(node, t1, pick, p1) +
-        teamRow(node, t2, pick, p2) +
-        metaHtml +
-        '<div class="matchup-footer"><span class="matchup-round-label">' + roundLabel + '</span></div>' +
+        teamRow(node, t1, pick, p1, 'a') +
+        '<div class="mc-divider"></div>' +
+        teamRow(node, t2, pick, p2, 'b') +
       '</div>';
     }
 
@@ -2569,15 +2597,19 @@
       const champId = finalIds.NCG[0];
       const winner = getWinnerTeam(champId);
       if (!winner) {
-        return '<div class="match"' +
-          ' data-region="final-four" data-round="2" data-matchup-id="championship"' +
+        return '<div class="matchup-card signal-none"' +
+          ' data-region="final-four" data-round="2" data-matchup-id="' + escAttr(champId || '') + '"' +
           ' data-team-a="" data-team-b="" data-seed-a="" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
-          '<div class="team-row"><span class="seed">-</span><button class="team-btn" disabled>TBD</button><span class="prob">--</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
+          '<div class="mc-team"><span class="mc-seed">-</span><span class="mc-name" style="color:#EEEEF3">TBD</span><span class="mc-pct">&mdash;</span></div>' +
+        '</div>';
       }
-      return '<div class="match picked"' +
-        ' data-region="final-four" data-round="2" data-matchup-id="championship"' +
+      const profile = getTeamProfileClient(winner.name) || {};
+      const color = escAttr(String(winner?.color_primary || profile?.color_primary || '#EEEEF3'));
+      return '<div class="matchup-card signal-none"' +
+        ' data-region="final-four" data-round="2" data-matchup-id="' + escAttr(champId || '') + '"' +
         ' data-team-a="' + escAttr(winner.name) + '" data-team-b="" data-seed-a="' + escAttr(winner.seed || '') + '" data-seed-b="" onclick="onMatchClick(event,\'' + champId + '\')">' +
-        '<div class="team-row"><span class="seed">' + (winner.seed ?? '-') + '</span><button class="team-btn winner" onclick="openCard(\'' + champId + '\')">' + getDisplayName(winner.name) + ' Champion</button><span class="prob">100%</span><button class="info" onclick="openCard(\'' + champId + '\')">i</button></div></div>';
+        '<div class="mc-team picked" onclick="event.stopPropagation();openCard(\'' + champId + '\')"><span class="mc-seed">' + (winner.seed ?? '-') + '</span><span class="mc-name" style="color:' + color + '">' + escHtml(getDisplayName(winner.name) + ' Champion') + '</span><span class="mc-pct">100%</span></div>' +
+      '</div>';
     }
 
     function renderProgress() {
