@@ -330,6 +330,16 @@
     margin-top: 6px;
     letter-spacing: .04em;
   }
+  .chat-route-status {
+    font-family: var(--fb);
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 3px;
+    letter-spacing: .02em;
+  }
+  .chat-route-status.ok { color: var(--green); }
+  .chat-route-status.err { color: var(--red); }
   .msg {
     display: flex;
     gap: 8px;
@@ -2061,6 +2071,7 @@
           </button>
         </div>
         <div class="chat-hint">Powered by 3-model ensemble</div>
+        <div id="chatRouteStatus" class="chat-route-status">Endpoint: idle</div>
       </div>
     </div>
   </div>
@@ -2856,6 +2867,13 @@
       btn.title = pane.classList.contains('collapsed') ? 'Expand panel' : 'Collapse panel';
     }
 
+    function setChatRouteStatus(text, cls = '') {
+      const el = document.getElementById('chatRouteStatus');
+      if (!el) return;
+      el.className = 'chat-route-status' + (cls ? ' ' + cls : '');
+      el.textContent = text;
+    }
+
     async function send(textOverride = null) {
       const inputEl = document.getElementById('chatInput');
       const sendBtn = document.getElementById('sendBtn');
@@ -2869,6 +2887,7 @@
       chatBusy = true;
       inputEl.disabled = true;
       updateChatControlState();
+      setChatRouteStatus('Endpoint: sending...', '');
       const typingEl = document.getElementById('chatTyping');
       const messagesEl = document.getElementById('chatMessages');
       if (typingEl && messagesEl) {
@@ -2882,13 +2901,37 @@
       saveChatHistory();
 
       try {
-        const res = await fetch(API_BASE + '/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: chatHistory })
-        });
-        if (!res.ok) throw new Error('API error ' + res.status);
-        const data = await res.json();
+        const payload = {
+          messages: chatHistory,
+          bracketState: bracketState || {},
+          focusMatchup: chatContext?.nodeId || ''
+        };
+        let data = null;
+        let lastErr = '';
+
+        try {
+          const res = await fetch(API_BASE + '/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const first = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(first?.error || ('API error ' + res.status));
+          data = first;
+          setChatRouteStatus('Endpoint: /api/chat', 'ok');
+        } catch (err1) {
+          lastErr = String(err1?.message || err1 || '');
+          const res2 = await fetch(API_BASE + '/api/bracket-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const second = await res2.json().catch(() => ({}));
+          if (!res2.ok) throw new Error(second?.error || lastErr || ('API error ' + res2.status));
+          data = second;
+          setChatRouteStatus('Endpoint: /api/bracket-chat (fallback)', 'ok');
+        }
+
         const rawReply = typeof data.reply === 'string' ? data.reply : (typeof data.error === 'string' ? data.error : '');
         const reply = rawReply.trim() ? rawReply : 'No response received.';
         chatHistory.push({ role: 'assistant', content: reply });
@@ -2907,7 +2950,9 @@
 
         saveChatHistory();
       } catch (e) {
-        const fallback = 'Sorry, something went wrong. Try again.';
+        const backendMsg = String(e?.message || '').trim();
+        const fallback = backendMsg ? ('Error: ' + backendMsg) : 'Sorry, something went wrong. Try again.';
+        setChatRouteStatus('Endpoint error: both routes failed', 'err');
         chatHistory.push({ role: 'assistant', content: fallback });
         renderChatMessage('bot', fallback);
         saveChatHistory();
@@ -2934,6 +2979,7 @@
       renderChatHistory();
       setChatContextFromNode(null);
       updateChatControlState();
+      setChatRouteStatus('Endpoint: idle', '');
     }
 
     function isNodePickable(node) {
