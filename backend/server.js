@@ -409,14 +409,14 @@ function normalizeTextKey(value) {
     .trim();
 }
 
-function normalizeRoundKey(value) {
+function normalizeCanonicalRoundKey(value) {
   const key = normalizeTextKey(value).replace(/\s+/g, '');
-  if (key === 'roundof64' || key === 'r64' || key === 'firstround' || key === 'round64') return 'R64';
-  if (key === 'roundof32' || key === 'r32' || key === 'secondround' || key === 'round32') return 'R32';
-  if (key === 'sweet16' || key === 's16' || key === 'roundof16') return 'S16';
-  if (key === 'elite8' || key === 'e8' || key === 'roundof8') return 'E8';
-  if (key === 'finalfour' || key === 'f4') return 'F4';
-  if (key === 'championship' || key === 'titlegame' || key === 'ncg') return 'NCG';
+  if (key === '64' || key === 'roundof64' || key === 'r64' || key === 'firstround' || key === 'round64') return 'R64';
+  if (key === '32' || key === 'roundof32' || key === 'r32' || key === 'secondround' || key === 'round32') return 'R32';
+  if (key === '16' || key === 'sweet16' || key === 's16' || key === 'roundof16') return 'S16';
+  if (key === '8' || key === 'elite8' || key === 'e8' || key === 'roundof8') return 'E8';
+  if (key === '4' || key === 'finalfour' || key === 'f4' || key === 'semifinal' || key === 'semifinals') return 'F4';
+  if (key === '2' || key === 'championship' || key === 'titlegame' || key === 'ncg' || key === 'roundof2' || key === 'final') return 'NCG';
   return String(value || '').trim();
 }
 
@@ -549,44 +549,48 @@ function parseUploadedCsv(type, rawInput) {
   }
   if (type === 'espn_public_csv') {
     const hasMatchupShape = rows.some((row) => {
-      const team1 = String(row.team_1 || row.team1 || row.Team1 || '').trim();
-      const team2 = String(row.team_2 || row.team2 || row.Team2 || '').trim();
+      const pick = makeCsvRowAccessor(row);
+      const team1 = String(pick('team_1', 'team1', 'Team1') || '').trim();
+      const team2 = String(pick('team_2', 'team2', 'Team2') || '').trim();
       return !!(team1 && team2);
     });
     const normalizedRows = [];
     if (hasMatchupShape) {
       for (const row of rows) {
-        const team1 = String(row.team_1 || row.team1 || row.Team1 || '').trim();
-        const team2 = String(row.team_2 || row.team2 || row.Team2 || '').trim();
+        const pick = makeCsvRowAccessor(row);
+        const team1 = String(pick('team_1', 'team1', 'Team1') || '').trim();
+        const team2 = String(pick('team_2', 'team2', 'Team2') || '').trim();
         if (!team1 || !team2) continue;
+        const roundRaw = String(pick('round', 'Round', 'round_key', 'round_label') || '').trim();
         normalizedRows.push({
-          round: normalizeRoundKey(row.round || row.Round || ''),
-          round_raw: String(row.round || row.Round || '').trim(),
-          region_or_stage: String(row.region_or_stage || row.region || row.stage || '').trim(),
-          matchup_number: parseNumberMaybe(row.matchup_number || row.game_number || row.game || ''),
+          round: normalizeCanonicalRoundKey(roundRaw),
+          round_raw: roundRaw,
+          region_or_stage: String(pick('region_or_stage', 'region', 'stage') || '').trim(),
+          matchup_number: parseNumberMaybe(pick('matchup_number', 'game_number', 'game_id', 'game')),
           team_1: team1,
-          team_1_pct: parsePercentMaybe(row.team_1_pct || row.team1_pct || row.public_1_pct),
+          team_1_pct: parsePercentMaybe(pick('team_1_pct', 'team1_pct', 'public_1_pct')),
           team_2: team2,
-          team_2_pct: parsePercentMaybe(row.team_2_pct || row.team2_pct || row.public_2_pct),
+          team_2_pct: parsePercentMaybe(pick('team_2_pct', 'team2_pct', 'public_2_pct')),
           source_format: 'matchup',
         });
       }
     } else {
       for (const row of rows) {
-        const team = String(row.team || row.Team || row.school || row.School || '').trim();
+        const pick = makeCsvRowAccessor(row);
+        const team = String(pick('team', 'Team', 'school', 'School', 'team_1', 'team1') || '').trim();
         if (!team) continue;
-        const roundRaw = String(row.round_label || row.round || row.Round || '').trim();
+        const roundRaw = String(pick('round_label', 'round_key', 'round', 'Round') || '').trim();
         normalizedRows.push({
-          round: normalizeRoundKey(roundRaw),
+          round: normalizeCanonicalRoundKey(roundRaw),
           round_raw: roundRaw,
-          region_or_stage: String(row.region_or_stage || row.region || row.stage || '').trim(),
-          matchup_number: parseNumberMaybe(row.matchup_number || row.game_number || row.game || row.rank || row.Rank || ''),
+          region_or_stage: String(pick('region_or_stage', 'region', 'stage') || '').trim(),
+          matchup_number: parseNumberMaybe(pick('matchup_number', 'game_number', 'game_id', 'game', 'rank', 'Rank')),
           team_1: team,
-          team_1_pct: parsePercentMaybe(row.pct_picked || row.pct || row.pick_pct || row.team_pct || row.public_pct),
+          team_1_pct: parsePercentMaybe(pick('pct_picked', 'pct', 'pick_pct', 'team_pct', 'public_pct', 'normalized_prob', 'raw_prob', 'prob')),
           team_2: '',
           team_2_pct: null,
-          rank: parseNumberMaybe(row.rank || row.Rank || ''),
-          seed: parseNumberMaybe(row.seed || row.Seed || ''),
+          rank: parseNumberMaybe(pick('rank', 'Rank')),
+          seed: parseNumberMaybe(pick('seed', 'Seed')),
           source_format: 'team_pick_distribution',
         });
       }
@@ -836,13 +840,13 @@ function buildBracketMatchupIndex() {
   bracketMatchupIndex.regions = regionSet.size ? Array.from(regionSet) : REGION_ORDER_2026.slice();
 }
 
-function normalizeRoundKey(value) {
+function normalizeRoundToken(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function isR64Round(value) {
-  const key = normalizeRoundKey(value);
-  return key === 'r64' || key === 'round64' || key === 'roundof64' || key === 'firstround' || key === '1stround';
+  const key = normalizeRoundToken(value);
+  return key === '64' || key === 'r64' || key === 'round64' || key === 'roundof64' || key === 'firstround' || key === '1stround';
 }
 
 function normalizeR64Matchups(rows, seasonFallback) {
@@ -2002,14 +2006,66 @@ function findEvByTeamName(teamName) {
 }
 
 function isRealBracketMatchup(teamA, teamB) {
-  if (!store.bracket2025?.bracketGames) return false;
   const a = normalizeTeamName(teamA);
   const b = normalizeTeamName(teamB);
-  return store.bracket2025.bracketGames.some((g) => {
-    const g1 = normalizeTeamName(g.team1 || g.team1Name || g.team1_name || g.team1School);
-    const g2 = normalizeTeamName(g.team2 || g.team2Name || g.team2_name || g.team2School);
-    return (g1 === a && g2 === b) || (g1 === b && g2 === a);
+  if (!a || !b) return false;
+  return getAuthoritativeR64Matchups().some((m) => {
+    const t1 = normalizeTeamName(m?.t1?.name || '');
+    const t2 = normalizeTeamName(m?.t2?.name || '');
+    return (t1 === a && t2 === b) || (t1 === b && t2 === a);
   });
+}
+
+function getAuthoritativeR64Matchups() {
+  const primary = Array.isArray(store.bracketMatchups?.matchups) ? store.bracketMatchups.matchups : [];
+  const fallback = Array.from(bracketMatchupIndex.byId.values());
+  const source = primary.length ? primary : fallback;
+  const out = [];
+  const seen = new Set();
+  for (const row of source) {
+    if (!row || !isR64Round(row.round)) continue;
+    const id = String(row.matchup_id || '');
+    const key = id || `${normalizeTeamName(row?.t1?.name || '')}|${normalizeTeamName(row?.t2?.name || '')}|${String(row.region || '')}`;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  const regionOrder = (Array.isArray(bracketMatchupIndex.regions) && bracketMatchupIndex.regions.length)
+    ? bracketMatchupIndex.regions
+    : REGION_ORDER_2026;
+  const regionRank = new Map(regionOrder.map((region, idx) => [String(region || '').toLowerCase(), idx]));
+  out.sort((a, b) => {
+    const ar = regionRank.has(String(a?.region || '').toLowerCase()) ? regionRank.get(String(a?.region || '').toLowerCase()) : 999;
+    const br = regionRank.has(String(b?.region || '').toLowerCase()) ? regionRank.get(String(b?.region || '').toLowerCase()) : 999;
+    if (ar !== br) return ar - br;
+    const ag = Number(a?.game_number ?? 999);
+    const bg = Number(b?.game_number ?? 999);
+    if (ag !== bg) return ag - bg;
+    return String(a?.matchup_id || '').localeCompare(String(b?.matchup_id || ''));
+  });
+  return out;
+}
+
+function buildUpsetMatchupGuardrailContext() {
+  const rows = getAuthoritativeR64Matchups();
+  if (!rows.length) {
+    return `UPSET_MATCHUP_GUARDRAIL:
+- Round of 64 authoritative matchup list is unavailable.
+- Never invent first-round pairings; if unclear, explicitly say matchup data is unavailable.`;
+  }
+  const lines = rows.map((m) => {
+    const s1 = Number(m?.t1?.seed);
+    const s2 = Number(m?.t2?.seed);
+    const seed1 = Number.isFinite(s1) ? s1 : '?';
+    const seed2 = Number.isFinite(s2) ? s2 : '?';
+    return `- ${m.matchup_id || 'R64'}: (${seed1}) ${m?.t1?.name || 'TBD'} vs (${seed2}) ${m?.t2?.name || 'TBD'} [${m?.region || 'Unknown'}]`;
+  });
+  return `UPSET_MATCHUP_GUARDRAIL:
+- For upset lists, use ONLY these Round of 64 pairings.
+- Never combine teams from different matchup_id rows.
+- If user suggests an invalid pairing, correct it directly using this list.
+AUTHORITATIVE_R64_MATCHUPS:
+${lines.join('\n')}`;
 }
 
 function findCtx(query, opts = {}) {
@@ -2139,22 +2195,54 @@ function findCtx(query, opts = {}) {
 
   // Upset queries
   if (/upset|cinderella|underdog|dark.?horse|sleeper|bust/.test(lc)) {
-    let count = 0;
-    // Bracket-aware upsets first
-    for (const g of bracketGames) {
-      if (g.upsetFlag === 'upset' || (g.predictedWinner && g.seed1 < g.seed2 && g.predictedWinner === g.team2)) {
-        ctx.push({ type: 'bracket', data: g });
-        count++;
-        if (count >= (c.upsetItems || 8)) break;
+    const limit = c.upsetItems || 8;
+    const r64 = getAuthoritativeR64Matchups();
+    const ranked = r64
+      .map((m) => {
+        const s1 = Number(m?.t1?.seed);
+        const s2 = Number(m?.t2?.seed);
+        const p1 = Number(m?.t1?.win_probability);
+        const p2 = Number(m?.t2?.win_probability);
+        const t1Dog = Number.isFinite(s1) && Number.isFinite(s2) ? s1 > s2 : false;
+        const dogProbRaw = t1Dog ? p1 : p2;
+        const dogProb = Number.isFinite(dogProbRaw) ? dogProbRaw : 0;
+        const seedGap = Number.isFinite(s1) && Number.isFinite(s2) ? Math.abs(s1 - s2) : 0;
+        const upsetFlag = String(m?.matchup_meta?.upset_flag || '').toLowerCase();
+        const upsetBoost = upsetFlag && upsetFlag !== 'chalk' ? 0.2 : 0;
+        const score = dogProb + upsetBoost + (seedGap >= 3 ? 0.05 : 0);
+        return { matchup: m, dogProb, upsetFlag, score };
+      })
+      .sort((a, b) => b.score - a.score);
+    const chosen = [];
+    const chosenIds = new Set();
+    for (const item of ranked) {
+      const id = String(item?.matchup?.matchup_id || '');
+      const looksUpset = item.dogProb >= 0.33 || (item.upsetFlag && item.upsetFlag !== 'chalk');
+      if (!looksUpset || chosenIds.has(id)) continue;
+      chosen.push(item.matchup);
+      chosenIds.add(id);
+      if (chosen.length >= limit) break;
+    }
+    if (chosen.length < limit) {
+      for (const item of ranked) {
+        const id = String(item?.matchup?.matchup_id || '');
+        if (chosenIds.has(id)) continue;
+        chosen.push(item.matchup);
+        chosenIds.add(id);
+        if (chosen.length >= limit) break;
       }
     }
-    // V5 enhancement: also surface high-volatility opponents + rising underdogs
-    if (count < (c.upsetItems || 8)) {
+    for (const m of chosen) {
+      ctx.push({ type: 'matchup', data: m });
+      const pred = findPredictionForTeams(m?.t1?.name, m?.t2?.name);
+      if (pred) ctx.push({ type: 'pred', model: 'base', data: pred });
+    }
+    if (!chosen.length) {
       for (const p of basePredictions) {
+        if (!isRealBracketMatchup(p?.t1_name, p?.t2_name)) continue;
         if (p.upset_flag && p.upset_flag !== '' && p.upset_flag !== 'chalk') {
           ctx.push({ type: 'pred', model: 'base', data: p });
-          count++;
-          if (count >= (c.upsetItems || 8)) break;
+          if (ctx.length >= limit) break;
         }
       }
     }
@@ -2322,7 +2410,10 @@ function getRelevantHistoricalContext(userMessage) {
   };
 
   for (const team of mentionedTeams) {
-    for (const pred of (historicalIndex.predictionsByTeam.get(team) || [])) addPred(pred);
+    for (const pred of (historicalIndex.predictionsByTeam.get(team) || [])) {
+      if (flags.isUpsets && !isRealBracketMatchup(pred?.t1_name, pred?.t2_name)) continue;
+      addPred(pred);
+    }
   }
 
   if (flags.isFinalFour || flags.isChampion) {
@@ -2338,13 +2429,27 @@ function getRelevantHistoricalContext(userMessage) {
   }
 
   if (flags.isUpsets) {
-    for (let seed = 5; seed <= 16; seed += 1) {
-      for (const pred of (historicalIndex.predictionsBySeed.get(seed) || [])) addPred(pred);
+    const beforeUpsetAdds = relevantPreds.length;
+    const r64 = getAuthoritativeR64Matchups();
+    for (const matchup of r64) {
+      const pred = findPredictionForTeams(matchup?.t1?.name, matchup?.t2?.name);
+      if (pred) addPred(pred);
+    }
+    if (relevantPreds.length === beforeUpsetAdds) {
+      for (let seed = 5; seed <= 16; seed += 1) {
+        for (const pred of (historicalIndex.predictionsBySeed.get(seed) || [])) {
+          if (!isRealBracketMatchup(pred?.t1_name, pred?.t2_name)) continue;
+          addPred(pred);
+        }
+      }
     }
   }
 
   for (const seedNum of flags.seedMatches) {
-    for (const pred of (historicalIndex.predictionsBySeed.get(seedNum) || [])) addPred(pred);
+    for (const pred of (historicalIndex.predictionsBySeed.get(seedNum) || [])) {
+      if (flags.isUpsets && !isRealBracketMatchup(pred?.t1_name, pred?.t2_name)) continue;
+      addPred(pred);
+    }
   }
 
   if (!relevantPreds.length) {
@@ -3416,6 +3521,16 @@ async function handleChat(req, res, opts = {}) {
     const bracketState = req.body?.bracketState;
     const focusMatchup = req.body?.focusMatchup;
     const shouldIncludeBracket = opts.forceBracketContext || !!bracketState;
+    const seasonMentions = Array.from(String(joined || '').matchAll(/\b(20\d{2})\b/g)).map((m) => Number(m[1]));
+    const requestedSeason = seasonMentions.length ? seasonMentions[seasonMentions.length - 1] : null;
+    const loadedSeason = Number(bracketMatchupIndex.season || cfg.activeSeason || 0) || null;
+    const seasonGuardrailBlock = (requestedSeason && loadedSeason && requestedSeason !== loadedSeason)
+      ? `SEASON_GUARDRAIL:
+- Loaded bracket season is ${loadedSeason}, but user requested ${requestedSeason}.
+- Explicitly state this mismatch before giving picks.
+- Do not claim ${requestedSeason} first-round matchups unless ${requestedSeason} bracket data is loaded.`
+      : '';
+    const upsetGuardrailBlock = intent === 'upset' ? buildUpsetMatchupGuardrailContext() : '';
     const bracketStateBlock = shouldIncludeBracket ? formatBracketStateContext(bracketState || {}, focusMatchup) : '';
     const ui2LayoutBlock = shouldIncludeBracket ? formatUi2BracketLayoutContext() : '';
     const uiProbabilityRule = shouldIncludeBracket
@@ -3426,7 +3541,9 @@ async function handleChat(req, res, opts = {}) {
       : '';
 
     const reply = await callLLM(msgs, `${intentHint}
+${seasonGuardrailBlock}
 ${bracketGrounding}
+${upsetGuardrailBlock}
 RELEVANT_HISTORICAL_CONTEXT:
 ${JSON.stringify(historicalCtx, null, 0)}
 CONTEXT_COUNTS: predictions=${historicalCtx.predictions.length}, archetypes=${Object.keys(historicalCtx.archetype_history || {}).length}
