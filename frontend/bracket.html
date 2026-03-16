@@ -3471,13 +3471,86 @@
       return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     }
 
+    function expandLookupKeyVariants(baseKey) {
+      const out = new Set();
+      const queue = [];
+      const seed = normalizeLookupKey(baseKey);
+      if (seed) queue.push(seed);
+      const expandDir = { n: 'north', s: 'south', e: 'east', w: 'west' };
+      const compressDir = { north: 'n', south: 's', east: 'e', west: 'w' };
+      while (queue.length) {
+        const key = queue.pop();
+        if (!key || out.has(key)) continue;
+        out.add(key);
+        const words = key.split(' ').filter(Boolean);
+        if (words.length) {
+          const first = words[0];
+          if (expandDir[first]) {
+            queue.push([expandDir[first], ...words.slice(1)].join(' '));
+          }
+          if (compressDir[first]) {
+            queue.push([compressDir[first], ...words.slice(1)].join(' '));
+          }
+        }
+        if (/\bst\b/.test(key)) {
+          queue.push(key.replace(/\bst\b/g, 'state'));
+          queue.push(key.replace(/\bst\b/g, 'saint'));
+        }
+        if (/\bstate\b/.test(key)) {
+          queue.push(key.replace(/\bstate\b/g, 'st'));
+        }
+        if (/\bsaint\b/.test(key)) {
+          queue.push(key.replace(/\bsaint\b/g, 'st'));
+        }
+      }
+      return Array.from(out);
+    }
+
+    function buildTeamLookupKeys(teamName) {
+      const out = new Set();
+      const variants = [
+        teamName,
+        getDisplayName(teamName),
+        normalizeName(teamName),
+        normalizeName(getDisplayName(teamName))
+      ];
+      for (const raw of variants) {
+        for (const key of expandLookupKeyVariants(raw)) out.add(key);
+      }
+      return Array.from(out);
+    }
+
+    function indexKenpomTeams(teamsRaw) {
+      const out = {};
+      const rows = teamsRaw || {};
+      for (const [rawKey, row] of Object.entries(rows)) {
+        const keys = new Set();
+        keys.add(normalizeLookupKey(rawKey));
+        for (const key of buildTeamLookupKeys(row?.team || rawKey)) keys.add(key);
+        for (const key of keys) {
+          if (!key) continue;
+          if (!out[key]) out[key] = row;
+        }
+      }
+      return out;
+    }
+
     function getByTeamNameLoose(mapObj, teamName) {
-      const key = normalizeLookupKey(teamName);
-      if (!key) return null;
-      if (mapObj?.[key]) return mapObj[key];
-      const display = getDisplayName(teamName);
-      const displayKey = normalizeLookupKey(display);
-      if (displayKey && mapObj?.[displayKey]) return mapObj[displayKey];
+      const directKeys = buildTeamLookupKeys(teamName);
+      for (const key of directKeys) {
+        if (mapObj?.[key]) return mapObj[key];
+      }
+      if (!mapObj || !directKeys.length) return null;
+      const directSet = new Set(directKeys);
+      for (const [rawKey, row] of Object.entries(mapObj)) {
+        const rowKeys = new Set([
+          normalizeLookupKey(rawKey),
+          ...buildTeamLookupKeys(row?.team || rawKey)
+        ]);
+        for (const rowKey of rowKeys) {
+          if (directSet.has(rowKey)) return row;
+        }
+      }
       return null;
     }
 
@@ -3508,7 +3581,7 @@
         const res = await fetch('/api/kenpom');
         if (!res.ok) return;
         const data = await res.json();
-        kenpomCsvTeams = data?.teams || {};
+        kenpomCsvTeams = indexKenpomTeams(data?.teams || {});
       } catch (e) {
         kenpomCsvTeams = {};
       }
@@ -5299,6 +5372,7 @@
         recommended_pick: String(data?.recommended_pick || meta?.predicted_winner || ''),
         historical_seed_matchup: data?.historical_seed_matchup || meta?.seed_matchup || null,
         kenpom: data?.kenpom || meta?.kenpom || null,
+        prediction: data?.prediction || data?.pred || null,
         risk: data?.risk || meta?.risk || null,
         pool_meta_full: data?.pool_meta || meta?.pool_meta || {},
         pool_meta: {
@@ -5582,6 +5656,106 @@
       return Number.isFinite(n) ? '(#' + n + ')' : '';
     }
 
+    function normalizeMetricKey(value) {
+      return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    }
+
+    function collectMetricLookup(raw, out) {
+      if (!raw || typeof raw !== 'object') return;
+      for (const [key, value] of Object.entries(raw)) {
+        const normalized = normalizeMetricKey(key);
+        if (!normalized) continue;
+        if (!(normalized in out)) out[normalized] = value;
+      }
+    }
+
+    function readMetricNumber(lookup, keys) {
+      for (const key of keys) {
+        const normalized = normalizeMetricKey(key);
+        if (!normalized) continue;
+        const n = Number(lookup[normalized]);
+        if (Number.isFinite(n)) return n;
+      }
+      return null;
+    }
+
+    function extractKenPomMetrics(raw) {
+      const lookup = {};
+      collectMetricLookup(raw, lookup);
+      collectMetricLookup(raw?.kenpom, lookup);
+      return {
+        rank: readMetricNumber(lookup, [
+          'rank', 'kenpom_rank', 'kp_rank', 'rk', 'overall_rank', 'adjem_rank', 'em_rank'
+        ]),
+        adjoe: readMetricNumber(lookup, [
+          'adjoe', 'adjo', 'adj_oe', 'adj_o', 'adjoffense', 'adjoff',
+          'offrating', 'ortg', 'offefficiency', 'offensiveefficiency', 'kp_ortg'
+        ]),
+        adjoe_rank: readMetricNumber(lookup, [
+          'adjoe_rank', 'adjo_rank', 'adj_oe_rank', 'adj_o_rank',
+          'offrank', 'ortg_rank', 'rankadjoe', 'rankadjo'
+        ]),
+        adjde: readMetricNumber(lookup, [
+          'adjde', 'adjd', 'adj_de', 'adj_d', 'adjdefense', 'adjdef',
+          'defrating', 'drtg', 'defefficiency', 'defensiveefficiency', 'kp_drtg'
+        ]),
+        adjde_rank: readMetricNumber(lookup, [
+          'adjde_rank', 'adjd_rank', 'adj_de_rank', 'adj_d_rank',
+          'defrank', 'drtg_rank', 'rankadjde', 'rankadjd'
+        ]),
+        adjem: readMetricNumber(lookup, [
+          'adjem', 'adj_em', 'net', 'netrtg', 'netrating', 'efficiencymargin', 'em', 'kp_netrtg'
+        ]),
+        adjem_rank: readMetricNumber(lookup, [
+          'adjem_rank', 'adj_em_rank', 'netrank', 'netrtg_rank', 'em_rank', 'rankadjem'
+        ]),
+        tempo: readMetricNumber(lookup, [
+          'tempo', 'adjtempo', 'adjt', 'adjustedtempo', 'adj_tempo', 'pace'
+        ]),
+        tempo_rank: readMetricNumber(lookup, [
+          'tempo_rank', 'temporank', 'adjtempo_rank', 'adjtemporank', 'adjt_rank', 'pacerank', 'rankadjtempo'
+        ]),
+      };
+    }
+
+    function inferKenPomSideForTeam(matchup, teamName, fallbackSide) {
+      const fallback = fallbackSide === 't2' ? 't2' : 't1';
+      const target = normalizeName(teamName || '');
+      if (!target) return fallback;
+      const pred = matchup?.prediction || matchup?.pred || null;
+      if (!pred) return fallback;
+      const predT1 = normalizeName(pred?.t1_name || pred?.team1_name || pred?.team1 || '');
+      const predT2 = normalizeName(pred?.t2_name || pred?.team2_name || pred?.team2 || '');
+      if (predT1 && target === predT1) return 't1';
+      if (predT2 && target === predT2) return 't2';
+      return fallback;
+    }
+
+    function extractKenPomForSide(raw, side) {
+      if (!raw || typeof raw !== 'object') return {};
+      const prefix = side === 't2' ? 't2' : 't1';
+      const teamPrefix = side === 't2' ? 'team2' : 'team1';
+      const sideLookup = {};
+      collectMetricLookup(raw[prefix], sideLookup);
+      collectMetricLookup(raw[prefix]?.kenpom, sideLookup);
+      collectMetricLookup(raw[teamPrefix], sideLookup);
+      collectMetricLookup(raw[teamPrefix]?.kenpom, sideLookup);
+      collectMetricLookup(raw[`${prefix}_profile`], sideLookup);
+      collectMetricLookup(raw[`${prefix}_profile`]?.kenpom, sideLookup);
+      for (const [key, value] of Object.entries(raw)) {
+        const normalized = normalizeMetricKey(key);
+        if (!normalized) continue;
+        if (normalized.startsWith(prefix)) {
+          const stripped = normalized.slice(prefix.length);
+          if (stripped) sideLookup[stripped] = value;
+        } else if (normalized.startsWith(teamPrefix)) {
+          const stripped = normalized.slice(teamPrefix.length);
+          if (stripped) sideLookup[stripped] = value;
+        }
+      }
+      return extractKenPomMetrics(sideLookup);
+    }
+
     function renderKenPomComparison(m, tA, tB) {
       const grid = document.getElementById('pcStatsGrid');
       if (!grid) return;
@@ -5589,10 +5763,25 @@
       const s2 = teamStats[tB?.name] || teamStats[getDisplayName(tB?.name)] || {};
       const csv1 = getByTeamNameLoose(kenpomCsvTeams, tA?.name) || {};
       const csv2 = getByTeamNameLoose(kenpomCsvTeams, tB?.name) || {};
-      const k1 = { ...s1, ...(tA?.kenpom || {}), ...csv1 };
-      const k2 = { ...s2, ...(tB?.kenpom || {}), ...csv2 };
-      const hasData = [k1.adjoe, k1.adjde, k1.adjem, k1.tempo, k2.adjoe, k2.adjde, k2.adjem, k2.tempo]
-        .some((x) => Number.isFinite(Number(x)));
+      const kenpomRaw = m?.kenpom || m?.matchup_meta?.kenpom || {};
+      const sideA = inferKenPomSideForTeam(m, tA?.name, 't1');
+      const sideB = inferKenPomSideForTeam(m, tB?.name, sideA === 't1' ? 't2' : 't1');
+      const k1 = {
+        ...extractKenPomMetrics(s1),
+        ...extractKenPomMetrics(tA?.kenpom || {}),
+        ...extractKenPomForSide(kenpomRaw, sideA),
+        ...extractKenPomMetrics(csv1),
+      };
+      const k2 = {
+        ...extractKenPomMetrics(s2),
+        ...extractKenPomMetrics(tB?.kenpom || {}),
+        ...extractKenPomForSide(kenpomRaw, sideB),
+        ...extractKenPomMetrics(csv2),
+      };
+      const hasData = [
+        k1.rank, k1.adjoe, k1.adjde, k1.adjem, k1.tempo,
+        k2.rank, k2.adjoe, k2.adjde, k2.adjem, k2.tempo
+      ].some((x) => Number.isFinite(Number(x)));
       if (!hasData) {
         grid.innerHTML = '<p class="pc-no-data">KenPom data not available.</p>';
         return;
@@ -5608,6 +5797,12 @@
       const hasOverallRank = Number.isFinite(rankA) || Number.isFinite(rankB);
       const rankClassA = Number.isFinite(rankA) && (!Number.isFinite(rankB) || rankA <= rankB) ? 'stat-better' : 'stat-worse';
       const rankClassB = Number.isFinite(rankB) && (!Number.isFinite(rankA) || rankB <= rankA) ? 'stat-better' : 'stat-worse';
+      const higherClassA = Number.isFinite(oeA) && (!Number.isFinite(oeB) || oeA >= oeB) ? 'stat-better' : 'stat-worse';
+      const higherClassB = Number.isFinite(oeB) && (!Number.isFinite(oeA) || oeB >= oeA) ? 'stat-better' : 'stat-worse';
+      const lowerClassA = Number.isFinite(deA) && (!Number.isFinite(deB) || deA <= deB) ? 'stat-better' : 'stat-worse';
+      const lowerClassB = Number.isFinite(deB) && (!Number.isFinite(deA) || deB <= deA) ? 'stat-better' : 'stat-worse';
+      const emClassA = Number.isFinite(emA) && (!Number.isFinite(emB) || emA >= emB) ? 'stat-better' : 'stat-worse';
+      const emClassB = Number.isFinite(emB) && (!Number.isFinite(emA) || emB >= emA) ? 'stat-better' : 'stat-worse';
       grid.innerHTML =
         '<table class="pc-stats-table"><thead><tr><th></th><th>' + escHtml(tA.abbreviation || getDisplayName(tA.name)) +
         '</th><th>' + escHtml(tB.abbreviation || getDisplayName(tB.name)) +
@@ -5617,17 +5812,17 @@
             (Number.isFinite(rankA) ? '#' + rankA : '-') + '</td><td class="' + rankClassB + '">' +
             (Number.isFinite(rankB) ? '#' + rankB : '-') + '</td></tr>'
           : '') +
-        '<tr><td class="stat-label">Adj OE</td><td class="' + (oeA >= oeB ? 'stat-better' : 'stat-worse') + '">' +
+        '<tr><td class="stat-label">Adj OE</td><td class="' + higherClassA + '">' +
         fmtNum(k1.adjoe) + ' <span class="stat-rank">' + fmtRank(k1.adjoe_rank) + '</span></td><td class="' +
-        (oeB >= oeA ? 'stat-better' : 'stat-worse') + '">' + fmtNum(k2.adjoe) +
+        higherClassB + '">' + fmtNum(k2.adjoe) +
         ' <span class="stat-rank">' + fmtRank(k2.adjoe_rank) + '</span></td></tr>' +
-        '<tr><td class="stat-label">Adj DE</td><td class="' + (deA <= deB ? 'stat-better' : 'stat-worse') + '">' +
+        '<tr><td class="stat-label">Adj DE</td><td class="' + lowerClassA + '">' +
         fmtNum(k1.adjde) + ' <span class="stat-rank">' + fmtRank(k1.adjde_rank) + '</span></td><td class="' +
-        (deB <= deA ? 'stat-better' : 'stat-worse') + '">' + fmtNum(k2.adjde) +
+        lowerClassB + '">' + fmtNum(k2.adjde) +
         ' <span class="stat-rank">' + fmtRank(k2.adjde_rank) + '</span></td></tr>' +
-        '<tr><td class="stat-label">Adj EM</td><td class="' + (emA >= emB ? 'stat-better' : 'stat-worse') + '">' +
+        '<tr><td class="stat-label">Adj EM</td><td class="' + emClassA + '">' +
         fmtNum(k1.adjem) + ' <span class="stat-rank">' + fmtRank(k1.adjem_rank) + '</span></td><td class="' +
-        (emB >= emA ? 'stat-better' : 'stat-worse') + '">' + fmtNum(k2.adjem) +
+        emClassB + '">' + fmtNum(k2.adjem) +
         ' <span class="stat-rank">' + fmtRank(k2.adjem_rank) + '</span></td></tr>' +
         '<tr><td class="stat-label">Tempo</td><td>' + fmtNum(k1.tempo) + '</td><td>' + fmtNum(k2.tempo) + '</td></tr>' +
         '</tbody></table>';

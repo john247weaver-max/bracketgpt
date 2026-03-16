@@ -209,8 +209,8 @@ function loadData() {
       store[key] = null;
     }
   }
-  const v53Loaded = loadDataFiles();
   loadTeamAliasLookup();
+  const v53Loaded = loadDataFiles();
   return anyLoaded || v53Loaded;
 }
 
@@ -441,6 +441,30 @@ function parseNumberMaybe(value) {
   return Number.isFinite(fallback) ? fallback : null;
 }
 
+function normalizeCsvHeaderKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function makeCsvRowAccessor(row) {
+  const byKey = {};
+  for (const [key, rawVal] of Object.entries(row || {})) {
+    const normalized = normalizeCsvHeaderKey(key);
+    if (!normalized) continue;
+    if (!(normalized in byKey)) byKey[normalized] = rawVal;
+  }
+  return (...candidates) => {
+    for (const candidate of candidates) {
+      const key = normalizeCsvHeaderKey(candidate);
+      if (!key) continue;
+      const val = byKey[key];
+      if (val == null) continue;
+      if (typeof val === 'string' && val.trim() === '') continue;
+      return val;
+    }
+    return null;
+  };
+}
+
 function parseUploadedCsv(type, rawInput) {
   const rows = parseCsvRows(rawInput);
   if (!rows.length) throw new Error('CSV appears empty.');
@@ -448,21 +472,77 @@ function parseUploadedCsv(type, rawInput) {
     const normalized = {};
     let count = 0;
     for (const row of rows) {
-      const name = row.TeamName || row.Team || row.team || row.team_name || row.School || row.school || '';
-      const key = normalizeTextKey(name);
-      if (!key) continue;
-      normalized[key] = {
-        team: String(name || '').trim(),
-        rank: parseNumberMaybe(row.Rank ?? row.rank ?? row.Rk ?? row.rk ?? row.KenPomRank ?? row.KP_Rank),
-        adjoe: parseNumberMaybe(row.AdjOE ?? row.adjoe ?? row.OffRating ?? row.ORtg),
-        adjoe_rank: parseNumberMaybe(row.AdjOE_Rank ?? row.AdjOERank ?? row.adjoe_rank ?? row.OffRank ?? row.ORtgRank),
-        adjde: parseNumberMaybe(row.AdjDE ?? row.adjde ?? row.DefRating ?? row.DRtg),
-        adjde_rank: parseNumberMaybe(row.AdjDE_Rank ?? row.AdjDERank ?? row.adjde_rank ?? row.DefRank ?? row.DRtgRank),
-        adjem: parseNumberMaybe(row.AdjEM ?? row.adjem ?? row.NetRtg ?? row.NetRating),
-        adjem_rank: parseNumberMaybe(row.AdjEM_Rank ?? row.AdjEMRank ?? row.adjem_rank ?? row.NetRank),
-        tempo: parseNumberMaybe(row.Tempo ?? row.tempo),
-        tempo_rank: parseNumberMaybe(row.Tempo_Rank ?? row.TempoRank ?? row.tempo_rank),
+      const pick = makeCsvRowAccessor(row);
+      const name = pick('TeamName', 'Team', 'team', 'team_name', 'Team Name', 'School', 'school', 'SchoolName', 'Tm');
+      const team = String(name || '').trim();
+      if (!team) continue;
+      const entry = {
+        team,
+        rank: parseNumberMaybe(pick(
+          'Rank', 'rank', 'Rk', 'rk', 'KenPomRank', 'KP_Rank', 'KP Rank', 'Overall Rank',
+          'AdjEM Rank', 'AdjEM_Rank', 'EM Rank', 'EM_Rank', 'RankAdjEM'
+        )),
+        adjoe: parseNumberMaybe(pick(
+          'AdjOE', 'Adj O', 'AdjO', 'adjoe', 'adjo',
+          'OffRating', 'Off Rating', 'ORtg', 'O Rtg',
+          'OffEfficiency', 'Off Efficiency', 'OffensiveEfficiency', 'Offensive Efficiency',
+          'AdjOff', 'Adj Off', 'AdjOffense', 'Adj Offense',
+          'KP_ORtg', 'KPORtg'
+        )),
+        adjoe_rank: parseNumberMaybe(pick(
+          'AdjOE_Rank', 'AdjOE Rank', 'AdjOERank',
+          'AdjO_Rank', 'AdjO Rank', 'AdjORank',
+          'adjoe_rank', 'adjo_rank',
+          'OffRank', 'Off Rank', 'ORtgRank', 'ORtg Rank',
+          'RankAdjOE', 'RankAdjO'
+        )),
+        adjde: parseNumberMaybe(pick(
+          'AdjDE', 'Adj D', 'AdjD', 'adjde', 'adjd',
+          'DefRating', 'Def Rating', 'DRtg', 'D Rtg',
+          'DefEfficiency', 'Def Efficiency', 'DefensiveEfficiency', 'Defensive Efficiency',
+          'AdjDef', 'Adj Def', 'AdjDefense', 'Adj Defense',
+          'KP_DRtg', 'KPDRtg'
+        )),
+        adjde_rank: parseNumberMaybe(pick(
+          'AdjDE_Rank', 'AdjDE Rank', 'AdjDERank',
+          'AdjD_Rank', 'AdjD Rank', 'AdjDRank',
+          'adjde_rank', 'adjd_rank',
+          'DefRank', 'Def Rank', 'DRtgRank', 'DRtg Rank',
+          'RankAdjDE', 'RankAdjD'
+        )),
+        adjem: parseNumberMaybe(pick(
+          'AdjEM', 'Adj EM', 'adjem',
+          'NetRtg', 'Net RTG', 'NetRating', 'Net Rating', 'Net',
+          'EM', 'EfficiencyMargin', 'Efficiency Margin', 'AdjMargin', 'Adj Margin',
+          'KP_NetRtg', 'KPNetRtg'
+        )),
+        adjem_rank: parseNumberMaybe(pick(
+          'AdjEM_Rank', 'AdjEM Rank', 'AdjEMRank',
+          'adjem_rank', 'EM_Rank', 'EM Rank', 'EMRank',
+          'NetRank', 'Net Rank', 'RankNet', 'RankAdjEM'
+        )),
+        tempo: parseNumberMaybe(pick(
+          'Tempo', 'tempo',
+          'AdjTempo', 'Adj Tempo', 'AdjustedTempo', 'Adjusted Tempo',
+          'AdjT', 'Adj T',
+          'Pace', 'AdjPace', 'Adj Pace'
+        )),
+        tempo_rank: parseNumberMaybe(pick(
+          'Tempo_Rank', 'Tempo Rank', 'TempoRank', 'tempo_rank',
+          'AdjTempoRank', 'Adj Tempo Rank',
+          'AdjT_Rank', 'AdjT Rank', 'AdjTRank',
+          'PaceRank', 'Pace Rank', 'RankAdjTempo'
+        )),
       };
+      const keys = new Set([
+        normalizeTextKey(team),
+        normalizeTeamNameBase(team),
+        normalizeTeamName(team),
+      ]);
+      for (const key of keys) {
+        if (!key) continue;
+        normalized[key] = entry;
+      }
       count += 1;
     }
     return { parsed: { rows, teams: normalized, count }, normalized: String(rawInput || ''), mode: 'csv' };
