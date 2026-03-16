@@ -6021,14 +6021,13 @@
       const host = document.getElementById('pcLeverage');
       if (!host) return;
       const useYahooMatrixPublic = Object.keys(exactTeamPublicRoundProbs || {}).length > 0;
-      const roundKey = normalizeRoundKeyClient(matchup?.round || 'R64');
-      const rounds = roundPathFrom(roundKey);
+      const rounds = ['R32', 'S16', 'E8', 'F4', 'NCG'];
       if (!rounds.length) {
         host.innerHTML = '';
         return;
       }
 
-      function buildTeamRoundRows(team, opponent, modelCurrent, publicCurrent) {
+      function buildTeamRoundRows(team, opponent) {
         const rows = [];
         const matchupContext = {
           region: matchup?.region,
@@ -6038,28 +6037,20 @@
           fallbackPublic: team?.pool?.public_pick_pct
         };
         for (const rk of rounds) {
-          const label = rk === roundKey ? 'Win This Game' : roundLabelForKey(rk);
-          let model = rk === roundKey
-            ? normalizeProbability(modelCurrent, null)
-            : getModelProbabilityForLeverageDisplay(team?.name, rk, null);
-          if (model == null && rk === roundKey) {
-            model = getRoundModelProbability(team?.name, rk, null);
-          }
-          const context = rk === roundKey
+          const label = roundLabelForKey(rk);
+          const model = getRoundModelProbability(team?.name, rk, null);
+          const context = rk === 'R32'
             ? matchupContext
             : {
-                region: matchup?.region,
-                seed: team?.seed,
-                fallbackPublic: team?.pool?.public_pick_pct
-              };
+              region: matchup?.region,
+              seed: team?.seed,
+              fallbackPublic: team?.pool?.public_pick_pct
+            };
           if (useYahooMatrixPublic) {
             context.publicSource = 'yahoo_matrix';
             context.allowSeedFallback = false;
           }
           let publicPct = getPublicRoundProbability(team?.name, rk, context);
-          if (publicPct == null && rk === roundKey && !useYahooMatrixPublic) {
-            publicPct = normalizeProbability(publicCurrent, null);
-          }
           if (model == null && publicPct == null) continue;
           const edge = (model == null || publicPct == null) ? null : (model - publicPct);
           const levEv = leverageEvForRound(model, publicPct, rk, team?.seed);
@@ -6151,8 +6142,8 @@
         '</div>';
       }
 
-      const rowsA = buildTeamRoundRows(teamA, teamB, matchup?.win_prob_t1 ?? teamA?.win_pct, perception?.teamA?.pct ?? matchup?.pool_meta?.public_pick_pct_t1);
-      const rowsB = buildTeamRoundRows(teamB, teamA, matchup?.win_prob_t2 ?? teamB?.win_pct, perception?.teamB?.pct ?? matchup?.pool_meta?.public_pick_pct_t2);
+      const rowsA = buildTeamRoundRows(teamA, teamB);
+      const rowsB = buildTeamRoundRows(teamB, teamA);
       const summaryA = summarizeTeam(teamA, rowsA);
       const summaryB = summarizeTeam(teamB, rowsB);
       const bracketTotals = computeBracketLeverageTotals(
@@ -6335,15 +6326,7 @@
 
       setTeam('A', tA, pctA, colorA, currentPick === 'a', !!currentPick);
       setTeam('B', tB, pctB, colorB, currentPick === 'b', !!currentPick);
-      const modelPick = pctA >= pctB ? 'A' : 'B';
-      const modelEl = document.getElementById('pcTeam' + modelPick);
       document.querySelectorAll('.pc-model-badge').forEach((el) => el.remove());
-      if (modelEl) {
-        const badge = document.createElement('span');
-        badge.className = 'pc-model-badge';
-        badge.textContent = 'MODEL PICK';
-        modelEl.appendChild(badge);
-      }
 
       document.getElementById('pcBarA').style.cssText = `width:${pctA}%; background:${colorA}`;
       document.getElementById('pcBarB').style.cssText = `width:${pctB}%; background:${colorB}`;
@@ -6463,9 +6446,6 @@
       oddsSection.className = 'pc-stats-section';
       oddsSection.innerHTML = '<div class="pc-stats-title">TOURNAMENT ODDS</div>';
       const winPct = normalizeProbability(team.win_pct || team.win_probability, null);
-      if (winPct != null) {
-        oddsSection.appendChild(makeStatLine('Win This Game', Math.round(winPct * 100) + '%', winPct >= 0.5 ? 'var(--green)' : 'var(--muted)', true));
-      }
       const epLeft = estimateEpLeft(team.name, currentPickCardMatchup?.round || 'R64', winPct);
       if (epLeft != null) {
         oddsSection.appendChild(makeStatLine('EP Left', Number(epLeft).toFixed(1), 'var(--gold)', true));
