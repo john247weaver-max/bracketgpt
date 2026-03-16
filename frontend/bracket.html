@@ -434,7 +434,7 @@
   .topbar {
     background: var(--bg-surface);
     border: 1px solid var(--bg-line);
-    border-radius: 2px;
+    border-radius: 8px;
     padding: 16px;
     margin-bottom: 12px;
     position: relative;
@@ -453,16 +453,41 @@
     position: relative;
     z-index: 1;
   }
-  .tophead { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .tophead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tophead-left {
+    display: grid;
+    gap: 4px;
+    min-width: 260px;
+  }
+  .topbar-kicker {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
   .tophead h1 {
     margin: 0;
     font-family: 'Barlow Condensed', sans-serif;
-    font-size: 32px;
+    font-size: 30px;
     font-weight: 900;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+    line-height: 1;
   }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tophead-sub {
+    font-family: var(--fb);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
   .btn {
     height: 32px;
     border-radius: 2px;
@@ -1369,7 +1394,7 @@
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 12px;
-    width: 100%; max-width: 440px;
+    width: 100%; max-width: 760px;
     max-height: calc(100vh - 32px);
     overflow: auto;
     transform: translateY(12px);
@@ -1769,6 +1794,112 @@
     font-size: 11px;
     color: var(--text-label);
   }
+  .pc-lev-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(170px, .9fr);
+    gap: 10px;
+    padding: 8px 10px 10px;
+  }
+  .pc-lev-main {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .pc-lev-sidebar {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-surface-2);
+    padding: 8px;
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+  .pc-lev-side-title {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .10em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pc-lev-side-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 6px 7px;
+    display: grid;
+    gap: 4px;
+  }
+  .pc-lev-side-team {
+    font-family: var(--fd);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .pc-lev-side-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--fb);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .pc-lev-side-metric strong {
+    font-family: var(--fd);
+    font-size: 12px;
+    letter-spacing: .03em;
+    color: var(--text);
+  }
+  .pc-lev-side-reason {
+    font-family: var(--fb);
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--muted);
+  }
+  .pc-lev-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    width: fit-content;
+  }
+  .pc-lev-status.diff {
+    color: var(--green);
+    border-color: rgba(0,168,70,.35);
+    background: rgba(0,168,70,.08);
+  }
+  .pc-lev-status.fade {
+    color: var(--orange);
+    border-color: rgba(255,107,43,.35);
+    background: rgba(255,107,43,.10);
+  }
+  .pc-lev-status.avoid {
+    color: var(--red);
+    border-color: rgba(211,47,47,.35);
+    background: rgba(211,47,47,.10);
+  }
+  .pc-lev-status.neutral {
+    color: var(--muted);
+    background: rgba(0,0,0,.04);
+  }
+  .pc-lev-guardrail {
+    font-family: var(--fb);
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--muted);
+    border-top: 1px dashed var(--border);
+    padding-top: 6px;
+  }
   .pc-lev-team {
     padding: 8px 10px 10px;
     border-top: 1px solid var(--border);
@@ -1826,6 +1957,9 @@
   }
   .pc-lev-neg {
     color: var(--red) !important;
+  }
+  .pc-lev-muted {
+    color: var(--muted) !important;
   }
 
   .pc-btns { padding: 0 16px 16px; display: flex; gap: 8px; }
@@ -1919,6 +2053,8 @@
     .round-tabs { display: flex; width: 100%; }
     .pool-size-control { width: 100%; justify-content: flex-end; }
     .optimizer-checklist-grid { grid-template-columns: 1fr; }
+    .tophead h1 { font-size: 24px; }
+    .tophead-sub { font-size: 11px; }
     .edge-main { grid-template-columns: 1fr; }
     .edge-row { grid-template-columns: 1fr .7fr .7fr .7fr .7fr; gap: 6px; font-size: 10px; }
     .chat-quick-grid { grid-template-columns: 1fr; }
@@ -1936,6 +2072,9 @@
       -webkit-overflow-scrolling: touch;
       border-radius: 12px 12px 0 0;
       max-width: 100%;
+    }
+    .pc-lev-layout {
+      grid-template-columns: 1fr;
     }
     .optimizer-toggle { top: auto; bottom: 92px; right: 12px; }
     .optimizer-panel {
@@ -1966,12 +2105,16 @@
       <main class="container">
         <section class="topbar">
           <div class="tophead">
-            <h1>2026 Interactive Bracket</h1>
+            <div class="tophead-left">
+              <div class="topbar-kicker">2026 model + pool edge board</div>
+              <h1>Interactive Bracket</h1>
+              <div class="tophead-sub">Round model probabilities, public differentials, and leverage guardrails in one flow.</div>
+            </div>
             <div class="actions">
-              <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
               <button class="btn btn-secondary" onclick="startGuidedFlow()">Start Picking</button>
               <button class="btn btn-primary" onclick="autoFillModelPicks()">Auto-Fill Model Picks</button>
               <button class="btn btn-secondary" onclick="exportBracket()">Export Bracket</button>
+              <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
             </div>
           </div>
           <div class="progress-wrap">
@@ -2020,7 +2163,6 @@
             </button>
           </div>
           <div class="strategy-right">
-            <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
             <div class="upset-rec" id="upsetRec">
               <div class="upset-rec-circle" id="upsetRecCircle">0</div>
               <div class="upset-rec-text" id="upsetRecText"></div>
@@ -2241,6 +2383,7 @@
       7: 0.52, 8: 0.46, 9: 0.44, 10: 0.38, 11: 0.34, 12: 0.36,
       13: 0.18, 14: 0.10, 15: 0.05, 16: 0.02
     };
+    const LEVERAGE_GUARD_SEEDS = new Set([15, 16]);
     let regions = ['South', 'East', 'West', 'Midwest'];
     const roundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
     const roundPoints = { R64: 10, R32: 20, S16: 40, E8: 80, F4: 160, NCG: 320 };
@@ -5568,9 +5711,22 @@
       };
     }
 
+    function seedHasLeverageGuard(seed) {
+      const s = Number(seed);
+      return Number.isFinite(s) && LEVERAGE_GUARD_SEEDS.has(s);
+    }
+
+    function getTeamRoundProbMap(teamName) {
+      const displayName = getDisplayName(teamName);
+      const direct = getByTeamNameLoose(roundAdvanceProbs, teamName) || getByTeamNameLoose(roundAdvanceProbs, displayName);
+      if (direct && typeof direct === 'object') return direct;
+      const stats = getByTeamNameLoose(teamStats, teamName) || getByTeamNameLoose(teamStats, displayName) || {};
+      return stats?.probs || stats?.round_probs || stats?.round_probabilities || stats?.rounds || {};
+    }
+
     function getRoundModelProbability(teamName, roundKey, fallback = null) {
       const displayName = getDisplayName(teamName);
-      const probs = getByTeamNameLoose(roundAdvanceProbs, teamName) || getByTeamNameLoose(roundAdvanceProbs, displayName) || {};
+      const probs = getTeamRoundProbMap(teamName);
       let prob = normalizeProbability(probs?.[roundKey], null);
       if (prob == null && roundKey === 'NCG') {
         prob = normalizeProbability(
@@ -5587,19 +5743,16 @@
       return roundOrder.slice(start);
     }
 
-    function leverageFactorForPublic(publicProb) {
-      const p = normalizeProbability(publicProb, null);
-      if (p == null) return null;
-      const peers = Math.max(1, clampPoolSize(poolSize) - 1);
-      return 1 / (1 + p * peers);
-    }
-
-    function leverageEvForRound(modelProb, publicProb, roundKey) {
+    function leverageEvForRound(modelProb, publicProb, roundKey, teamSeed) {
       const p = normalizeProbability(modelProb, null);
-      const lev = leverageFactorForPublic(publicProb);
-      if (p == null || lev == null) return null;
+      const pub = normalizeProbability(publicProb, null);
+      if (p == null || pub == null) return null;
       const pts = roundPoints[roundKey] || 0;
-      return p * pts * lev;
+      const fieldGap = Math.max(0, 1 - pub);
+      const confidenceEdge = (2 * p) - 1;
+      let swing = pts * fieldGap * confidenceEdge;
+      if (seedHasLeverageGuard(teamSeed)) swing = Math.min(0, swing);
+      return swing;
     }
 
     function formatPctShort(prob) {
@@ -5612,6 +5765,41 @@
       if (!Number.isFinite(p)) return '--';
       const s = p >= 0 ? '+' : '';
       return s + (p * 100).toFixed(1) + '%';
+    }
+
+    function formatSignedPoints(value) {
+      const v = Number(value);
+      if (!Number.isFinite(v)) return '--';
+      const s = v >= 0 ? '+' : '';
+      return s + v.toFixed(2);
+    }
+
+    function classifyPublicDifferential(edge, modelProb, swingPts, roundKey, teamSeed) {
+      if (seedHasLeverageGuard(teamSeed)) {
+        const lossTxt = Number.isFinite(Number(swingPts)) ? formatSignedPoints(swingPts) : '--';
+        return { code: 'avoid', label: 'Avoid', note: '15/16 seed cap. Current EV swing: ' + lossTxt + ' pts.' };
+      }
+      const e = Number(edge);
+      const m = normalizeProbability(modelProb, null);
+      const swing = Number(swingPts);
+      const pts = Math.max(1, Number(roundPoints[roundKey] || 0));
+      const swingRate = Number.isFinite(swing) ? swing / pts : null;
+      if (!Number.isFinite(e) || swingRate == null) {
+        return { code: 'neutral', label: 'Neutral', note: 'Public mapping is limited for this team.' };
+      }
+      if (swingRate <= -0.14) {
+        return { code: 'avoid', label: 'Avoid', note: 'Projected loss: ' + formatSignedPoints(swing) + ' pts for this round.' };
+      }
+      if (swingRate >= 0.10 && m != null && m >= 0.52) {
+        return { code: 'diff', label: 'Differentiate', note: 'Projected gain: ' + formatSignedPoints(swing) + ' pts this round.' };
+      }
+      if (e <= -0.06) {
+        return { code: 'fade', label: 'Fade', note: 'Public is heavier than model by ' + formatSignedPct(Math.abs(e) * -1) + '.' };
+      }
+      if (m != null && m < 0.40 && e > 0) {
+        return { code: 'neutral', label: 'Neutral', note: 'Positive ownership edge, but model base is still thin.' };
+      }
+      return { code: 'neutral', label: 'Neutral', note: 'Net swing sits near break-even: ' + formatSignedPoints(swing) + ' pts.' };
     }
 
     function renderLeverageSection(matchup, teamA, teamB, perception) {
@@ -5642,10 +5830,17 @@
             ? normalizeProbability(publicCurrent, null)
             : getPublicRoundProbability(team?.name, rk, matchupContext);
           if (model == null && publicPct == null) continue;
-          if (model == null) model = 0;
-          const edge = (publicPct == null) ? null : (model - publicPct);
-          const levEv = leverageEvForRound(model, publicPct, rk);
-          rows.push({ label, model, publicPct, edge, levEv });
+          const edge = (model == null || publicPct == null) ? null : (model - publicPct);
+          const levEv = leverageEvForRound(model, publicPct, rk, team?.seed);
+          rows.push({
+            label,
+            roundKey: rk,
+            model,
+            publicPct,
+            edge,
+            levEv,
+            seedGuard: seedHasLeverageGuard(team?.seed)
+          });
         }
         return rows;
       }
@@ -5657,37 +5852,78 @@
             '<div class="pc-lev-sub">Round-level public mapping unavailable for this team.</div>' +
           '</div>';
         }
-        const totalLev = rows.reduce((sum, r) => sum + (Number.isFinite(r.levEv) ? r.levEv : 0), 0);
+        const totalLevRaw = rows.reduce((sum, r) => sum + (Number.isFinite(r.levEv) ? r.levEv : 0), 0);
+        const totalLev = Number(totalLevRaw || 0);
         const body = rows.map((r) => {
           const edgeClass = Number(r.edge) > 0 ? 'pc-lev-pos' : (Number(r.edge) < 0 ? 'pc-lev-neg' : '');
+          const levClass = Number(r.levEv) > 0 ? 'pc-lev-pos' : (Number(r.levEv) < 0 ? 'pc-lev-neg' : (r.seedGuard ? 'pc-lev-muted' : ''));
+          const levValue = formatSignedPoints(r.levEv);
           return '<tr>' +
             '<td>' + escHtml(r.label) + '</td>' +
             '<td>' + escHtml(formatPctShort(r.model)) + '</td>' +
             '<td>' + escHtml(formatPctShort(r.publicPct)) + '</td>' +
             '<td class="' + edgeClass + '">' + escHtml(formatSignedPct(r.edge)) + '</td>' +
-            '<td>' + escHtml(Number.isFinite(r.levEv) ? r.levEv.toFixed(2) : '--') + '</td>' +
+            '<td class="' + levClass + '">' + escHtml(levValue) + '</td>' +
           '</tr>';
         }).join('');
         return '<div class="pc-lev-team">' +
           '<div class="pc-lev-team-top">' +
             '<span style="color:' + escAttr(accentColor || 'var(--text)') + '">' + escHtml(getDisplayName(team?.name || 'Team')) + '</span>' +
-            '<span class="pc-lev-total">Total ' + escHtml(totalLev.toFixed(2)) + '</span>' +
+            '<span class="pc-lev-total">Total ' + escHtml(formatSignedPoints(totalLev)) + '</span>' +
           '</div>' +
           '<table class="pc-lev-table"><thead><tr>' +
-            '<th>Round</th><th>Model</th><th>Public</th><th>Edge</th><th>Lev EV</th>' +
+            '<th>Round</th><th>Model</th><th>Public</th><th>Edge</th><th>EV +/-</th>' +
           '</tr></thead><tbody>' + body + '</tbody></table>' +
+        '</div>';
+      }
+
+      function summarizeTeam(team, rows) {
+        const roundRow = rows.find((r) => r.roundKey === roundKey) || rows[0] || null;
+        const totalLevRaw = rows.reduce((sum, r) => sum + (Number.isFinite(r.levEv) ? r.levEv : 0), 0);
+        const totalLev = Number(totalLevRaw || 0);
+        const status = classifyPublicDifferential(roundRow?.edge, roundRow?.model, roundRow?.levEv, roundKey, team?.seed);
+        return {
+          team,
+          totalLev,
+          edge: roundRow?.edge,
+          swing: roundRow?.levEv,
+          status
+        };
+      }
+
+      function renderSummaryCard(summary, accentColor) {
+        const displayName = getDisplayName(summary?.team?.name || 'Team');
+        return '<div class="pc-lev-side-card">' +
+          '<div class="pc-lev-side-team" style="color:' + escAttr(accentColor || 'var(--text)') + '">' + escHtml(displayName) + '</div>' +
+          '<div class="pc-lev-side-metric"><span>Total EV</span><strong>' + escHtml(formatSignedPoints(summary?.totalLev)) + '</strong></div>' +
+          '<div class="pc-lev-side-metric"><span>This Round</span><strong>' + escHtml(formatSignedPoints(summary?.swing)) + '</strong></div>' +
+          '<div class="pc-lev-side-metric"><span>Public Diff</span><strong>' + escHtml(formatSignedPct(summary?.edge)) + '</strong></div>' +
+          '<span class="pc-lev-status ' + escAttr(summary?.status?.code || 'neutral') + '">' + escHtml(summary?.status?.label || 'Neutral') + '</span>' +
+          '<div class="pc-lev-side-reason">' + escHtml(summary?.status?.note || '') + '</div>' +
         '</div>';
       }
 
       const rowsA = buildTeamRoundRows(teamA, teamB, matchup?.win_prob_t1 ?? teamA?.win_pct, perception?.teamA?.pct ?? matchup?.pool_meta?.public_pick_pct_t1);
       const rowsB = buildTeamRoundRows(teamB, teamA, matchup?.win_prob_t2 ?? teamB?.win_pct, perception?.teamB?.pct ?? matchup?.pool_meta?.public_pick_pct_t2);
+      const summaryA = summarizeTeam(teamA, rowsA);
+      const summaryB = summarizeTeam(teamB, rowsB);
       const mappingLabel = perception?.mapping === 'team+game_pair'
         ? 'mapped by team + game'
         : (perception?.mapping === 'team_then_game' ? 'mapped by team then game' : 'mapped by team');
       host.innerHTML =
-        '<div class="pc-lev-head"><span>Leverage EV vs Public</span><span class="pc-lev-sub">Pool ' + escHtml(String(poolSize)) + ' | ' + escHtml(mappingLabel) + '</span></div>' +
-        renderTeamTable(teamA, rowsA, teamA?.color_primary || '#2E74D4') +
-        renderTeamTable(teamB, rowsB, teamB?.color_primary || '#E8601F');
+        '<div class="pc-lev-head"><span>Net EV Swing vs Public</span><span class="pc-lev-sub">Pool ' + escHtml(String(poolSize)) + ' | ' + escHtml(mappingLabel) + '</span></div>' +
+        '<div class="pc-lev-layout">' +
+          '<div class="pc-lev-main">' +
+            renderTeamTable(teamA, rowsA, teamA?.color_primary || '#2E74D4') +
+            renderTeamTable(teamB, rowsB, teamB?.color_primary || '#E8601F') +
+          '</div>' +
+          '<aside class="pc-lev-sidebar">' +
+            '<div class="pc-lev-side-title">Leverage Sidebar</div>' +
+            renderSummaryCard(summaryA, teamA?.color_primary || '#2E74D4') +
+            renderSummaryCard(summaryB, teamB?.color_primary || '#E8601F') +
+            '<div class="pc-lev-guardrail">Math: EV swing = round points x (1 - public pick %) x (2 x model - 1). 15/16 seeds are capped at non-positive swing.</div>' +
+          '</aside>' +
+        '</div>';
     }
 
     function estimateEpLeft(teamName, roundKey, winProbThisGame) {
@@ -5964,7 +6200,7 @@
       const archetype = String(team.archetype || (Array.isArray(team.archetypes) ? team.archetypes[0] : '') || 'Unknown');
       if (archetypeEl) archetypeEl.textContent = archetype;
       col.querySelectorAll('.pc-stat, .pc-stats-section').forEach((el) => el.remove());
-      const advance = getByTeamNameLoose(roundAdvanceProbs, team.name) || getByTeamNameLoose(roundAdvanceProbs, displayName) || {};
+      const advance = getTeamRoundProbMap(team.name);
       const oddsSection = document.createElement('div');
       oddsSection.className = 'pc-stats-section';
       oddsSection.innerHTML = '<div class="pc-stats-title">TOURNAMENT ODDS</div>';
@@ -5984,7 +6220,7 @@
         { key: 'NCG', label: 'Title Game' },
       ];
       for (const rd of rounds) {
-        const prob = advance[rd.key];
+        const prob = getRoundModelProbability(team.name, rd.key, normalizeProbability(advance?.[rd.key], null));
         if (prob != null && prob > 0.005) {
           const pct = (prob * 100).toFixed(1) + '%';
           const c = prob >= 0.5 ? 'var(--green)' : prob >= 0.2 ? 'var(--text)' : 'var(--muted)';
@@ -6537,6 +6773,8 @@
     function scorePickForSubset(node, team, opponent, modelProb, subset) {
       const roundKey = normalizeRoundKeyClient(node?.round || 'R64');
       const model = normalizeProbability(modelProb, 0.5);
+      const teamSeed = Number(team?.seed);
+      const seedGuard = seedHasLeverageGuard(teamSeed);
       const publicProb = getPublicRoundProbability(team?.name, roundKey, {
         region: node?.region,
         matchupNumber: node?.source?.game_number || node?.source?.matchup_number || (Number(node?.slot) + 1),
@@ -6545,24 +6783,27 @@
         fallbackPublic: team?.pool?.public_pick_pct
       });
       const publicNorm = normalizeProbability(publicProb, null);
-      const levFactor = leverageFactorForPublic(publicNorm);
-      const levScore = levFactor == null ? model : (model * levFactor);
       const edge = publicNorm == null ? 0 : (model - publicNorm);
+      const swingPts = leverageEvForRound(model, publicNorm, roundKey, team?.seed);
+      const roundPts = Math.max(1, Number(roundPoints[roundKey] || 1));
+      const swingNorm = Number.isFinite(swingPts) ? (swingPts / roundPts) : ((2 * model) - 1);
       const weights = subset?.weights || {};
       let score =
         safeNum(weights.model, 0) * model +
-        safeNum(weights.lev, 0) * levScore +
+        safeNum(weights.lev, 0) * swingNorm +
         safeNum(weights.edge, 0) * edge;
       const minProb = Number(subset?.minProb?.[roundKey]);
       if (Number.isFinite(minProb) && model < minProb) {
         score -= (minProb - model) * 0.9;
       }
-      const teamSeed = Number(team?.seed);
       const oppSeed = Number(opponent?.seed);
+      if (seedGuard) {
+        score -= roundKey === 'R64' ? 0.30 : 0.16;
+      }
       if (Number.isFinite(teamSeed) && Number.isFinite(oppSeed) && teamSeed > oppSeed && edge > 0) {
         score += safeNum(subset?.underdogBoost, 0) * edge;
       }
-      return { score, model, public: publicNorm, levScore };
+      return { score, model, public: publicNorm, swingPts, swingNorm, seedGuard };
     }
 
     function optimizeBracket(strategy = 'lev_core') {
