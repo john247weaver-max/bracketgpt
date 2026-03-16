@@ -142,6 +142,7 @@ const DATA_FILES = {
   archetype_summary: 'archetype_summary_v5.json',
   archetype_history: 'archetype_history.json',
 };
+const TEAM_MAPPING_FILE = 'team_name_mapping_2026.json';
 
 const REGION_ORDER_2025 = ['South', 'East', 'West', 'Midwest'];
 const FINAL_FOUR_PAIRINGS_2025 = [['South', 'East'], ['West', 'Midwest']];
@@ -206,7 +207,52 @@ function loadData() {
     }
   }
   const v53Loaded = loadDataFiles();
+  loadTeamAliasLookup();
   return anyLoaded || v53Loaded;
+}
+
+let teamAliasLookup = new Map();
+
+function normalizeTeamNameBase(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[’']/g, '')
+    .replace(/\./g, '')
+    .replace(/&/g, ' and ')
+    .replace(/\bsaint\b/gi, 'st')
+    .replace(/\bstate\b/gi, 'st')
+    .replace(/\buniversity\b/gi, 'univ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function loadTeamAliasLookup() {
+  const out = new Map();
+  const mappingPath = path.join(DATA_DIR, TEAM_MAPPING_FILE);
+  try {
+    if (!fs.existsSync(mappingPath)) {
+      teamAliasLookup = out;
+      return;
+    }
+    const raw = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+    const aliases = raw?.team_alias_mapping || {};
+    for (const [canonicalRaw, aliasList] of Object.entries(aliases)) {
+      const canonical = normalizeTeamNameBase(canonicalRaw);
+      if (!canonical) continue;
+      out.set(canonical, canonical);
+      if (!Array.isArray(aliasList)) continue;
+      for (const aliasRaw of aliasList) {
+        const alias = normalizeTeamNameBase(aliasRaw);
+        if (!alias || alias.length <= 2) continue;
+        out.set(alias, canonical);
+      }
+    }
+    teamAliasLookup = out;
+  } catch (e) {
+    console.warn(`Team mapping load failed (${TEAM_MAPPING_FILE}): ${e.message}`);
+    teamAliasLookup = out;
+  }
 }
 
 function syncDataStoreAliases() {
@@ -2315,17 +2361,8 @@ function fmtCtx(ctx) {
 }
 
 function normalizeTeamName(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[â€™']/g, '')
-    .replace(/\./g, '')
-    .replace(/&/g, ' and ')
-    .replace(/\bsaint\b/gi, 'st')
-    .replace(/\bstate\b/gi, 'st')
-    .replace(/\buniversity\b/gi, 'univ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+  const normalized = normalizeTeamNameBase(value);
+  return teamAliasLookup.get(normalized) || normalized;
 }
 
 function readBracket2025Source() {

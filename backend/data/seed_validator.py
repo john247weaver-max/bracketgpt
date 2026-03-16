@@ -1,4 +1,4 @@
-"""
+﻿"""
 BRACKETGPT SEED VALIDATOR
 ==========================
 Single source of truth: bracket JSON (bracket_2025.json / bracket_predictions_2025.json)
@@ -10,16 +10,16 @@ This module:
   4. Logs every fix so you know what changed
 
 Usage:
-  # Standalone — validate everything in backend/data/
+  # Standalone â€” validate everything in backend/data/
   python seed_validator.py --bracket backend/data/bracket_2025.json --data-dir backend/data/
 
-  # In pipeline — import and use
+  # In pipeline â€” import and use
   from seed_validator import SeedValidator
   validator = SeedValidator('bracket_2025.json')
   fixed_csv = validator.fix_csv('public_ownership_2025.csv')
   fixed_json = validator.fix_json('pool_strategy_2025.json')
 
-  # In server.js startup — call via child_process
+  # In server.js startup â€” call via child_process
   # const { execSync } = require('child_process');
   # execSync('python3 seed_validator.py --bracket backend/data/bracket_2025.json --data-dir backend/data/');
 """
@@ -41,10 +41,25 @@ class SeedValidator:
     def __init__(self, bracket_path):
         self.bracket_path = bracket_path
         self.truth = {}          # canonical: { team_name: {seed, region} }
-        self.aliases = {}        # lowercase/normalized → canonical name
+        self.aliases = {}        # lowercase/normalized â†’ canonical name
         self.play_in_teams = {}  # teams that only appear in First Four
         self.fixes = []          # log of all corrections made
+        self.shared_alias_map = self._load_shared_alias_map()
         self._load_bracket()
+
+    def _load_shared_alias_map(self):
+        """Load optional shared alias mapping from team_name_mapping_2026.json."""
+        mapping_path = os.path.join(os.path.dirname(__file__), 'team_name_mapping_2026.json')
+        try:
+            if not os.path.exists(mapping_path):
+                return {}
+            with open(mapping_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            alias_map = data.get('team_alias_mapping', {})
+            return alias_map if isinstance(alias_map, dict) else {}
+        except Exception as e:
+            print(f"⚠️  Could not load shared alias map ({mapping_path}): {e}")
+            return {}
 
     def _load_bracket(self):
         """Extract canonical seed/region from bracket JSON."""
@@ -68,7 +83,7 @@ class SeedValidator:
                     self._register_aliases(name)
 
         # Pass 2: First Four games (play-in teams not in R64)
-        # First, build seed→region mapping from R64 for reference
+        # First, build seedâ†’region mapping from R64 for reference
         seed_region_map = defaultdict(list)
         for name, info in self.truth.items():
             seed_region_map[(info['seed'], info['region'])].append(name)
@@ -98,7 +113,7 @@ class SeedValidator:
                     self._register_aliases(name)
 
         if len(self.truth) < 64:
-            print(f"⚠️  Only found {len(self.truth)} teams (expected 64-68)")
+            print(f"âš ï¸  Only found {len(self.truth)} teams (expected 64-68)")
 
     def _register_aliases(self, name):
         """Register common name variations for fuzzy matching."""
@@ -128,9 +143,15 @@ class SeedValidator:
             'North Carolina': ['unc', 'north carolina'],
             'San Diego St': ['san diego state', 'sdsu'],
         }
+        merged_alias_map = dict(ALIAS_MAP)
+        for canonical_name, alias_list in self.shared_alias_map.items():
+            if isinstance(alias_list, list):
+                merged_alias_map[canonical_name] = alias_list
 
-        if name in ALIAS_MAP:
-            for alias in ALIAS_MAP[name]:
+        if name in merged_alias_map:
+            for alias in merged_alias_map[name]:
+                if len(self._normalize(alias)) <= 2:
+                    continue
                 self.aliases[alias.lower()] = name
                 self.aliases[self._normalize(alias)] = name
 
@@ -241,7 +262,7 @@ class SeedValidator:
 
         return result
 
-    # ── File Fixers ──────────────────────────────────────────
+    # â”€â”€ File Fixers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def fix_csv(self, csv_path, output_path=None):
         """
@@ -274,20 +295,20 @@ class SeedValidator:
             canonical, actual_seed, actual_region = self.resolve(team_name)
 
             if canonical is None:
-                fixes.append(f"⚠️  {team_name}: not found in bracket (removing)")
+                fixes.append(f"âš ï¸  {team_name}: not found in bracket (removing)")
                 continue
 
             if claimed_seed != actual_seed:
-                fixes.append(f"🔧 {team_name}: seed {claimed_seed} → {actual_seed}")
+                fixes.append(f"ðŸ”§ {team_name}: seed {claimed_seed} â†’ {actual_seed}")
                 row[seed_col] = str(actual_seed)
 
             if region_col and claimed_region and claimed_region != actual_region and actual_region != 'Unknown':
-                fixes.append(f"🔧 {team_name}: region '{claimed_region}' → '{actual_region}'")
+                fixes.append(f"ðŸ”§ {team_name}: region '{claimed_region}' â†’ '{actual_region}'")
                 row[region_col] = actual_region
 
             # Also fix team name to canonical form
             if team_name != canonical:
-                fixes.append(f"📝 {team_name} → {canonical}")
+                fixes.append(f"ðŸ“ {team_name} â†’ {canonical}")
                 row[team_col] = canonical
 
             fixed_rows.append(row)
@@ -299,7 +320,7 @@ class SeedValidator:
                 # Don't add play-in losers unless they were already in the file
                 if canonical_name in self.play_in_teams:
                     continue
-                fixes.append(f"➕ {canonical_name} (seed {info['seed']}, {info['region']}): missing from CSV")
+                fixes.append(f"âž• {canonical_name} (seed {info['seed']}, {info['region']}): missing from CSV")
 
         # Write fixed file
         with open(output_path, 'w', newline='') as f:
@@ -343,7 +364,7 @@ class SeedValidator:
                 canonical, seed, region = self.resolve(obj['t1_name'])
                 if canonical:
                     if obj.get('t1_seed') is not None and int(obj['t1_seed']) != seed:
-                        fixes.append(f"🔧 {path}.t1 {obj['t1_name']}: seed {obj['t1_seed']} → {seed}")
+                        fixes.append(f"ðŸ”§ {path}.t1 {obj['t1_name']}: seed {obj['t1_seed']} â†’ {seed}")
                         obj['t1_seed'] = seed
                     if obj.get('t1_name') != canonical:
                         obj['t1_name'] = canonical
@@ -353,7 +374,7 @@ class SeedValidator:
                 canonical, seed, region = self.resolve(obj['t2_name'])
                 if canonical:
                     if obj.get('t2_seed') is not None and int(obj['t2_seed']) != seed:
-                        fixes.append(f"🔧 {path}.t2 {obj['t2_name']}: seed {obj['t2_seed']} → {seed}")
+                        fixes.append(f"ðŸ”§ {path}.t2 {obj['t2_name']}: seed {obj['t2_seed']} â†’ {seed}")
                         obj['t2_seed'] = seed
                     if obj.get('t2_name') != canonical:
                         obj['t2_name'] = canonical
@@ -366,7 +387,7 @@ class SeedValidator:
                     for seed_key in ['seed', 'team_seed']:
                         if seed_key in obj and obj[seed_key] is not None:
                             if int(obj[seed_key]) != seed:
-                                fixes.append(f"🔧 {path}.{team_name}: seed {obj[seed_key]} → {seed}")
+                                fixes.append(f"ðŸ”§ {path}.{team_name}: seed {obj[seed_key]} â†’ {seed}")
                                 obj[seed_key] = seed
 
                     # Fix region
@@ -374,7 +395,7 @@ class SeedValidator:
                         if region_key in obj and obj[region_key]:
                             if obj[region_key] != region and region != 'Unknown':
                                 if obj[region_key] != 'Final Four':
-                                    fixes.append(f"🔧 {path}.{team_name}: region '{obj[region_key]}' → '{region}'")
+                                    fixes.append(f"ðŸ”§ {path}.{team_name}: region '{obj[region_key]}' â†’ '{region}'")
                                     obj[region_key] = region
 
                     # Fix team name
@@ -435,13 +456,13 @@ class SeedValidator:
         return report
 
     def get_truth_table(self):
-        """Return the canonical team → seed/region mapping as a dict."""
+        """Return the canonical team â†’ seed/region mapping as a dict."""
         return dict(self.truth)
 
     def print_truth(self):
         """Pretty-print the canonical seed chart."""
         print(f"\n{'='*50}")
-        print(f"BRACKET TRUTH TABLE — {len(self.truth)} teams")
+        print(f"BRACKET TRUTH TABLE â€” {len(self.truth)} teams")
         print(f"Source: {self.bracket_path}")
         print(f"{'='*50}")
         for name, info in sorted(self.truth.items(), key=lambda x: (x[1]['seed'], x[0])):
@@ -459,7 +480,7 @@ def main():
     args = parser.parse_args()
 
     validator = SeedValidator(args.bracket)
-    print(f"✅ Loaded {len(validator.truth)} teams from bracket")
+    print(f"âœ… Loaded {len(validator.truth)} teams from bracket")
 
     if args.print_truth:
         validator.print_truth()
@@ -482,11 +503,11 @@ def main():
             return
 
         if fixes:
-            print(f"\n{'❌' if args.dry_run else '🔧'} {len(fixes)} {'issues found' if args.dry_run else 'fixes applied'}:")
+            print(f"\n{'âŒ' if args.dry_run else 'ðŸ”§'} {len(fixes)} {'issues found' if args.dry_run else 'fixes applied'}:")
             for fix in fixes:
                 print(f"  {fix}")
         else:
-            print(f"✅ {filepath}: all seeds correct")
+            print(f"âœ… {filepath}: all seeds correct")
         return
 
     if args.data_dir:
@@ -496,13 +517,13 @@ def main():
         print(f"{'='*50}")
         print(f"Files checked: {len(report['files_checked'])}")
         print(f"Total fixes: {report['total_fixes']}")
-        print(f"Status: {'✅ ALL VALID' if report['all_valid'] else '🔧 FIXES APPLIED'}")
+        print(f"Status: {'âœ… ALL VALID' if report['all_valid'] else 'ðŸ”§ FIXES APPLIED'}")
 
         for fc in report['files_checked']:
-            status = '✅' if fc.get('fixes', 0) == 0 and 'error' not in fc else '🔧'
+            status = 'âœ…' if fc.get('fixes', 0) == 0 and 'error' not in fc else 'ðŸ”§'
             if 'error' in fc:
-                status = '❌'
-                print(f"\n  {status} {fc['file']}: ERROR — {fc['error']}")
+                status = 'âŒ'
+                print(f"\n  {status} {fc['file']}: ERROR â€” {fc['error']}")
             elif fc['fixes'] > 0:
                 print(f"\n  {status} {fc['file']}: {fc['fixes']} fixes")
                 for detail in fc['details'][:10]:
@@ -525,3 +546,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

@@ -1490,6 +1490,19 @@
       'Colorado St': 'Colorado St.',
       'Mississippi St': 'Miss. State',
     };
+    const TEAM_MAPPING_SOURCE_PATH = '/data/team_name_mapping_2026.json';
+    const LEGACY_ALIAS_CANONICAL = {
+      'ole miss': 'mississippi',
+      'uconn': 'connecticut',
+      'saint marys': 'st marys ca',
+      'mount st marys': 'mt st marys',
+      'omaha': 'ne omaha',
+      'siu edwardsville': 'siue',
+      'uncw': 'unc wilmington',
+      'colorado state': 'colorado st',
+      'norfolk state': 'norfolk st',
+      'utah state': 'utah st'
+    };
 
     let baseMatchups = [];
     let bracketData = null;
@@ -1561,6 +1574,7 @@
     let poolSize = 50;
     let regionPreviewTimer = null;
     let regionPreviewFadeTimer = null;
+    const aliasLookup = new Map();
     const CHAT_STORAGE_KEY = 'bracketgpt_bracket_chat_history';
     let chatHistory = [];
     let chatBusy = false;
@@ -1571,21 +1585,42 @@
       activeStrategy: ''
     };
 
+    function aliasKey(v) {
+      return String(v || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    }
+    function resetAliasLookup() {
+      aliasLookup.clear();
+      for (const [alias, canonical] of Object.entries(LEGACY_ALIAS_CANONICAL)) {
+        aliasLookup.set(aliasKey(alias), aliasKey(canonical));
+      }
+    }
+    async function loadTeamNameMappingSource() {
+      resetAliasLookup();
+      try {
+        const res = await fetch(TEAM_MAPPING_SOURCE_PATH, { cache: 'no-store' });
+        if (!res.ok) return;
+        const mapping = await res.json();
+        const aliases = mapping?.team_alias_mapping;
+        if (!aliases || typeof aliases !== 'object') return;
+        for (const [canonicalRaw, aliasList] of Object.entries(aliases)) {
+          const canonical = aliasKey(canonicalRaw);
+          if (!canonical) continue;
+          aliasLookup.set(canonical, canonical);
+          if (!Array.isArray(aliasList)) continue;
+          for (const aliasRaw of aliasList) {
+            const alias = aliasKey(aliasRaw);
+            if (!alias) continue;
+            if (alias.length <= 2) continue;
+            aliasLookup.set(alias, canonical);
+          }
+        }
+      } catch (e) {
+        // Fallback to local aliases only.
+      }
+    }
     function normalizeName(v) {
-      const cleaned = String(v || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
-      const aliases = {
-        'ole miss': 'mississippi',
-        'uconn': 'connecticut',
-        'saint marys': 'st marys ca',
-        'mount st marys': 'mt st marys',
-        'omaha': 'ne omaha',
-        'siu edwardsville': 'siue',
-        'uncw': 'unc wilmington',
-        'colorado state': 'colorado st',
-        'norfolk state': 'norfolk st',
-        'utah state': 'utah st'
-      };
-      return aliases[cleaned] || cleaned;
+      const cleaned = aliasKey(v);
+      return aliasLookup.get(cleaned) || cleaned;
     }
     function normalizeRegionName(v) {
       return String(v || '').toLowerCase().replace(/[^a-z]/g, '');
@@ -4422,6 +4457,7 @@
       showLoading();
       clearError();
       try {
+        await loadTeamNameMappingSource();
         const data = await loadBracketData();
         if (!data || !Array.isArray(matchups) || matchups.length === 0) {
           throw new Error('Bracket data not loaded. Check admin panel.');
