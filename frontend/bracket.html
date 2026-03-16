@@ -2743,18 +2743,20 @@
 
     async function streamParagraphs(fullText, bubbleEl) {
       const messagesEl = document.getElementById('chatMessages');
+      const typingEl = document.getElementById('chatTyping');
       const paragraphs = String(fullText || '')
         .split(/\n\n+/)
         .map((p) => p.trim())
         .filter((p) => p.length > 0);
 
       bubbleEl.innerHTML = '';
+      if (typingEl) typingEl.style.display = 'none';
 
       for (let i = 0; i < paragraphs.length; i += 1) {
         const p = document.createElement('p');
         p.innerHTML = formatBot(paragraphs[i]);
         p.style.opacity = '0';
-        p.style.transition = 'opacity 0.4s ease';
+        p.style.transition = 'opacity 0.2s ease';
         bubbleEl.appendChild(p);
 
         requestAnimationFrame(() => {
@@ -2766,7 +2768,8 @@
         if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
 
         if (i < paragraphs.length - 1) {
-          await delay(1800);
+          const pauseMs = Math.max(180, Math.min(520, Math.round(paragraphs[i].length * 3.5)));
+          await delay(pauseMs);
         }
       }
     }

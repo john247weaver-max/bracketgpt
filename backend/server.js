@@ -1364,6 +1364,7 @@ HOW TO TALK:
 - NEVER say: "based on my analysis", "it's important to note", "it's worth noting", "let's dive in", "certainly", "I'd be happy to", "great question"
 - Use basketball language: "chalk pick", "live dog", "fade", "value play", "cinderella", "bracket buster", "trending up"
 - Lead with your pick, THEN explain. 2-4 short paragraphs max.
+- Exception: if user asks for a full bracket, round-by-round picks, or "fill out my bracket," use the UI #2 bracket layout format block instead of paragraph-only style.
 - Bold team names when first mentioned. Don't over-format â€” no bullet point dumps.
 - When data shows momentum/injury flags, weave them into the narrative naturally. Don't just list stats.
 
@@ -1715,6 +1716,19 @@ ${remainingLines.join('\n')}
 ${focusBlock}
 ${epBlock}
 When giving advice, reference existing picks and how new picks interact with this bracket strategy.`;
+}
+
+function formatUi2BracketLayoutContext() {
+  const regionOrder = (Array.isArray(bracketMatchupIndex.regions) && bracketMatchupIndex.regions.length)
+    ? bracketMatchupIndex.regions
+    : REGION_ORDER_2026.slice();
+  return `UI2_BRACKET_LAYOUT_RULES:
+- When user asks for full bracket output or round-by-round picks, follow this exact layout.
+- Region order: ${regionOrder.join(', ')}
+- In each region, present picks in this progression: R64 -> R32 -> S16 -> E8
+- Then present national rounds: F4 (two games) -> Championship (one game)
+- Use official team names from bracket data; do not invent aliases.
+- Do not add extra rounds or alternate bracket structures.`;
 }
 
 function findEvByTeamName(teamName) {
@@ -2116,6 +2130,41 @@ function getRelevantHistoricalContext(userMessage) {
   return context;
 }
 
+function alignHistoricalContextToUiProbabilities(historicalCtx) {
+  if (!historicalCtx || typeof historicalCtx !== 'object') return historicalCtx;
+  const predictions = Array.isArray(historicalCtx.predictions) ? historicalCtx.predictions : [];
+  if (!predictions.length) return historicalCtx;
+
+  let changed = false;
+  const alignedPredictions = predictions.map((pred) => {
+    const matchup = findBracketMatchupByTeams(pred?.t1_name, pred?.t2_name);
+    if (!matchup) return pred;
+
+    const predT1 = normalizeTeamName(pred?.t1_name || '');
+    const matchT1 = normalizeTeamName(matchup?.t1?.name || '');
+    const matchT2 = normalizeTeamName(matchup?.t2?.name || '');
+
+    let uiProbForPredT1 = Number(matchup?.t1?.win_probability);
+    if (predT1 && predT1 === matchT2) {
+      uiProbForPredT1 = Number(matchup?.t2?.win_probability);
+    } else if (predT1 && predT1 !== matchT1 && predT1 !== matchT2) {
+      return pred;
+    }
+    if (!Number.isFinite(uiProbForPredT1)) return pred;
+
+    changed = true;
+    return {
+      ...pred,
+      model_win_prob: uiProbForPredT1,
+      predicted_winner_name: uiProbForPredT1 >= 0.5 ? pred?.t1_name : pred?.t2_name,
+      ui_probability_source: 'bracket_matchup_cards',
+    };
+  });
+
+  if (!changed) return historicalCtx;
+  return { ...historicalCtx, predictions: alignedPredictions };
+}
+
 function ctxFingerprint(item) {
   if (!item || !item.type) return '';
   if (item.type === 'pred') {
@@ -2272,13 +2321,23 @@ function fmtCtx(ctx) {
 
     if (item.type === 'pred') {
       const p = item.data;
-      const prob = Math.max(p.model_win_prob || 0.5, 1 - (p.model_win_prob || 0.5));
-      const winner = p.predicted_winner_name || (p.model_win_prob > 0.5 ? p.t1_name : p.t2_name);
+      const uiMatchup = findBracketMatchupByTeams(p?.t1_name, p?.t2_name);
+      const p1Ui = Number(uiMatchup?.t1?.win_probability);
+      const p2Ui = Number(uiMatchup?.t2?.win_probability);
+      const predT1 = normalizeTeamName(p?.t1_name || '');
+      const uiT2 = normalizeTeamName(uiMatchup?.t2?.name || '');
+      let uiProbForPredT1 = p1Ui;
+      if (predT1 && predT1 === uiT2) uiProbForPredT1 = p2Ui;
+      const useUi = Number.isFinite(uiProbForPredT1);
+      const resolvedP1 = useUi ? uiProbForPredT1 : Number(p?.model_win_prob || 0.5);
+      const prob = Math.max(resolvedP1, 1 - resolvedP1);
+      const winner = resolvedP1 >= 0.5 ? p.t1_name : p.t2_name;
 
       // Base prediction line
       let line = `[${item.model}] (${p.t1_seed})${p.t1_name} vs (${p.t2_seed})${p.t2_name}`;
       line += ` â†’ ${winner} ${(prob * 100).toFixed(0)}% ${p.confidence || ''}`;
 
+      if (useUi) line += ' [UI_PROB]';
       if (p.upset_flag) line += ` ${p.upset_flag}`;
 
       // Archetype info
@@ -3064,7 +3123,8 @@ async function handleChat(req, res, opts = {}) {
     const joined = msgs.map((m) => m.content).join(' ');
     const intent = detectIntent(joined);
     const ctx = findCtx(joined, { intent, messageCount: msgs.length });
-    const historicalCtx = getRelevantHistoricalContext(joined);
+    const historicalCtxRaw = getRelevantHistoricalContext(joined);
+    const historicalCtx = alignHistoricalContextToUiProbabilities(historicalCtxRaw);
     const intentHint = intent === 'value'
       ? 'INTENT: VALUE. Lead with EV/value-edge vs public pick rates and bracket leverage.'
       : `INTENT: ${intent.toUpperCase()}.`;
@@ -3073,6 +3133,13 @@ async function handleChat(req, res, opts = {}) {
     const focusMatchup = req.body?.focusMatchup;
     const shouldIncludeBracket = opts.forceBracketContext || !!bracketState;
     const bracketStateBlock = shouldIncludeBracket ? formatBracketStateContext(bracketState || {}, focusMatchup) : '';
+    const ui2LayoutBlock = shouldIncludeBracket ? formatUi2BracketLayoutContext() : '';
+    const uiProbabilityRule = shouldIncludeBracket
+      ? `UI_PROBABILITY_RULES:
+- Treat bracket UI matchup-card win probabilities as the single source of truth.
+- If any other context has a different probability for the same matchup, ignore it and use the UI value.
+- If a matchup is not present in UI matchup-card data, say "UI probability not available for this matchup."`
+      : '';
 
     const reply = await callLLM(msgs, `${intentHint}
 ${bracketGrounding}
@@ -3080,6 +3147,8 @@ RELEVANT_HISTORICAL_CONTEXT:
 ${JSON.stringify(historicalCtx, null, 0)}
 CONTEXT_COUNTS: predictions=${historicalCtx.predictions.length}, archetypes=${Object.keys(historicalCtx.archetype_history || {}).length}
 ${bracketStateBlock}
+${ui2LayoutBlock}
+${uiProbabilityRule}
 ${fmtCtx(ctx)}`);
     return res.json({ reply, intent });
   } catch (e) {
@@ -3469,7 +3538,7 @@ app.get('/bracket', (req, res) => {
 app.use('/data', express.static(path.join(__dirname, 'data')));
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'), (err) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'bracket.html'), (err) => {
     if (err && !res.headersSent) res.status(404).send('Not found');
   });
 });
