@@ -1557,7 +1557,6 @@
     <div class="nav-links">
       <a href="/bracket" class="active">Bracket</a>
       <a href="/">Chat</a>
-      <a href="/value-picks">Picks</a>
     </div>
   </nav>
 
@@ -1600,7 +1599,6 @@
           <div class="strategy-control">
             <button class="strategy-pill active" data-strategy="balanced" onclick="applyStrategy('balanced')">
               <span class="strategy-inner"><i class="strategy-icon" data-lucide="scale"></i><span class="strategy-name">BALANCED</span></span>
-              <span class="strategy-ep" id="ep-balanced">-- EP</span>
             </button>
             <button class="strategy-pill open-slot" type="button" disabled aria-disabled="true" title="Reserved for Monte Carlo optimizer strategy">
               <span class="strategy-inner"><i class="strategy-icon" data-lucide="cpu"></i><span class="strategy-name">MONTE CARLO (OPEN SLOT)</span></span>
@@ -1609,7 +1607,6 @@
           </div>
           <div class="strategy-right">
             <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
-            <div class="custom-ep-counter"><span id="strategy-mode">Custom</span>: <strong id="custom-ep">0</strong> EP</div>
             <div class="upset-rec" id="upsetRec">
               <div class="upset-rec-circle" id="upsetRecCircle">0</div>
               <div class="upset-rec-text" id="upsetRecText"></div>
@@ -1801,19 +1798,10 @@
     </div>
   </div>
   <div class="flow-banner" id="flowBanner"></div>
-  <button class="btn btn-secondary optimizer-toggle" onclick="toggleOptimizer()"><i class="strategy-icon" data-lucide="bar-chart-2"></i> Optimizer</button>
-  <aside class="optimizer-panel" id="optimizerPanel">
-    <div class="opt-title"><i data-lucide="bar-chart-2"></i> Points Optimizer</div>
-    <button class="btn btn-primary" onclick="autoFillOptimalBracket()">Auto-Fill Optimal Bracket</button>
-    <div id="optimizerRankings"></div>
-    <div class="champ-header"><i data-lucide="trophy"></i> Champion Probabilities</div>
-    <div id="optimizerChamps"></div>
-  </aside>
 
   <div class="mobile-tabs">
     <a href="/bracket" class="active">Bracket</a>
     <a href="/">Chat</a>
-    <a href="/value-picks">Picks</a>
   </div>
 
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
@@ -4815,14 +4803,6 @@
       const key = String(strategy || '').toLowerCase();
       if (!strategyKeys.includes(key)) return;
       let strategyData = strategyMap[key];
-      try {
-        const r = await fetch('/api/bracket-output/strategy/' + encodeURIComponent(key));
-        if (r.ok) {
-          strategyData = await r.json();
-          strategyMap[key] = strategyData;
-        }
-      } catch (e) {}
-      if (!strategyData) return;
       if (!strategyData?.rounds || !Object.keys(strategyData.rounds).length) {
         const fallback = optimizeBracket(key);
         bracketState.picks = fallback.picks;
@@ -5042,33 +5022,16 @@
         if (!data || !Array.isArray(matchups) || matchups.length === 0) {
           throw new Error('Bracket data not loaded. Check admin panel.');
         }
-        const rOutput = await fetch('/api/bracket-output').catch(() => null);
-        if (rOutput && rOutput.ok) {
-          bracketOutput = await rOutput.json();
-          strategyMap = bracketOutput.strategies || {};
-          teamEpRankings = bracketOutput.team_ep_rankings || {};
-          championProbs = bracketOutput.bracket_structure?.champion_probs || {};
-          teamStats = bracketOutput?.team_stats || {};
-          roundAdvanceProbs = bracketOutput?.round_advance_probs || {};
-          upsetScoresData = bracketOutput?.upset_scores || [];
-          upsetThresholdsData = bracketOutput?.upset_thresholds || [];
-          if (bracketOutput.metadata?.scoring) {
-            applyEspnScoringMap(bracketOutput.metadata.scoring);
-          }
-        } else {
-          strategyMap = {};
-          teamEpRankings = {};
-          championProbs = {};
-          teamStats = {};
-          roundAdvanceProbs = {};
-          upsetScoresData = [];
-          upsetThresholdsData = [];
-        }
-        const fallbackTotals = buildOptimizerStrategies();
+        bracketOutput = null;
+        strategyMap = {};
+        teamEpRankings = {};
+        championProbs = {};
+        teamStats = {};
+        roundAdvanceProbs = {};
+        upsetScoresData = [];
+        upsetThresholdsData = [];
         for (const key of strategyKeys) {
           if (!strategyMap[key]) strategyMap[key] = {};
-          const existing = Number(strategyMap[key]?.total_ep);
-          strategyMap[key].total_ep = Number.isFinite(existing) ? existing : safeNum(fallbackTotals[key], 0);
         }
         window._teamDir = teamDirectory;
         window._seedHistory = seedHistory;
@@ -5117,10 +5080,8 @@
         buildTeamIndex();
         loadState();
         buildTree(byRegion, regions);
-        updateStrategyBar();
-        renderOptimizer();
         const activeKey = String(bracketState.activeStrategy || '').toLowerCase();
-        if (strategyKeys.includes(activeKey) && strategyMap[activeKey]?.rounds && Object.keys(strategyMap[activeKey].rounds).length) {
+        if (strategyKeys.includes(activeKey)) {
           await applyStrategy(activeKey);
         }
         saveState();

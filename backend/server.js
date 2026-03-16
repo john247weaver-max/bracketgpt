@@ -3015,28 +3015,7 @@ ${fmtCtx(ctx)}`);
 }
 
 app.post('/api/chat', async (req, res) => {
-  try {
-    if (!rateOk(req.ip || 'x')) return res.status(429).json({ error: 'Too many messages.' });
-    const { messages } = req.body || {};
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'messages array required' });
-    }
-
-    const lastMessage = messages[messages.length - 1]?.content || '';
-    const context = buildChatContext(lastMessage);
-
-    let systemContent = getSystemPrompt();
-    if (Object.keys(context).length > 0) {
-      systemContent += '\n\n--- CONTEXT DATA (from model predictions) ---\n';
-      systemContent += JSON.stringify(context, null, 2);
-    }
-
-    const reply = await callLLM(messages, systemContent, { rawSystemPrompt: true });
-    return res.json({ reply });
-  } catch (err) {
-    console.error('LLM call failed:', err.message);
-    return res.status(500).json({ error: 'Failed to get response from AI' });
-  }
+  return handleChat(req, res);
 });
 
 app.post('/api/bracket-chat', async (req, res) => {
@@ -3403,9 +3382,7 @@ app.get('/admin', (req, res) => {
 });
 
 app.get('/value-picks', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'frontend', 'value-picks.html'), (err) => {
-    if (err && !res.headersSent) res.status(404).send('Not found');
-  });
+  return res.redirect(302, '/');
 });
 
 app.get('/bracket', (req, res) => {
