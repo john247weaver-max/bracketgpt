@@ -51,6 +51,8 @@
   }
   a { color: inherit; text-decoration: none; }
   button, input, select { font: inherit; }
+  .font-condensed { }
+  .font-base { }
 
   .nav {
     position: sticky;
@@ -65,7 +67,6 @@
     background: var(--bg-base);
   }
   .brand {
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 18px;
     font-weight: 900;
     color: var(--accent);
@@ -79,7 +80,6 @@
     height: 100%;
     border-bottom: 2px solid transparent;
     color: var(--text-muted);
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.1em;
@@ -144,7 +144,6 @@
     width: 26px;
     height: 24px;
     padding: 0;
-    font-family: var(--fd);
     font-size: 12px;
     font-weight: 900;
     cursor: pointer;
@@ -161,7 +160,6 @@
     color: var(--text-muted);
     border-radius: 6px;
     padding: 4px 8px;
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -178,7 +176,6 @@
     cursor: default;
   }
   .chat-pane-title {
-    font-family: var(--fd);
     font-size: 13px;
     font-weight: 900;
     letter-spacing: .10em;
@@ -186,7 +183,6 @@
     color: var(--text);
   }
   .chat-pane-sub {
-    font-family: var(--fb);
     font-size: 11px;
     color: var(--muted);
   }
@@ -204,7 +200,6 @@
     background: rgba(46,116,212,0.07);
   }
   .chat-context-title {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .1em;
@@ -213,7 +208,6 @@
     margin-bottom: 6px;
   }
   .chat-context-main {
-    font-family: var(--fd);
     font-size: 14px;
     font-weight: 700;
     letter-spacing: .04em;
@@ -232,7 +226,6 @@
     color: var(--text-muted);
     border-radius: 6px;
     padding: 6px 7px;
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .06em;
@@ -267,7 +260,6 @@
     color: #1A5CB5;
     border-radius: 6px;
     padding: 7px 10px;
-    font-family: var(--fd);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -295,7 +287,6 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
-    font-family: var(--fb);
     font-size: 13px;
     padding: 9px 12px;
     outline: none;
@@ -323,7 +314,6 @@
     color: #fff;
   }
   .chat-hint {
-    font-family: var(--fb);
     font-size: 10px;
     color: var(--dim);
     text-align: center;
@@ -331,7 +321,6 @@
     letter-spacing: .04em;
   }
   .chat-route-status {
-    font-family: var(--fb);
     font-size: 10px;
     color: var(--muted);
     text-align: center;
@@ -350,7 +339,6 @@
     max-width: 88%;
     padding: 9px 12px;
     border-radius: 10px;
-    font-family: var(--fb);
     font-size: 13px;
     line-height: 1.5;
     color: var(--text);
@@ -370,7 +358,6 @@
   .chat-welcome {
     padding: 18px 12px;
     text-align: center;
-    font-family: var(--fb);
     color: var(--muted);
     font-size: 13px;
     border: 1px dashed var(--border);
@@ -390,7 +377,6 @@
     border: 1px solid var(--border);
     background: #fff;
     color: #333;
-    font-family: var(--fb);
     font-size: 12px;
     cursor: pointer;
   }
@@ -460,7 +446,6 @@
     min-width: 260px;
   }
   .topbar-kicker {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .12em;
@@ -469,7 +454,6 @@
   }
   .tophead h1 {
     margin: 0;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 30px;
     font-weight: 900;
     letter-spacing: 0.05em;
@@ -477,7 +461,6 @@
     line-height: 1;
   }
   .tophead-sub {
-    font-family: var(--fb);
     font-size: 12px;
     color: var(--muted);
     line-height: 1.3;
@@ -494,7 +477,6 @@
     border: 1px solid var(--bg-line);
     padding: 0 12px;
     cursor: pointer;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -509,7 +491,6 @@
   .progress-wrap { margin-top: 12px; }
   .progress-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   #progress-text {
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 22px;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -517,7 +498,6 @@
   }
   #progress-text .slash { color: var(--text-muted); padding: 0 4px; }
   #completion-text {
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -544,7 +524,6 @@
     gap: 3px;
   }
   .impact-label {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .1em;
@@ -552,7 +531,6 @@
     color: var(--muted);
   }
   .impact-value {
-    font-family: var(--fd);
     font-size: 22px;
     font-weight: 900;
     letter-spacing: .04em;
@@ -561,7 +539,6 @@
     line-height: 1;
   }
   .impact-sub {
-    font-family: var(--fb);
     font-size: 11px;
     color: var(--dim);
     line-height: 1.3;
@@ -592,7 +569,6 @@
     margin-bottom: 8px;
   }
   .optimizer-checklist-title {
-    font-family: var(--fd);
     font-size: 12px;
     font-weight: 900;
     letter-spacing: .10em;
@@ -603,7 +579,6 @@
     border: 1px solid var(--bg-line);
     border-radius: 999px;
     padding: 2px 8px;
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -642,7 +617,6 @@
     min-height: 32px;
   }
   .optimizer-check-label {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -650,7 +624,6 @@
     color: var(--muted);
   }
   .optimizer-check-value {
-    font-family: var(--fd);
     font-size: 12px;
     font-weight: 900;
     letter-spacing: .08em;
@@ -663,7 +636,6 @@
   .optimizer-check-value.bad { color: var(--red); }
   .optimizer-check-foot {
     margin-top: 8px;
-    font-family: var(--fb);
     font-size: 11px;
     line-height: 1.35;
     color: var(--muted);
@@ -683,7 +655,6 @@
     margin-bottom: 10px;
   }
   .edge-title {
-    font-family: var(--fd);
     font-size: 12px;
     font-weight: 900;
     letter-spacing: .10em;
@@ -694,7 +665,6 @@
     border: 1px solid var(--bg-line);
     border-radius: 999px;
     padding: 2px 8px;
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -715,7 +685,6 @@
     padding: 8px;
   }
   .edge-label {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -724,7 +693,6 @@
     margin-bottom: 5px;
   }
   .edge-champ {
-    font-family: var(--fd);
     font-size: 20px;
     font-weight: 900;
     letter-spacing: .03em;
@@ -733,7 +701,6 @@
     margin-bottom: 6px;
   }
   .edge-sub {
-    font-family: var(--fb);
     font-size: 11px;
     line-height: 1.3;
     color: var(--muted);
@@ -752,7 +719,6 @@
     padding: 5px 7px;
   }
   .edge-stat-name {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -760,7 +726,6 @@
     color: var(--muted);
   }
   .edge-stat-val {
-    font-family: var(--fd);
     font-size: 12px;
     font-weight: 900;
     letter-spacing: .06em;
@@ -772,7 +737,6 @@
   .edge-stat-val.bad { color: var(--red); }
   .edge-current {
     margin: 0 0 8px;
-    font-family: var(--fb);
     font-size: 11px;
     line-height: 1.35;
     color: var(--muted);
@@ -783,7 +747,6 @@
     padding-left: 16px;
     display: grid;
     gap: 3px;
-    font-family: var(--fb);
     font-size: 11px;
     line-height: 1.35;
     color: var(--text);
@@ -801,20 +764,18 @@
     padding: 6px 8px;
     border-bottom: 1px solid var(--bg-line);
     align-items: center;
-    font-family: var(--fb);
     font-size: 11px;
   }
   .edge-row:last-child { border-bottom: 0; }
   .edge-row.head {
     background: var(--bg-surface-2);
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .08em;
     text-transform: uppercase;
     color: var(--muted);
   }
-  .edge-row .r { text-align: right; font-family: var(--fd); font-weight: 700; letter-spacing: .04em; }
+  .edge-row .r { text-align: right; font-weight: 700; letter-spacing: .04em; }
   .edge-row .g { color: var(--green); }
   .edge-row .o { color: var(--orange); }
   .edge-row .m { color: var(--muted); }
@@ -860,7 +821,6 @@
   .finals h2 svg,
   .champ-header svg { width: 14px; height: 14px; stroke-width: 2.2; }
   .strategy-pill .strategy-name {
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -876,7 +836,6 @@
     border-radius: 2px;
     background: var(--bg-surface-2);
     color: var(--accent);
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -890,7 +849,6 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -911,7 +869,6 @@
     background: rgba(0, 168, 70, 0.15);
     border: 2px solid var(--green);
     color: var(--green);
-    font-family: var(--fd);
     font-size: 20px;
     font-weight: 900;
     display: flex;
@@ -921,7 +878,6 @@
     transition: all 0.2s ease;
   }
   .upset-rec-text {
-    font-family: var(--fb);
     font-size: 12px;
     line-height: 1.4;
     color: var(--muted);
@@ -948,7 +904,6 @@
     padding: 8px 12px;
     cursor: pointer;
     white-space: nowrap;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -962,7 +917,6 @@
     flex-shrink: 0;
   }
   .pool-size-label {
-    font-family: var(--fd);
     font-size: 11px; font-weight: 700;
     letter-spacing: .10em; text-transform: uppercase;
     color: var(--muted);
@@ -973,7 +927,6 @@
     border: 1px solid var(--bg-line);
     border-radius: 2px;
     color: var(--text);
-    font-family: var(--fd);
     font-size: 16px; font-weight: 900;
     text-align: center;
     padding: 5px 6px;
@@ -986,7 +939,6 @@
     border-color: var(--blue);
   }
   .pool-size-unit {
-    font-family: var(--fd);
     font-size: 11px; font-weight: 700;
     letter-spacing: .08em; text-transform: uppercase;
     color: var(--dim);
@@ -1013,7 +965,6 @@
   }
   .region-title {
     margin: 0;
-    font-family: var(--fd);
     font-size: 20px;
     font-weight: 900;
     letter-spacing: 0.06em;
@@ -1021,7 +972,6 @@
     line-height: 1;
   }
   .region-round-label {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.10em;
@@ -1037,7 +987,6 @@
     margin: 0 0 10px;
     border-bottom: 1px solid var(--bg-line);
     padding-bottom: 5px;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 11px;
     font-weight: 700;
     color: var(--text-label);
@@ -1103,7 +1052,6 @@
     background: linear-gradient(90deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01));
   }
   .mp-meta {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .1em;
@@ -1111,7 +1059,6 @@
     color: var(--muted);
   }
   .mp-confidence {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: .08em;
@@ -1163,7 +1110,6 @@
     transition: width 180ms ease;
   }
   .mp-seed {
-    font-family: var(--fd);
     font-size: 12px;
     font-weight: 700;
     color: var(--dim);
@@ -1171,7 +1117,6 @@
     flex-shrink: 0;
   }
   .mp-name {
-    font-family: var(--fd);
     font-size: 18px;
     font-weight: 900;
     letter-spacing: 0.02em;
@@ -1183,7 +1128,6 @@
     line-height: 1;
   }
   .mp-pct {
-    font-family: var(--fd);
     font-size: 14px;
     font-weight: 700;
     color: var(--muted);
@@ -1192,7 +1136,6 @@
     text-align: right;
   }
   .mp-net {
-    font-family: var(--fd);
     font-size: 11px;
     font-weight: 700;
     flex-shrink: 0;
@@ -1218,7 +1161,6 @@
     position: absolute;
     top: -1px;
     right: 8px;
-    font-family: var(--fd);
     font-size: 9px;
     font-weight: 800;
     letter-spacing: .10em;
@@ -1236,7 +1178,6 @@
     position: absolute;
     top: -1px;
     right: 8px;
-    font-family: var(--fd);
     font-size: 9px;
     font-weight: 800;
     letter-spacing: .10em;
@@ -1250,7 +1191,6 @@
     border: 1px solid var(--border);
   }
   .signal-tag {
-    font-family: var(--fd);
     font-size: 10px; font-weight: 800;
     letter-spacing: .10em; text-transform: uppercase;
     padding: 2px 7px; border-radius: 3px;
@@ -1279,7 +1219,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 18px;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -1321,7 +1260,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 15px;
     font-weight: 900;
     letter-spacing: 0.1em;
@@ -1336,7 +1274,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.12em;
@@ -1366,7 +1303,6 @@
     opacity: 0;
     transition: opacity 200ms ease-in-out;
     z-index: 1002;
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 28px;
     font-weight: 900;
     letter-spacing: 0.12em;
@@ -1422,7 +1358,6 @@
   }
   .pc-progress {
     text-align: center;
-    font-family: var(--fd);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -1437,7 +1372,6 @@
     color: var(--text);
     border-radius: 4px;
     cursor: pointer;
-    font-family: var(--fd);
     font-size: 16px;
     line-height: 1;
     padding: 0;
@@ -1459,12 +1393,12 @@
     gap: 8px;
   }
   .pc-region {
-    font-family: var(--fd); font-size: 11px; font-weight: 700;
+    font-size: 11px; font-weight: 700;
     letter-spacing: .12em; text-transform: uppercase;
     color: var(--muted);
   }
   .pc-flag {
-    font-family: var(--fd); font-size: 11px; font-weight: 700;
+    font-size: 11px; font-weight: 700;
     letter-spacing: .10em; text-transform: uppercase;
     padding: 3px 8px; border-radius: 4px;
   }
@@ -1500,7 +1434,6 @@
   .pc-team.picked { background: rgba(0,168,70,.08); }
   .pc-team.dimmed .pc-name { color: var(--muted); }
   .pc-model-badge {
-    font-family: var(--fd);
     font-size: 9px;
     font-weight: 700;
     letter-spacing: .12em;
@@ -1515,25 +1448,25 @@
   }
 
   .pc-seed {
-    font-family: var(--fd); font-size: 12px; font-weight: 700;
+    font-size: 12px; font-weight: 700;
     color: var(--gold); letter-spacing: .06em;
   }
   .pc-name {
-    font-family: var(--fd); font-size: 30px; font-weight: 900;
+    font-size: 30px; font-weight: 900;
     color: var(--text); letter-spacing: .02em; line-height: 1;
     text-align: center;
   }
   .pc-pct {
-    font-family: var(--fd); font-size: 42px; font-weight: 900; line-height: 1;
+    font-size: 42px; font-weight: 900; line-height: 1;
     margin-top: 2px;
   }
   .pc-pct-lbl {
-    font-family: var(--fd); font-size: 10px; font-weight: 700;
+    font-size: 10px; font-weight: 700;
     letter-spacing: .08em; text-transform: uppercase;
     color: var(--dim);
   }
   .pc-pick-tag {
-    font-family: var(--fd); font-size: 10px; font-weight: 700;
+    font-size: 10px; font-weight: 700;
     letter-spacing: .10em; text-transform: uppercase;
     color: var(--green); margin-top: 2px;
   }
@@ -1549,7 +1482,7 @@
   .pc-bar-lbls {
     display: flex; justify-content: space-between;
     padding: 4px 0 12px;
-    font-family: var(--fb); font-size: 11px; color: var(--muted);
+    font-size: 11px; color: var(--muted);
     gap: 10px;
   }
   .pc-bar-lbls span:last-child { text-align: right; }
@@ -1602,7 +1535,6 @@
   }
   .pc-section-label {
     margin: 10px 16px 4px;
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -1611,7 +1543,6 @@
   }
   .pc-seed-history {
     margin: 0 16px 8px;
-    font-family: var(--fb);
     font-size: 13px;
     color: #444;
     line-height: 1.5;
@@ -1645,13 +1576,13 @@
   }
   .pc-col:last-child { border-right: none; }
   .pc-col-name {
-    font-family: var(--fd); font-size: 11px; font-weight: 900;
+    font-size: 11px; font-weight: 900;
     letter-spacing: .08em; text-transform: uppercase;
     color: var(--muted); margin-bottom: 8px;
   }
   .pc-archetype {
     display: inline-flex; align-items: center; gap: 4px;
-    font-family: var(--fd); font-size: 10px; font-weight: 700;
+    font-size: 10px; font-weight: 700;
     letter-spacing: .08em; text-transform: uppercase;
     padding: 3px 7px; border-radius: 4px; margin-bottom: 10px;
     background: rgba(46,116,212,.12); color: var(--blue);
@@ -1668,7 +1599,6 @@
     border-top: none;
   }
   .pc-stats-title {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.10em;
@@ -1683,12 +1613,10 @@
     padding: 3px 0;
   }
   .pc-stat-label {
-    font-family: var(--fb);
     font-size: 12px;
     color: var(--muted);
   }
   .pc-stat-value {
-    font-family: var(--fd);
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.03em;
@@ -1699,14 +1627,12 @@
   }
   .pc-summary {
     margin: 6px 0 8px;
-    font-family: var(--fb);
     font-size: 12px;
     line-height: 1.45;
     color: var(--text);
   }
   .pc-mini-title {
     margin: 8px 0 4px;
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -1719,7 +1645,6 @@
   }
   .pc-bullet-item {
     margin: 0 0 4px;
-    font-family: var(--fb);
     font-size: 12px;
     line-height: 1.35;
     color: var(--muted);
@@ -1749,7 +1674,7 @@
     border-top: 5px solid var(--red);
   }
   .pc-stat-text {
-    font-family: var(--fb); font-size: 12px; line-height: 1.4; color: var(--muted);
+    font-size: 12px; line-height: 1.4; color: var(--muted);
   }
   .pc-stat-text.strong { color: var(--text); }
 
@@ -1760,12 +1685,12 @@
     background: rgba(46,116,212,.08);
   }
   .pc-insight-lbl {
-    font-family: var(--fd); font-size: 10px; font-weight: 700;
+    font-size: 10px; font-weight: 700;
     letter-spacing: .12em; text-transform: uppercase;
     color: var(--blue); margin-bottom: 5px;
   }
   .pc-insight-txt {
-    font-family: var(--fb); font-size: 13px; line-height: 1.5; color: var(--muted);
+    font-size: 13px; line-height: 1.5; color: var(--muted);
   }
 
   .pc-lev {
@@ -1782,7 +1707,6 @@
     gap: 8px;
     padding: 8px 10px;
     border-bottom: 1px solid var(--border);
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -1790,7 +1714,6 @@
     color: var(--muted);
   }
   .pc-lev-sub {
-    font-family: var(--fb);
     font-size: 11px;
     color: var(--text-label);
   }
@@ -1815,7 +1738,6 @@
     align-content: start;
   }
   .pc-lev-side-title {
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: .10em;
@@ -1831,7 +1753,6 @@
     gap: 4px;
   }
   .pc-lev-side-team {
-    font-family: var(--fd);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: .06em;
@@ -1843,18 +1764,15 @@
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    font-family: var(--fb);
     font-size: 11px;
     color: var(--muted);
   }
   .pc-lev-side-metric strong {
-    font-family: var(--fd);
     font-size: 12px;
     letter-spacing: .03em;
     color: var(--text);
   }
   .pc-lev-side-reason {
-    font-family: var(--fb);
     font-size: 10px;
     line-height: 1.35;
     color: var(--muted);
@@ -1866,7 +1784,6 @@
     border-radius: 999px;
     border: 1px solid var(--border);
     padding: 2px 8px;
-    font-family: var(--fd);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: .09em;
@@ -1893,7 +1810,6 @@
     background: rgba(0,0,0,.04);
   }
   .pc-lev-guardrail {
-    font-family: var(--fb);
     font-size: 10px;
     line-height: 1.35;
     color: var(--muted);
@@ -1913,7 +1829,6 @@
     align-items: center;
     gap: 8px;
     margin-bottom: 6px;
-    font-family: var(--fd);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -1926,13 +1841,11 @@
   .pc-lev-table {
     width: 100%;
     border-collapse: collapse;
-    font-family: var(--fb);
     font-size: 11px;
   }
   .pc-lev-table th {
     text-align: right;
     color: var(--muted);
-    font-family: var(--fd);
     font-size: 9px;
     letter-spacing: 0.07em;
     text-transform: uppercase;
@@ -1965,7 +1878,7 @@
   .pc-btns { padding: 0 16px 16px; display: flex; gap: 8px; }
   .pc-btn {
     flex: 1; padding: 13px; border: none; border-radius: 7px;
-    font-family: var(--fd); font-size: 16px; font-weight: 900;
+    font-size: 16px; font-weight: 900;
     letter-spacing: .05em; text-transform: uppercase;
     cursor: pointer; color: #fff;
     transition: transform 0.1s ease, opacity 0.15s ease;
@@ -2001,7 +1914,6 @@
     text-align: center;
     padding: 12px 0;
     color: var(--text-muted);
-    font-family: 'Barlow Condensed', sans-serif;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: .1em;
@@ -2554,10 +2466,10 @@
     let upsetThresholdsData = [];
     let kenpomCsvTeams = {};
     let publicPerceptionRows = [];
-    let activeStrategy = '';
     let strategyBaselinePicks = {};
     let strategyEpByNode = {};
     let customOverrideNodes = new Set();
+    const TOP_BIN_DOM = {};
     const flowRoundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
     const PICK_REGIONS = ['South', 'East', 'West', 'Midwest'];
     const PICK_ROUNDS = ['R64', 'R32', 'S16', 'E8'];
@@ -2607,13 +2519,32 @@
       activeStrategy: ''
     };
 
-    function aliasKey(v) {
-      return String(v || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    const safeNum = (v, fallback = 0) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const safeProb = (v, fallback = 0.5) => {
+      const n = safeNum(v, fallback);
+      return n > 1 ? n / 100 : Math.max(0, Math.min(1, n));
+    };
+    const getProp = (obj, keys, fallback = null) => {
+      if (!obj) return fallback;
+      for (const k of keys) {
+        if (obj[k] != null) return obj[k];
+      }
+      return fallback;
+    };
+    function normalizeString(v, keepSpaces = true) {
+      let str = String(v || '').toLowerCase().trim();
+      str = keepSpaces
+        ? str.replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ')
+        : str.replace(/[^a-z0-9]/g, '');
+      return str;
     }
     function resetAliasLookup() {
       aliasLookup.clear();
       for (const [alias, canonical] of Object.entries(LEGACY_ALIAS_CANONICAL)) {
-        aliasLookup.set(aliasKey(alias), aliasKey(canonical));
+        aliasLookup.set(normalizeString(alias), normalizeString(canonical));
       }
     }
     async function loadTeamNameMappingSource() {
@@ -2625,12 +2556,12 @@
         const aliases = mapping?.team_alias_mapping;
         if (!aliases || typeof aliases !== 'object') return;
         for (const [canonicalRaw, aliasList] of Object.entries(aliases)) {
-          const canonical = aliasKey(canonicalRaw);
+          const canonical = normalizeString(canonicalRaw);
           if (!canonical) continue;
           aliasLookup.set(canonical, canonical);
           if (!Array.isArray(aliasList)) continue;
           for (const aliasRaw of aliasList) {
-            const alias = aliasKey(aliasRaw);
+            const alias = normalizeString(aliasRaw);
             if (!alias) continue;
             if (alias.length <= 2) continue;
             aliasLookup.set(alias, canonical);
@@ -2641,7 +2572,7 @@
       }
     }
     function normalizeName(v) {
-      const cleaned = aliasKey(v);
+      const cleaned = normalizeString(v, true);
       return aliasLookup.get(cleaned) || cleaned;
     }
     function summaryTokens(value) {
@@ -2751,7 +2682,7 @@
       }
     }
     function normalizeRegionName(v) {
-      return String(v || '').toLowerCase().replace(/[^a-z]/g, '');
+      return normalizeString(v, false).replace(/[0-9]/g, '');
     }
     function getDisplayName(v) {
       const name = String(v || '').trim();
@@ -3197,32 +3128,27 @@
       const messagesEl = document.getElementById('chatMessages');
       if (!messagesEl) return;
       messagesEl.innerHTML = '';
-      let welcomeEl = document.getElementById('chatWelcome');
-      if (!welcomeEl) {
-        welcomeEl = document.createElement('div');
-        welcomeEl.id = 'chatWelcome';
-        welcomeEl.className = 'chat-welcome';
-        welcomeEl.innerHTML = '<p>Ask about any matchup, upset picks, or bracket strategy.</p>' +
-          '<div class="chat-prompts">' +
-          '<button onclick="sendChatMessage(\'Best upset picks this year?\')">Best upsets?</button>' +
-          '<button onclick="sendChatMessage(\'Compare the 1-seeds\')">Compare 1-seeds</button>' +
-          '<button onclick="sendChatMessage(\'Big pool strategy\')">Pool strategy</button>' +
-          '</div>';
-      }
-      let typingEl = document.getElementById('chatTyping');
-      if (!typingEl) {
-        typingEl = document.createElement('div');
-        typingEl.id = 'chatTyping';
-        typingEl.className = 'chat-typing';
-        typingEl.style.display = 'none';
-        typingEl.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
-      }
-      messagesEl.appendChild(welcomeEl);
+      const welcomeHTML = `
+        <div id="chatWelcome" class="chat-welcome">
+          <p>Ask about any matchup, upset picks, or bracket strategy.</p>
+          <div class="chat-prompts">
+            <button onclick="sendChatMessage('Best upset picks this year?')">Best upsets?</button>
+            <button onclick="sendChatMessage('Compare the 1-seeds')">Compare 1-seeds</button>
+            <button onclick="sendChatMessage('Big pool strategy')">Pool strategy</button>
+          </div>
+        </div>`;
+      const typingHTML = `
+        <div id="chatTyping" class="chat-typing" style="display:none">
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>`;
+      messagesEl.insertAdjacentHTML('beforeend', welcomeHTML);
       for (const msg of chatHistory) {
         renderChatMessage(msg.role === 'user' ? 'user' : 'bot', msg.content || '');
       }
+      messagesEl.insertAdjacentHTML('beforeend', typingHTML);
+      const welcomeEl = document.getElementById('chatWelcome');
+      const typingEl = document.getElementById('chatTyping');
       typingEl.style.display = 'none';
-      messagesEl.appendChild(typingEl);
       if (welcomeEl) welcomeEl.style.display = chatHistory.length ? 'none' : '';
       updateChatControlState();
     }
@@ -3541,6 +3467,18 @@
 
     function clearError() { document.getElementById('error').innerHTML = ''; }
 
+    function initTopBinCache() {
+      TOP_BIN_DOM.progressText = document.getElementById('progress-text');
+      TOP_BIN_DOM.completionText = document.getElementById('completion-text');
+      TOP_BIN_DOM.progressBar = document.getElementById('progress-bar');
+      TOP_BIN_DOM.impactCompletion = document.getElementById('impactCompletion');
+      TOP_BIN_DOM.impactPicks = document.getElementById('impactPicks');
+      TOP_BIN_DOM.impactEp = document.getElementById('impactEp');
+      TOP_BIN_DOM.customEp = document.getElementById('custom-ep');
+      TOP_BIN_DOM.strategyMode = document.getElementById('strategy-mode');
+      TOP_BIN_DOM.strategyPills = document.querySelectorAll('.strategy-pill');
+    }
+
     function saveState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bracketState));
       localStorage.setItem('bracketgpt_bracket_state', JSON.stringify(bracketState));
@@ -3576,10 +3514,6 @@
       roundPoints.NCG = safeNum(scoring.NCG ?? scoring.Championship ?? scoring.championship ?? scoring[6], roundPoints.NCG);
     }
 
-    function safeNum(v, fallback) {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : (fallback || 0);
-    }
     function calculateEP(winProbability, round) {
       const prob = normalizeProbability(winProbability, 0);
       const points = roundPoints[round] || roundPoints.R64 || 10;
@@ -3773,14 +3707,10 @@
       }
     }
 
-    function normalizeLookupKey(value) {
-      return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    }
-
     function expandLookupKeyVariants(baseKey) {
       const out = new Set();
       const queue = [];
-      const seed = normalizeLookupKey(baseKey);
+      const seed = normalizeString(baseKey, true);
       if (seed) queue.push(seed);
       const expandDir = { n: 'north', s: 'south', e: 'east', w: 'west' };
       const compressDir = { north: 'n', south: 's', east: 'e', west: 'w' };
@@ -3831,7 +3761,7 @@
       const rows = teamsRaw || {};
       for (const [rawKey, row] of Object.entries(rows)) {
         const keys = new Set();
-        keys.add(normalizeLookupKey(rawKey));
+        keys.add(normalizeString(rawKey, true));
         for (const key of buildTeamLookupKeys(row?.team || rawKey)) keys.add(key);
         for (const key of keys) {
           if (!key) continue;
@@ -3850,7 +3780,7 @@
       const directSet = new Set(directKeys);
       for (const [rawKey, row] of Object.entries(mapObj)) {
         const rowKeys = new Set([
-          normalizeLookupKey(rawKey),
+          normalizeString(rawKey, true),
           ...buildTeamLookupKeys(row?.team || rawKey)
         ]);
         for (const rowKey of rowKeys) {
@@ -3907,66 +3837,56 @@
       return out;
     }
 
-    async function loadMonteCarloData() {
+    async function fetchJSON(url, fallback = {}) {
       try {
-        const res = await fetch('/api/bracket-output');
-        if (!res.ok) return;
-        const data = await res.json();
-        bracketOutput = data || null;
-        strategyMap = data?.strategies || {};
-        teamEpRankings = data?.team_ep_rankings || {};
-        championProbs = data?.bracket_structure?.champion_probs || data?.champion_probs || {};
-        teamStats = data?.team_stats || data?.team_profiles || {};
-        const directRoundMap = normalizeRoundProbMap(
-          data?.round_advance_probs ||
-          data?.team_round_probs ||
-          data?.team_round_probabilities ||
-          data?.round_probabilities ||
-          data?.bracket_structure?.round_advance_probs ||
-          {}
-        );
-        const derivedRoundMap = deriveRoundProbMapFromTeamStats(teamStats);
-        roundAdvanceProbs = Object.keys(directRoundMap).length ? { ...derivedRoundMap, ...directRoundMap } : derivedRoundMap;
-        upsetScoresData = Array.isArray(data?.upset_scores) ? data.upset_scores : [];
-        upsetThresholdsData = Array.isArray(data?.upset_thresholds) ? data.upset_thresholds : [];
+        const res = await fetch(url);
+        return res.ok ? await res.json() : fallback;
       } catch (e) {
-        // Keep client fallback behavior if Monte Carlo payload is unavailable.
+        return fallback;
       }
+    }
+
+    async function loadMonteCarloData() {
+      const data = await fetchJSON('/api/bracket-output', null);
+      if (!data) return;
+      bracketOutput = data || null;
+      strategyMap = data?.strategies || {};
+      teamEpRankings = data?.team_ep_rankings || {};
+      championProbs = data?.bracket_structure?.champion_probs || data?.champion_probs || {};
+      teamStats = data?.team_stats || data?.team_profiles || {};
+      const directRoundMap = normalizeRoundProbMap(
+        data?.round_advance_probs ||
+        data?.team_round_probs ||
+        data?.team_round_probabilities ||
+        data?.round_probabilities ||
+        data?.bracket_structure?.round_advance_probs ||
+        {}
+      );
+      const derivedRoundMap = deriveRoundProbMapFromTeamStats(teamStats);
+      roundAdvanceProbs = Object.keys(directRoundMap).length ? { ...derivedRoundMap, ...directRoundMap } : derivedRoundMap;
+      upsetScoresData = Array.isArray(data?.upset_scores) ? data.upset_scores : [];
+      upsetThresholdsData = Array.isArray(data?.upset_thresholds) ? data.upset_thresholds : [];
     }
 
     async function loadExactTeamRoundProbData() {
-      try {
-        const res = await fetch('/api/team-round-probabilities');
-        if (!res.ok) return;
-        const data = await res.json();
-        exactTeamRoundProbs = normalizeRoundProbMap(data?.team_round_probs || {});
-        exactTeamPublicRoundProbs = normalizeRoundProbMap(data?.team_public_round_probs || {});
-      } catch (e) {
+      const data = await fetchJSON('/api/team-round-probabilities', null);
+      if (!data) {
         exactTeamRoundProbs = {};
         exactTeamPublicRoundProbs = {};
+        return;
       }
+      exactTeamRoundProbs = normalizeRoundProbMap(data?.team_round_probs || {});
+      exactTeamPublicRoundProbs = normalizeRoundProbMap(data?.team_public_round_probs || {});
     }
 
     async function loadKenpomCsvData() {
-      try {
-        const res = await fetch('/api/kenpom');
-        if (!res.ok) return;
-        const data = await res.json();
-        kenpomCsvTeams = indexKenpomTeams(data?.teams || {});
-      } catch (e) {
-        kenpomCsvTeams = {};
-      }
+      const data = await fetchJSON('/api/kenpom', null);
+      kenpomCsvTeams = data ? indexKenpomTeams(data?.teams || {}) : {};
     }
 
     async function loadPublicPerceptionData() {
-      try {
-        const res = await fetch('/api/public-perception');
-        if (!res.ok) return;
-        const data = await res.json();
-        publicPerceptionRows = Array.isArray(data?.rows) ? data.rows : [];
-      } catch (e) {
-        publicPerceptionRows = [];
-      }
+      const data = await fetchJSON('/api/public-perception', null);
+      publicPerceptionRows = Array.isArray(data?.rows) ? data.rows : [];
     }
 
     function normalizeRoundToken(v) {
@@ -3978,41 +3898,32 @@
       return key === '64' || key === 'r64' || key === 'round64' || key === 'roundof64' || key === 'firstround' || key === '1stround';
     }
 
-    function toProb(v, fallback) {
-      const n = Number(v);
-      if (!Number.isFinite(n)) return fallback;
-      if (n <= 0) return 0;
-      if (n <= 1) return n;
-      if (n <= 100) return n / 100;
-      return fallback;
-    }
-
     function normalizeIncomingMatchup(raw, idx, seasonFallback) {
       const m = raw || {};
-      const region = String(m?.region || 'Unknown').trim() || 'Unknown';
-      const gameNo = Number(m?.game_number || ((idx % 8) + 1));
+      const region = String(getProp(m, ['region'], 'Unknown')).trim() || 'Unknown';
+      const gameNo = safeNum(getProp(m, ['game_number'], (idx % 8) + 1), (idx % 8) + 1);
       const t1Raw = m?.t1 || {};
       const t2Raw = m?.t2 || {};
       const hasNested = Object.keys(t1Raw).length > 0 || Object.keys(t2Raw).length > 0;
       const t1 = hasNested ? t1Raw : {
-        team_id: m?.team1Id ?? m?.team1_id ?? null,
-        name: m?.team1 || m?.team1Name || m?.t1_name || 'TBD',
-        seed: m?.seed1 ?? m?.team1Seed ?? m?.t1_seed ?? null,
-        win_probability: m?.winProb ?? m?.model_win_prob ?? null,
-        predicted_margin: m?.predicted_margin ?? null,
-        abbreviation: m?.team1Abbreviation ?? null,
-        color_primary: m?.team1Color ?? null
+        team_id: getProp(m, ['team1Id', 'team1_id'], null),
+        name: String(getProp(m, ['team1', 'team1Name', 't1_name'], 'TBD')),
+        seed: getProp(m, ['seed1', 'team1Seed', 't1_seed'], null),
+        win_probability: getProp(m, ['winProb', 'model_win_prob'], null),
+        predicted_margin: getProp(m, ['predicted_margin'], null),
+        abbreviation: getProp(m, ['team1Abbreviation'], null),
+        color_primary: getProp(m, ['team1Color'], null)
       };
       const t2 = hasNested ? t2Raw : {
-        team_id: m?.team2Id ?? m?.team2_id ?? null,
-        name: m?.team2 || m?.team2Name || m?.t2_name || 'TBD',
-        seed: m?.seed2 ?? m?.team2Seed ?? m?.t2_seed ?? null,
+        team_id: getProp(m, ['team2Id', 'team2_id'], null),
+        name: String(getProp(m, ['team2', 'team2Name', 't2_name'], 'TBD')),
+        seed: getProp(m, ['seed2', 'team2Seed', 't2_seed'], null),
         win_probability: null,
         predicted_margin: m?.predicted_margin == null ? null : -Number(m.predicted_margin),
-        abbreviation: m?.team2Abbreviation ?? null,
-        color_primary: m?.team2Color ?? null
+        abbreviation: getProp(m, ['team2Abbreviation'], null),
+        color_primary: getProp(m, ['team2Color'], null)
       };
-      const p1 = toProb(t1?.win_probability ?? t1?.model_win_prob, 0.5);
+      const p1 = safeProb(getProp(t1, ['win_probability', 'model_win_prob'], 0.5), 0.5);
       const pair = canonicalSeedPair(t1?.seed, t2?.seed);
       const explicitSlot = Number(m?.slot);
       const inferredSlot = Number.isFinite(explicitSlot)
@@ -4157,7 +4068,7 @@
 
             const t1Name = String(g?.team1 || g?.team1Name || 'TBD');
             const t2Name = String(g?.team2 || g?.team2Name || 'TBD');
-            let p1 = toProb(g?.winProb, 0.5);
+            let p1 = safeProb(g?.winProb, 0.5);
             if (!Number.isFinite(p1)) p1 = 0.5;
             const p2 = 1 - p1;
 
@@ -4742,9 +4653,8 @@
         return;
       }
       bracketState.picks[matchId] = winnerName;
-      if (activeStrategy && strategyBaselinePicks[matchId] && strategyBaselinePicks[matchId] !== winnerName) {
+      if (bracketState.activeStrategy && strategyBaselinePicks[matchId] && strategyBaselinePicks[matchId] !== winnerName) {
         customOverrideNodes.add(matchId);
-        activeStrategy = '';
         bracketState.activeStrategy = 'custom';
       } else if (strategyBaselinePicks[matchId] && strategyBaselinePicks[matchId] === winnerName) {
         customOverrideNodes.delete(matchId);
@@ -4974,29 +4884,22 @@
         rows;
     }
 
-    function updateBracketChecklist() {
+    function computeBracketAggregates() {
       const completion = computeCompletion();
-      const tier = getPoolTierConfig(poolSize);
-      const upsetBand = tier.upsetTarget;
-      const underdogBand = [Math.max(0, upsetBand[0] + 2), upsetBand[1] + 3];
-      const seed10Band = tier.key === 'small' ? [0, 1] : [1, 3];
-      const seed11Band = tier.key === 'small' ? [0, 1] : [1, 3];
-      const seed12Band = tier.key === 'small' ? [0, 1] : [1, 3];
-      const longshotBand = tier.key === 'huge' ? [1, 3] : [0, 2];
+      let totalEp = 0;
       let trueUpsets = 0;
       let underdogWins = 0;
-      const seedWins = { 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0 };
       let validR64Games = 0;
-
+      const seedWins = { 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0 };
       for (const node of nodesById.values()) {
-        if (node.round !== 'R64') continue;
         const [t1, t2] = getMatchTeams(node);
         if (!t1 || !t2) continue;
         const pick = bracketState.picks[node.id];
         if (!pick) continue;
+        if (validPickForNode(node)) totalEp += getNodeEp(node, pick);
+        if (node.round !== 'R64') continue;
         const winner = (t1.name === pick) ? t1 : (t2.name === pick ? t2 : null);
         if (!winner) continue;
-
         const s1 = Number(t1.seed);
         const s2 = Number(t2.seed);
         const wSeed = Number(winner.seed);
@@ -5009,6 +4912,23 @@
         if (!(Math.min(s1, s2) === 8 && Math.max(s1, s2) === 9)) trueUpsets += 1;
         if (seedWins[wSeed] != null) seedWins[wSeed] += 1;
       }
+      return { completion, totalEp, trueUpsets, underdogWins, validR64Games, seedWins };
+    }
+
+    function updateBracketChecklist(aggregates = null) {
+      const summary = aggregates || computeBracketAggregates();
+      const completion = summary.completion;
+      const tier = getPoolTierConfig(poolSize);
+      const upsetBand = tier.upsetTarget;
+      const underdogBand = [Math.max(0, upsetBand[0] + 2), upsetBand[1] + 3];
+      const seed10Band = tier.key === 'small' ? [0, 1] : [1, 3];
+      const seed11Band = tier.key === 'small' ? [0, 1] : [1, 3];
+      const seed12Band = tier.key === 'small' ? [0, 1] : [1, 3];
+      const longshotBand = tier.key === 'huge' ? [1, 3] : [0, 2];
+      const trueUpsets = summary.trueUpsets;
+      const underdogWins = summary.underdogWins;
+      const seedWins = summary.seedWins;
+      const validR64Games = summary.validR64Games;
 
       const longshotTotal = seedWins[13] + seedWins[14] + seedWins[15] + seedWins[16];
       setChecklistCell('checkTrueUpsets', `${trueUpsets} / ${upsetBand[0]}-${upsetBand[1]}`, classifyAgainstBand(trueUpsets, upsetBand));
@@ -5083,11 +5003,12 @@
 
     function teamRow(node, team, pick, prob, side) {
       if (!team) {
-        return '<div class="mp-team">' +
-          '<span class="mp-seed low-seed">-</span>' +
-          '<span class="mp-name" style="color:#EEEEF3">TBD</span>' +
-          '<span class="mp-pct">&mdash;</span>' +
-        '</div>';
+        return `
+          <div class="mp-team">
+            <span class="mp-seed low-seed">-</span>
+            <span class="mp-name" style="color:#EEEEF3">TBD</span>
+            <span class="mp-pct">&mdash;</span>
+          </div>`;
       }
       const picked = team && pick === team.name;
       const eliminated = !!pick && team && pick !== team.name;
@@ -5100,18 +5021,16 @@
       const stats = teamStats[team?.name] || teamStats[getDisplayName(team?.name)] || {};
       const netRating = stats.net_rating;
       const netHtml = (netRating != null)
-        ? '<span class="mp-net" style="color:' +
-          (netRating >= 20 ? 'var(--green)' : netRating >= 10 ? 'var(--text)' : 'var(--muted)') +
-          '">' + (netRating >= 0 ? '+' : '') + netRating.toFixed(0) + '</span>'
+        ? `<span class="mp-net" style="color:${netRating >= 20 ? 'var(--green)' : netRating >= 10 ? 'var(--text)' : 'var(--muted)'}">${netRating >= 0 ? '+' : ''}${netRating.toFixed(0)}</span>`
         : '';
       const pctText = Number.isFinite(normalizedProb) ? (Math.round(normalizedProb * 100) + '%') : '&mdash;';
-      return '<div class="mp-team' + (picked ? ' picked' : '') + (eliminated ? ' eliminated' : '') + '"' +
-        ' data-side="' + side + '">' +
-        '<span class="mp-seed ' + seedClass(seedNum) + '">' + seedValue + '</span>' +
-        '<span class="mp-name" style="color:' + teamColor + '">' + escHtml(displayName) + '</span>' +
-        netHtml +
-        '<span class="mp-pct">' + pctText + '</span>' +
-      '</div>';
+      return `
+        <div class="mp-team${picked ? ' picked' : ''}${eliminated ? ' eliminated' : ''}" data-side="${side}">
+          <span class="mp-seed ${seedClass(seedNum)}">${seedValue}</span>
+          <span class="mp-name" style="color:${teamColor}">${escHtml(displayName)}</span>
+          ${netHtml}
+          <span class="mp-pct">${pctText}</span>
+        </div>`;
     }
 
     function renderMatch(node) {
@@ -5136,24 +5055,25 @@
       const edgePct = hasProb ? Math.round(Math.abs(n1 - n2) * 100) : 0;
       const conf = getConfidenceLabel(favProb);
       const confHtml = hasProb
-        ? '<span class="mp-confidence" style="color:' + escAttr(conf.color) + ';border-color:' + escAttr(conf.color) + '">' + escHtml(conf.label) + '</span>'
+        ? `<span class="mp-confidence" style="color:${escAttr(conf.color)};border-color:${escAttr(conf.color)}">${escHtml(conf.label)}</span>`
         : '<span class="mp-confidence">PROJECTED</span>';
       const leftW = hasProb ? Math.max(0, Math.min(100, n1 * 100)) : 50;
       const rightW = Math.max(0, 100 - leftW);
-      return '<div class="matchup-pair signal-none"' +
-        ' data-region="' + regionAttr + '"' +
-        ' data-round="' + roundAttr + '"' +
-        ' data-matchup-id="' + matchupAttr + '"' +
-        ' data-team-a="' + escAttr(t1?.name || '') + '"' +
-        ' data-team-b="' + escAttr(t2?.name || '') + '"' +
-        ' data-seed-a="' + escAttr(t1?.seed || '') + '"' +
-        ' data-seed-b="' + escAttr(t2?.seed || '') + '">' +
-        '<div class="mp-head"><span class="mp-meta">' + (hasProb ? (edgePct + '% edge') : 'Awaiting teams') + '</span>' + confHtml + '</div>' +
-        teamRow(node, t1, pick, p1, 'a') +
-        '<div class="mp-divider"></div>' +
-        teamRow(node, t2, pick, p2, 'b') +
-        '<div class="mp-prob-track"><span class="mp-prob-a" style="width:' + leftW.toFixed(1) + '%;background:rgba(46,116,212,.75)"></span><span class="mp-prob-b" style="width:' + rightW.toFixed(1) + '%;background:rgba(232,96,31,.75)"></span></div>' +
-      '</div>';
+      return `
+        <div class="matchup-pair signal-none"
+          data-region="${regionAttr}"
+          data-round="${roundAttr}"
+          data-matchup-id="${matchupAttr}"
+          data-team-a="${escAttr(t1?.name || '')}"
+          data-team-b="${escAttr(t2?.name || '')}"
+          data-seed-a="${escAttr(t1?.seed || '')}"
+          data-seed-b="${escAttr(t2?.seed || '')}">
+          <div class="mp-head"><span class="mp-meta">${hasProb ? (edgePct + '% edge') : 'Awaiting teams'}</span>${confHtml}</div>
+          ${teamRow(node, t1, pick, p1, 'a')}
+          <div class="mp-divider"></div>
+          ${teamRow(node, t2, pick, p2, 'b')}
+          <div class="mp-prob-track"><span class="mp-prob-a" style="width:${leftW.toFixed(1)}%;background:rgba(46,116,212,.75)"></span><span class="mp-prob-b" style="width:${rightW.toFixed(1)}%;background:rgba(232,96,31,.75)"></span></div>
+        </div>`;
     }
 
     function renderRegion(region) {
@@ -5212,35 +5132,25 @@
     }
 
     function renderProgress() {
-      const c = computeCompletion();
+      const summary = computeBracketAggregates();
+      const c = summary.completion;
       const pct = Math.round((c.total / 63) * 100);
-      let totalEp = 0;
-      for (const node of nodesById.values()) {
-        const pick = bracketState.picks[node.id];
-        if (!pick || !validPickForNode(node)) continue;
-        totalEp += getNodeEp(node, pick);
-      }
-      document.getElementById('progress-text').innerHTML = c.total + ' <span class="slash">/</span> 63';
-      document.getElementById('completion-text').textContent = pct + '%';
-      document.getElementById('progress-bar').style.width = pct + '%';
-      const impactCompletion = document.getElementById('impactCompletion');
-      const impactPicks = document.getElementById('impactPicks');
-      const impactEp = document.getElementById('impactEp');
-      if (impactCompletion) impactCompletion.textContent = pct + '%';
-      if (impactPicks) impactPicks.textContent = c.total + ' of 63 picks locked';
-      if (impactEp) impactEp.textContent = totalEp.toFixed(0);
-      const epEl = document.getElementById('custom-ep');
-      if (epEl) epEl.textContent = totalEp.toFixed(0);
-      const modeEl = document.getElementById('strategy-mode');
-      if (modeEl) modeEl.textContent = activeStrategy ? (activeStrategy.toUpperCase()) : 'Custom';
-      const pills = document.querySelectorAll('.strategy-pill');
-      pills.forEach((pill) => {
+      const totalEp = summary.totalEp;
+      if (TOP_BIN_DOM.progressText) TOP_BIN_DOM.progressText.innerHTML = c.total + ' <span class="slash">/</span> 63';
+      if (TOP_BIN_DOM.completionText) TOP_BIN_DOM.completionText.textContent = pct + '%';
+      if (TOP_BIN_DOM.progressBar) TOP_BIN_DOM.progressBar.style.width = pct + '%';
+      if (TOP_BIN_DOM.impactCompletion) TOP_BIN_DOM.impactCompletion.textContent = pct + '%';
+      if (TOP_BIN_DOM.impactPicks) TOP_BIN_DOM.impactPicks.textContent = c.total + ' of 63 picks locked';
+      if (TOP_BIN_DOM.impactEp) TOP_BIN_DOM.impactEp.textContent = totalEp.toFixed(0);
+      if (TOP_BIN_DOM.customEp) TOP_BIN_DOM.customEp.textContent = totalEp.toFixed(0);
+      if (TOP_BIN_DOM.strategyMode) TOP_BIN_DOM.strategyMode.textContent = bracketState.activeStrategy ? (bracketState.activeStrategy.toUpperCase()) : 'Custom';
+      TOP_BIN_DOM.strategyPills?.forEach((pill) => {
         const key = pill.dataset.strategy;
-        pill.classList.toggle('active', !!activeStrategy && key === activeStrategy);
+        pill.classList.toggle('active', !!bracketState.activeStrategy && key === bracketState.activeStrategy);
       });
-      updateBracketChecklist();
+      updateBracketChecklist(summary);
       updateStrategyBar();
-      bracketState.activeStrategy = activeStrategy || 'custom';
+      bracketState.activeStrategy = bracketState.activeStrategy || 'custom';
       saveState();
     }
 
@@ -5438,10 +5348,92 @@
       };
     }
 
+    function buildTeamProfile(baseTeam, fallbackName, modelSideData, humanSummary, defaultColor) {
+      const base = baseTeam || {};
+      const model = modelSideData || {};
+      const basePlayers = Array.isArray(base?.key_players) ? base.key_players.filter(Boolean) : [];
+      const modelPlayers = Array.isArray(model?.key_players) ? model.key_players.filter(Boolean) : [];
+      return {
+        ...model,
+        ...base,
+        name: String(base?.name || fallbackName || 'TBD'),
+        seed: Number.isFinite(Number(base?.seed)) ? Number(base.seed) : (base?.seed ?? '-'),
+        region: String(base?.region || ''),
+        color_primary: base?.color_primary || model?.color_primary || defaultColor,
+        abbreviation: String(base?.abbreviation || model?.abbreviation || ''),
+        kenpom: base?.kenpom || model?.kenpom || {},
+        momentum: String(base?.momentum || model?.momentum || 'steady'),
+        key_players: basePlayers.length ? basePlayers : (modelPlayers.length ? modelPlayers : (humanSummary?.keyPlayer ? [humanSummary.keyPlayer] : [])),
+        summary: String(base?.summary || model?.summary || humanSummary?.summary || ''),
+        strengths: Array.isArray(base?.strengths) && base.strengths.length ? base.strengths : (Array.isArray(model?.strengths) && model.strengths.length ? model.strengths : (humanSummary?.strengths || [])),
+        weaknesses: Array.isArray(base?.weaknesses) && base.weaknesses.length ? base.weaknesses : (Array.isArray(model?.weaknesses) && model.weaknesses.length ? model.weaknesses : (humanSummary?.weaknesses || [])),
+        pool: base?.pool || model?.pool || {}
+      };
+    }
+
     async function getCardData(node) {
       const [t1, t2] = getMatchTeams(node);
-      if (!t1 || !t2) return fallbackMeta(node);
-      if (node.round === 'R64' && node.source) return node.source;
+      if (!t1 || !t2) {
+        const data = fallbackMeta(node);
+        const meta = data?.matchup_meta || {};
+        return {
+          matchup_id: String(node?.id || data?.matchup_id || ''),
+          region: String(data?.region || node?.region || ''),
+          round: String(data?.round || node?.round || 'R64'),
+          matchup_number: Number(data?.matchup_number || data?.game_number || node?.source?.game_number || ((Number(node?.slot) || 0) + 1)),
+          confidence_tier: String(data?.confidence_tier || data?.confidence || meta?.confidence || 'moderate').toLowerCase(),
+          upset_flag: String(data?.upset_flag || meta?.upset_flag || data?.display_flag || meta?.display_flag || 'chalk').toLowerCase(),
+          display_flag: String(data?.display_flag || data?.upset_flag || meta?.display_flag || meta?.upset_flag || ''),
+          win_prob_t1: normalizeProbability(data?.win_prob_t1 ?? data?.t1?.win_probability, 0.5),
+          win_prob_t2: normalizeProbability(data?.win_prob_t2 ?? data?.t2?.win_probability, 0.5),
+          recommended_pick: String(data?.recommended_pick || meta?.predicted_winner || ''),
+          historical_seed_matchup: data?.historical_seed_matchup || meta?.seed_matchup || null,
+          kenpom: data?.kenpom || meta?.kenpom || null,
+          prediction: data?.prediction || data?.pred || null,
+          risk: data?.risk || meta?.risk || null,
+          pool_meta_full: data?.pool_meta || meta?.pool_meta || {},
+          pool_meta: {
+            public_pick_pct_t1: data?.pool_meta?.public_pick_pct_t1 ?? meta?.pool_meta?.public_pick_pct_t1 ?? null,
+            public_pick_pct_t2: data?.pool_meta?.public_pick_pct_t2 ?? meta?.pool_meta?.public_pick_pct_t2 ?? null
+          },
+          recommended_pick_reason: String(meta?.chatbot_responses?.quick || ''),
+          historical_blurb: String(meta?.risk?.reason || 'Model analysis unavailable for this matchup.'),
+          team1: buildTeamProfile(data?.t1 || {}, 'Team A', {}, findTeamHumanSummary(data?.t1?.name || ''), '#2E74D4'),
+          team2: buildTeamProfile(data?.t2 || {}, 'Team B', {}, findTeamHumanSummary(data?.t2?.name || ''), '#E8601F')
+        };
+      }
+      if (node.round === 'R64' && node.source) {
+        const data = node.source;
+        const meta = data?.matchup_meta || {};
+        const srcA = data?.team1 || data?.t1 || {};
+        const srcB = data?.team2 || data?.t2 || {};
+        const pA = normalizeProbability(srcA?.win_pct ?? srcA?.win_probability, 0.5);
+        return {
+          matchup_id: String(node?.id || data?.matchup_id || ''),
+          region: String(data?.region || node?.region || ''),
+          round: String(data?.round || node?.round || 'R64'),
+          matchup_number: Number(data?.matchup_number || data?.game_number || node?.source?.game_number || ((Number(node?.slot) || 0) + 1)),
+          confidence_tier: String(data?.confidence_tier || data?.confidence || meta?.confidence || 'moderate').toLowerCase(),
+          upset_flag: String(data?.upset_flag || meta?.upset_flag || data?.display_flag || meta?.display_flag || 'chalk').toLowerCase(),
+          display_flag: String(data?.display_flag || data?.upset_flag || meta?.display_flag || meta?.upset_flag || ''),
+          win_prob_t1: normalizeProbability(data?.win_prob_t1 ?? srcA?.win_pct ?? srcA?.win_probability, pA),
+          win_prob_t2: normalizeProbability(data?.win_prob_t2 ?? srcB?.win_pct ?? srcB?.win_probability, 1 - pA),
+          recommended_pick: String(data?.recommended_pick || meta?.predicted_winner || ''),
+          historical_seed_matchup: data?.historical_seed_matchup || meta?.seed_matchup || null,
+          kenpom: data?.kenpom || meta?.kenpom || null,
+          prediction: data?.prediction || data?.pred || null,
+          risk: data?.risk || meta?.risk || null,
+          pool_meta_full: data?.pool_meta || meta?.pool_meta || {},
+          pool_meta: {
+            public_pick_pct_t1: data?.pool_meta?.public_pick_pct_t1 ?? meta?.pool_meta?.public_pick_pct_t1 ?? srcA?.pool?.public_pick_pct ?? null,
+            public_pick_pct_t2: data?.pool_meta?.public_pick_pct_t2 ?? meta?.pool_meta?.public_pick_pct_t2 ?? srcB?.pool?.public_pick_pct ?? null
+          },
+          recommended_pick_reason: String(meta?.chatbot_responses?.quick || ''),
+          historical_blurb: String(meta?.risk?.reason || 'Model analysis unavailable for this matchup.'),
+          team1: { ...buildTeamProfile(srcA, 'Team A', {}, findTeamHumanSummary(srcA?.name || ''), '#2E74D4'), win_pct: pA },
+          team2: { ...buildTeamProfile(srcB, 'Team B', {}, findTeamHumanSummary(srcB?.name || ''), '#E8601F'), win_pct: 1 - pA }
+        };
+      }
       const tA = getTeamProfileClient(t1.name) || teamIndex.get(normalizeName(t1.name)) || {};
       const tB = getTeamProfileClient(t2.name) || teamIndex.get(normalizeName(t2.name)) || {};
       const hA = findTeamHumanSummary(t1.name);
@@ -5470,40 +5462,34 @@
         round: node.round,
         region: node.region,
         t1: {
-          ...tA,
-          ...t1,
-          win_probability: resolvedP1,
-          archetype: t1?.archetype || pred?.[sideA + '_archetype'] || tA?.archetype || 'Unknown',
-          key_players: t1?.key_players || predProfileA?.key_players || tA?.key_players || [],
-          summary: t1?.summary || predProfileA?.summary || tA?.summary || hA?.summary || '',
+          ...buildTeamProfile(
+            { ...tA, ...t1, win_probability: resolvedP1, archetype: t1?.archetype || pred?.[sideA + '_archetype'] || tA?.archetype || 'Unknown' },
+            t1.name,
+            predProfileA,
+            hA,
+            tA.color_primary || t1.color_primary || 'var(--text-muted)'
+          ),
           historical_comp: t1?.historical_comp || pred?.[sideA + '_historical_comp'] || pred?.[sideA + '_topComp'] || tA?.historical_comp || null,
           topComp: t1?.topComp || pred?.[sideA + '_topComp'] || pred?.[sideA + '_historical_comp'] || tA?.historical_comp || null,
-          strengths: t1?.strengths || predProfileA?.strengths || tA?.strengths || hA?.strengths || [],
-          weaknesses: t1?.weaknesses || predProfileA?.weaknesses || tA?.weaknesses || hA?.weaknesses || [],
-          momentum: t1?.momentum || predProfileA?.momentum || tA?.momentum || null,
           pool: t1?.pool || predProfileA?.pool || tA?.pool || {
             public_pick_pct: Number.isFinite(pickPct1) ? pickPct1 : null,
             public_pick_pct_source: 'projected'
-          },
-          color_primary: tA.color_primary || t1.color_primary || 'var(--text-muted)'
+          }
         },
         t2: {
-          ...tB,
-          ...t2,
-          win_probability: resolvedP2,
-          archetype: t2?.archetype || pred?.[sideB + '_archetype'] || tB?.archetype || 'Unknown',
-          key_players: t2?.key_players || predProfileB?.key_players || tB?.key_players || [],
-          summary: t2?.summary || predProfileB?.summary || tB?.summary || hB?.summary || '',
+          ...buildTeamProfile(
+            { ...tB, ...t2, win_probability: resolvedP2, archetype: t2?.archetype || pred?.[sideB + '_archetype'] || tB?.archetype || 'Unknown' },
+            t2.name,
+            predProfileB,
+            hB,
+            tB.color_primary || t2.color_primary || 'var(--text-muted)'
+          ),
           historical_comp: t2?.historical_comp || pred?.[sideB + '_historical_comp'] || pred?.[sideB + '_topComp'] || tB?.historical_comp || null,
           topComp: t2?.topComp || pred?.[sideB + '_topComp'] || pred?.[sideB + '_historical_comp'] || tB?.historical_comp || null,
-          strengths: t2?.strengths || predProfileB?.strengths || tB?.strengths || hB?.strengths || [],
-          weaknesses: t2?.weaknesses || predProfileB?.weaknesses || tB?.weaknesses || hB?.weaknesses || [],
-          momentum: t2?.momentum || predProfileB?.momentum || tB?.momentum || null,
           pool: t2?.pool || predProfileB?.pool || tB?.pool || {
             public_pick_pct: Number.isFinite(pickPct2) ? pickPct2 : null,
             public_pick_pct_source: 'projected'
-          },
-          color_primary: tB.color_primary || t2.color_primary || 'var(--text-muted)'
+          }
         },
         prediction: pred || null,
         ep: Number((Math.max(resolvedP1, resolvedP2) * (roundPoints[node.round] || 10)).toFixed(1)),
@@ -5534,7 +5520,45 @@
           responses: pred?.chatbot_responses || syntheticMeta.responses
         }
       };
-      return result;
+      const meta = result?.matchup_meta || {};
+      const srcA = result?.team1 || result?.t1 || {};
+      const srcB = result?.team2 || result?.t2 || {};
+      const pA = normalizeProbability(srcA?.win_pct ?? srcA?.win_probability, 0.5);
+      const reason = result?.recommended_pick_reason || meta?.recommended_pick_reason || meta?.chatbot_responses?.quick || meta?.responses?.quick || '';
+      const fallbackBlurb = result?.historical_blurb || meta?.historical_blurb || meta?.responses?.historical || meta?.risk?.reason || 'Model analysis unavailable for this matchup.';
+      return {
+        matchup_id: String(node?.id || result?.matchup_id || ''),
+        region: String(result?.region || node?.region || ''),
+        round: String(result?.round || node?.round || 'R64'),
+        matchup_number: Number(result?.matchup_number || result?.game_number || node?.source?.game_number || ((Number(node?.slot) || 0) + 1)),
+        confidence_tier: String(result?.confidence_tier || result?.confidence || meta?.confidence_tier || meta?.confidence || 'moderate').toLowerCase(),
+        upset_flag: String(result?.upset_flag || meta?.upset_flag || result?.display_flag || meta?.display_flag || 'chalk').toLowerCase(),
+        display_flag: String(result?.display_flag || result?.upset_flag || meta?.display_flag || meta?.upset_flag || ''),
+        win_prob_t1: normalizeProbability(result?.win_prob_t1 ?? srcA?.win_pct ?? srcA?.win_probability, pA),
+        win_prob_t2: normalizeProbability(result?.win_prob_t2 ?? srcB?.win_pct ?? srcB?.win_probability, 1 - pA),
+        recommended_pick: String(result?.recommended_pick || meta?.predicted_winner || ''),
+        historical_seed_matchup: result?.historical_seed_matchup || meta?.seed_matchup || null,
+        kenpom: result?.kenpom || meta?.kenpom || null,
+        prediction: result?.prediction || result?.pred || null,
+        risk: result?.risk || meta?.risk || null,
+        pool_meta_full: result?.pool_meta || meta?.pool_meta || {},
+        pool_meta: {
+          public_pick_pct_t1: result?.pool_meta?.public_pick_pct_t1 ?? meta?.pool_meta?.public_pick_pct_t1 ?? srcA?.pool?.public_pick_pct ?? null,
+          public_pick_pct_t2: result?.pool_meta?.public_pick_pct_t2 ?? meta?.pool_meta?.public_pick_pct_t2 ?? srcB?.pool?.public_pick_pct ?? null
+        },
+        recommended_pick_reason: String(reason || ''),
+        historical_blurb: String(fallbackBlurb || ''),
+        team1: {
+          ...buildTeamProfile(srcA, 'Team A', predProfileA, hA, '#2E74D4'),
+          win_pct: pA,
+          region: String(result?.region || node?.region || '')
+        },
+        team2: {
+          ...buildTeamProfile(srcB, 'Team B', predProfileB, hB, '#E8601F'),
+          win_pct: 1 - pA,
+          region: String(result?.region || node?.region || '')
+        }
+      };
     }
 
     function applyMobileRoundVisibility() {
@@ -5641,7 +5665,7 @@
       for (const key of buildTeamLookupKeys(value)) {
         if (key) out.add(key);
       }
-      const direct = normalizeLookupKey(value);
+      const direct = normalizeString(value, true);
       if (direct) out.add(direct);
       return out;
     }
@@ -5661,7 +5685,7 @@
       if (!teamKeys.size) return null;
       const targetRound = normalizeRoundKeyClient(roundKey);
       const opponentKeys = buildNameKeySet(context?.opponent || '');
-      const regionNorm = normalizeLookupKey(context?.region || '');
+      const regionNorm = normalizeString(context?.region || '', true);
       const matchupNumber = parseMatchupNumber(context?.matchupNumber);
       let best = null;
       for (const row of publicPerceptionRows) {
@@ -5683,7 +5707,7 @@
           continue;
         }
         if (pct == null) continue;
-        const rowRegion = normalizeLookupKey(row?.region_or_stage || row?.region || '');
+        const rowRegion = normalizeString(row?.region_or_stage || row?.region || '', true);
         const rowMatchNum = parseMatchupNumber(row?.matchup_number || row?.game_number || row?.game_id);
         const rowSource = String(row?.source_format || '').toLowerCase();
         const matchedOpponent = opponentKeys.size
@@ -5763,7 +5787,7 @@
       const aKeys = buildNameKeySet(teamAName);
       const bKeys = buildNameKeySet(teamBName);
       if (!aKeys.size || !bKeys.size) return null;
-      const region = normalizeLookupKey(matchup?.region || '');
+      const region = normalizeString(matchup?.region || '', true);
       const matchNum = parseMatchupNumber(matchup?.matchup_number || matchup?.game_number);
       let best = null;
       for (const row of publicPerceptionRows) {
@@ -5776,7 +5800,7 @@
         const forward = keySetIntersects(rowTeam1Keys, aKeys) && keySetIntersects(rowTeam2Keys, bKeys);
         const reverse = keySetIntersects(rowTeam1Keys, bKeys) && keySetIntersects(rowTeam2Keys, aKeys);
         if (!forward && !reverse) continue;
-        const rowRegion = normalizeLookupKey(row?.region_or_stage || '');
+        const rowRegion = normalizeString(row?.region_or_stage || '', true);
         const rowNum = parseMatchupNumber(row?.matchup_number || row?.game_number || row?.game_id);
         const score =
           (region && rowRegion && region === rowRegion ? 2 : 0) +
@@ -6225,80 +6249,6 @@
       return 'chalk';
     }
 
-    function toPickCardMatchup(data, node) {
-      const meta = data?.matchup_meta || {};
-      const srcA = data?.team1 || data?.t1 || {};
-      const srcB = data?.team2 || data?.t2 || {};
-      const pA = normalizeProbability(srcA?.win_pct ?? srcA?.win_probability, 0.5);
-      const reason = data?.recommended_pick_reason ||
-        meta?.recommended_pick_reason ||
-        meta?.chatbot_responses?.quick ||
-        meta?.responses?.quick ||
-        '';
-      const fallbackBlurb = data?.historical_blurb ||
-        meta?.historical_blurb ||
-        meta?.responses?.historical ||
-        meta?.risk?.reason ||
-        'Model analysis unavailable for this matchup.';
-      return {
-        matchup_id: String(node?.id || data?.matchup_id || ''),
-        region: String(data?.region || node?.region || ''),
-        round: String(data?.round || node?.round || 'R64'),
-        matchup_number: Number(data?.matchup_number || data?.game_number || node?.source?.game_number || ((Number(node?.slot) || 0) + 1)),
-        confidence_tier: String(
-          data?.confidence_tier ||
-          data?.confidence ||
-          meta?.confidence_tier ||
-          meta?.confidence ||
-          'moderate'
-        ).toLowerCase(),
-        upset_flag: String(data?.upset_flag || meta?.upset_flag || data?.display_flag || meta?.display_flag || 'chalk').toLowerCase(),
-        display_flag: String(data?.display_flag || data?.upset_flag || meta?.display_flag || meta?.upset_flag || ''),
-        win_prob_t1: normalizeProbability(data?.win_prob_t1 ?? srcA?.win_pct ?? srcA?.win_probability, pA),
-        win_prob_t2: normalizeProbability(data?.win_prob_t2 ?? srcB?.win_pct ?? srcB?.win_probability, 1 - pA),
-        recommended_pick: String(data?.recommended_pick || meta?.predicted_winner || ''),
-        historical_seed_matchup: data?.historical_seed_matchup || meta?.seed_matchup || null,
-        kenpom: data?.kenpom || meta?.kenpom || null,
-        prediction: data?.prediction || data?.pred || null,
-        risk: data?.risk || meta?.risk || null,
-        pool_meta_full: data?.pool_meta || meta?.pool_meta || {},
-        pool_meta: {
-          public_pick_pct_t1: data?.pool_meta?.public_pick_pct_t1 ?? meta?.pool_meta?.public_pick_pct_t1 ?? srcA?.pool?.public_pick_pct ?? null,
-          public_pick_pct_t2: data?.pool_meta?.public_pick_pct_t2 ?? meta?.pool_meta?.public_pick_pct_t2 ?? srcB?.pool?.public_pick_pct ?? null
-        },
-        recommended_pick_reason: String(reason || ''),
-        historical_blurb: String(fallbackBlurb || ''),
-        team1: {
-          name: String(srcA?.name || 'Team A'),
-          seed: Number.isFinite(Number(srcA?.seed)) ? Number(srcA.seed) : '-',
-          region: String(data?.region || node?.region || ''),
-          color_primary: srcA?.color_primary || '#2E74D4',
-          abbreviation: String(srcA?.abbreviation || ''),
-          kenpom: srcA?.kenpom || {},
-          win_pct: pA,
-          momentum: String(srcA?.momentum || 'steady'),
-          key_players: Array.isArray(srcA?.key_players) ? srcA.key_players : [],
-          summary: String(srcA?.summary || ''),
-          strengths: Array.isArray(srcA?.strengths) ? srcA.strengths : [],
-          weaknesses: Array.isArray(srcA?.weaknesses) ? srcA.weaknesses : []
-        },
-        team2: {
-          name: String(srcB?.name || 'Team B'),
-          seed: Number.isFinite(Number(srcB?.seed)) ? Number(srcB.seed) : '-',
-          region: String(data?.region || node?.region || ''),
-          color_primary: srcB?.color_primary || '#E8601F',
-          abbreviation: String(srcB?.abbreviation || ''),
-          kenpom: srcB?.kenpom || {},
-          win_pct: 1 - pA,
-          momentum: String(srcB?.momentum || 'steady'),
-          key_players: Array.isArray(srcB?.key_players) ? srcB.key_players : [],
-          summary: String(srcB?.summary || ''),
-          strengths: Array.isArray(srcB?.strengths) ? srcB.strengths : [],
-          weaknesses: Array.isArray(srcB?.weaknesses) ? srcB.weaknesses : []
-        }
-      };
-    }
-
     function openPickCard(matchupData) {
       const m = matchupData;
       const tA = m.team1;
@@ -6538,14 +6488,10 @@
       return Number.isFinite(n) ? '(#' + n + ')' : '';
     }
 
-    function normalizeMetricKey(value) {
-      return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-    }
-
     function collectMetricLookup(raw, out) {
       if (!raw || typeof raw !== 'object') return;
       for (const [key, value] of Object.entries(raw)) {
-        const normalized = normalizeMetricKey(key);
+        const normalized = normalizeString(key, false);
         if (!normalized) continue;
         if (!(normalized in out)) out[normalized] = value;
       }
@@ -6553,7 +6499,7 @@
 
     function readMetricNumber(lookup, keys) {
       for (const key of keys) {
-        const normalized = normalizeMetricKey(key);
+        const normalized = normalizeString(key, false);
         if (!normalized) continue;
         const n = Number(lookup[normalized]);
         if (Number.isFinite(n)) return n;
@@ -6625,7 +6571,7 @@
       collectMetricLookup(raw[`${prefix}_profile`], sideLookup);
       collectMetricLookup(raw[`${prefix}_profile`]?.kenpom, sideLookup);
       for (const [key, value] of Object.entries(raw)) {
-        const normalized = normalizeMetricKey(key);
+        const normalized = normalizeString(key, false);
         if (!normalized) continue;
         if (normalized.startsWith(prefix)) {
           const stripped = normalized.slice(prefix.length);
@@ -6796,7 +6742,7 @@
       if (Number.isInteger(seqIdx)) currentPickIndex = seqIdx;
       const data = await getCardData(node);
       if (guidedNodeId !== node.id) return;
-      openPickCard(toPickCardMatchup(data, node));
+      openPickCard(data);
     }
 
     function resumeAutoFlow(afterNodeId) {
@@ -6885,13 +6831,12 @@
         strategyEpByNode = {};
         customOverrideNodes.clear();
         bracketState.picks = fallback.picks;
-        activeStrategy = key;
         bracketState.activeStrategy = key;
         saveState();
         renderAll();
         return;
       }
-      activeStrategy = key;
+      bracketState.activeStrategy = key;
       strategyBaselinePicks = {};
       strategyEpByNode = {};
       customOverrideNodes.clear();
@@ -7073,7 +7018,6 @@
     function resetBracket() {
       if (!confirm('Clear all bracket picks?')) return;
       bracketState.picks = {};
-      activeStrategy = '';
       strategyBaselinePicks = {};
       strategyEpByNode = {};
       customOverrideNodes.clear();
@@ -7087,7 +7031,6 @@
       if (!confirm('Fill bracket with model-recommended picks? You can still change individual picks after.')) return;
       if (guidedFlowActive) exitGuidedFlow({ closeCard: true });
       bulkFilling = true;
-      activeStrategy = '';
       bracketState.activeStrategy = 'custom';
       strategyBaselinePicks = {};
       strategyEpByNode = {};
@@ -7143,6 +7086,7 @@
         poolSize = clampPoolSize(savedPool);
       }
       updatePoolInputValue();
+      initTopBinCache();
       showLoading();
       clearError();
       try {
@@ -7278,6 +7222,7 @@
   </script>
 </body>
 </html>
+
 
 
 

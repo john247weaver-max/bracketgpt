@@ -304,6 +304,14 @@ function loadDataFiles() {
 
 function parseUploadedJson(rawInput) {
   const raw = String(rawInput || '');
+
+  // Fast path for valid JSON to avoid expensive regex passes on large payloads.
+  try {
+    return { parsed: JSON.parse(raw), normalized: raw, mode: 'fast_path' };
+  } catch (fastErr) {
+    // Fall through to lenient parsing attempts.
+  }
+
   const attempts = [];
 
   function pushCandidate(label, text) {
@@ -3350,12 +3358,16 @@ function normalizeMessageContent(rawContent) {
 
 function sanitizeIncomingMessages(rawMessages) {
   if (!Array.isArray(rawMessages)) return [];
+  const MAX_USER_MESSAGE_CHARS = 2000;
   const out = [];
   for (const msg of rawMessages.slice(-40)) {
     if (!msg || typeof msg !== 'object') continue;
     const roleRaw = String(msg.role || '').toLowerCase();
     const role = (roleRaw === 'assistant' || roleRaw === 'system') ? roleRaw : 'user';
-    const content = normalizeMessageContent(msg.content);
+    let content = normalizeMessageContent(msg.content);
+    if (role === 'user' && content.length > MAX_USER_MESSAGE_CHARS) {
+      content = content.slice(0, MAX_USER_MESSAGE_CHARS);
+    }
     if (!content) continue;
     out.push({ role, content });
   }

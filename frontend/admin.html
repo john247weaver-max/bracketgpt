@@ -323,6 +323,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let pw = '';
+    let toastTimer = null;
     const STATUS_TEXT = { pending: '...', ok: 'OK', err: 'ERR' };
     const uploadTypes = ['bracket_ready', 'predictions', 'bracket', 'bracket_cache', 'bracket_output', 'kenpom_csv', 'espn_public_csv', 'team_round_probs_csv', 'team_round_probs_json', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
 
@@ -330,7 +331,8 @@
       const t = $('toast');
       t.textContent = msg;
       t.style.display = 'block';
-      setTimeout(() => { t.style.display = 'none'; }, 2500);
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { t.style.display = 'none'; }, 2500);
     }
 
     function setStatusBadge(el, state) {
@@ -356,7 +358,15 @@
     }
 
     async function refreshUploadViews() {
-      await Promise.all([loadDataStatus(), initUploadStatus()]);
+      try {
+        const res = await fetch('/api/admin/data-status', { headers: { 'x-admin-password': pw } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const status = await res.json();
+        renderDataStatusFromPayload(status);
+        updateUploadBadgesFromPayload(status);
+      } catch (e) {
+        $('data-status-loading').textContent = 'Failed to load data status: ' + e.message;
+      }
     }
 
     async function doAuth() {
@@ -387,12 +397,12 @@
       if (w.floorWeight != null) $('wf').value = Math.round(w.floorWeight * 100);
 
       const f = c.features || {};
-      if (f.showTeamProfiles != null) $('ftp').classList.toggle('on', f.showTeamProfiles);
-      if (f.showMatchupData != null) $('fmd').classList.toggle('on', f.showMatchupData);
-      if (f.showOptimizerData != null) $('fod').classList.toggle('on', f.showOptimizerData);
-      if (f.showUpsetPicks != null) $('fup').classList.toggle('on', f.showUpsetPicks);
-      if (f.showSafetyScores != null) $('fss').classList.toggle('on', f.showSafetyScores);
-      if (f.includeHistoricalContext != null) $('fhc').classList.toggle('on', f.includeHistoricalContext);
+      $('ftp').classList.toggle('on', !!f.showTeamProfiles);
+      $('fmd').classList.toggle('on', !!f.showMatchupData);
+      $('fod').classList.toggle('on', !!f.showOptimizerData);
+      $('fup').classList.toggle('on', !!f.showUpsetPicks);
+      $('fss').classList.toggle('on', !!f.showSafetyScores);
+      $('fhc').classList.toggle('on', !!f.includeHistoricalContext);
 
       const cx = c.context || {};
       if (cx.maxItems != null) $('cxm').value = cx.maxItems;
@@ -418,16 +428,18 @@
     }
 
     async function save() {
+      const asInt = (id) => parseInt($(id).value, 10) || 0;
+      const asFloat = (id) => parseFloat($(id).value) || 0;
       const cfg = {
         provider: $('prov').value,
         model: $('mdl').value,
         apiKey: $('key').value,
-        temperature: parseFloat($('tmp').value),
-        maxTokens: parseInt($('tok').value, 10),
+        temperature: asFloat('tmp'),
+        maxTokens: asInt('tok'),
         weights: {
-          baseWeight: parseInt($('wb').value, 10) / 100,
-          upsetWeight: parseInt($('wu').value, 10) / 100,
-          floorWeight: parseInt($('wf').value, 10) / 100,
+          baseWeight: asFloat('wb') / 100,
+          upsetWeight: asFloat('wu') / 100,
+          floorWeight: asFloat('wf') / 100,
         },
         features: {
           showTeamProfiles: $('ftp').classList.contains('on'),
@@ -438,10 +450,10 @@
           includeHistoricalContext: $('fhc').classList.contains('on'),
         },
         context: {
-          maxItems: parseInt($('cxm').value, 10),
-          upsetItems: parseInt($('cxu').value, 10),
-          optimizerItems: parseInt($('cxo').value, 10),
-          titleSeedCutoff: parseInt($('cxt').value, 10),
+          maxItems: asInt('cxm'),
+          upsetItems: asInt('cxu'),
+          optimizerItems: asInt('cxo'),
+          titleSeedCutoff: asInt('cxt'),
           includeTeamProfiles: $('cftp').classList.contains('on'),
           includeOptimizer: $('cfop').classList.contains('on'),
           includeTitleAngles: $('cfta').classList.contains('on'),
@@ -450,7 +462,7 @@
         brandName: $('bn').value,
         tagline: $('tl').value,
         activeSeason: $('sn').value,
-        messagesPerMinute: parseInt($('rl').value, 10),
+        messagesPerMinute: asInt('rl'),
       };
       const r = await fetch('/admin/config', {
         method: 'POST',
@@ -496,122 +508,122 @@
       }
     }
 
-    async function loadDataStatus() {
-      try {
-        const res = await fetch('/api/admin/data-status', { headers: { 'x-admin-password': pw } });
-        const status = await res.json();
-        const files = status.files || {};
-        const warningSuffix = Number(files.team_round_probs_csv?.warnings || 0) > 0
-          ? ` - ${files.team_round_probs_csv.warnings} warnings`
-          : '';
-        const warningSuffixJson = Number(files.team_round_probs_json?.warnings || 0) > 0
-          ? ` - ${files.team_round_probs_json.warnings} warnings`
-          : '';
-        const rows = [
-          {
-            file: 'bracket_ready_2026.json',
-            loaded: files.bracket_ready?.loaded,
-            detail: files.bracket_ready?.loaded
-              ? `${files.bracket_ready.matchups} R64 matchups - ${files.bracket_ready.teams} teams`
-              : 'Not loaded',
-          },
-          {
-            file: 'chatbot_predictions_v5.json',
-            loaded: files.predictions?.loaded,
-            detail: files.predictions?.loaded
-              ? `${status.predictions} predictions - ${status.teams} teams - ${files.predictions.version || 'v5.3'}`
-              : 'Not loaded',
-          },
-          {
-            file: 'bracket_2026.json',
-            loaded: files.bracket?.loaded,
-            detail: files.bracket?.loaded
-              ? `${files.bracket.teams} teams - ${files.bracket.r64_matchups} R64 matchups`
-              : 'Not loaded',
-          },
-          {
-            file: 'bracket_cache_2026.json',
-            loaded: files.bracket_cache?.loaded,
-            detail: files.bracket_cache?.loaded
-              ? `${files.bracket_cache.matchups} cached of ${files.bracket_cache.total_all_pairs} total`
-              : 'Not loaded',
-          },
-          {
-            file: 'bracketgpt_bracket_output_2026.json',
-            loaded: files.bracket_output?.loaded,
-            detail: files.bracket_output?.loaded
-              ? `${files.bracket_output.strategies} strategies - ${files.bracket_output.team_ep_rankings} teams ranked`
-              : 'Not loaded',
-          },
-          {
-            file: 'kenpom_2026.csv',
-            loaded: files.kenpom_csv?.loaded,
-            detail: files.kenpom_csv?.loaded
-              ? `${files.kenpom_csv.rows} rows - ${files.kenpom_csv.teams} teams`
-              : 'Not loaded',
-          },
-          {
-            file: 'espn_peoples_bracket_2026.csv',
-            loaded: files.espn_public_csv?.loaded,
-            detail: files.espn_public_csv?.loaded
-              ? `${files.espn_public_csv.rows} matchup rows`
-              : 'Not loaded',
-          },
-          {
-            file: 'bracket_tree_exact_probabilities_2026.csv',
-            loaded: files.team_round_probs_csv?.loaded,
-            detail: files.team_round_probs_csv?.loaded
-              ? `${files.team_round_probs_csv.rows} rows - ${files.team_round_probs_csv.teams} teams${warningSuffix}`
-              : 'Not loaded',
-          },
-          {
-            file: 'bracket_probabilities_with_yahoo_corrected_2026.json',
-            loaded: files.team_round_probs_json?.loaded,
-            detail: files.team_round_probs_json?.loaded
-              ? `${files.team_round_probs_json.rows} rows - ${files.team_round_probs_json.teams} teams${warningSuffixJson}`
-              : 'Not loaded',
-          },
-          {
-            file: 'team_profiles_2026.json',
-            loaded: files.team_profiles?.loaded,
-            detail: files.team_profiles?.loaded
-              ? `${status.profiles} team profiles`
-              : 'Not loaded',
-          },
-          {
-            file: 'seed_matchup_all_rounds.json',
-            loaded: files.seed_matchups?.loaded,
-            detail: files.seed_matchups?.loaded
-              ? `${status.seed_rounds} rounds loaded`
-              : 'Not loaded',
-          },
-          {
-            file: 'archetype_summary_v5.json',
-            loaded: files.archetype_summary?.loaded,
-            detail: files.archetype_summary?.loaded
-              ? `${status.archetypes} archetypes`
-              : 'Not loaded',
-          },
-          {
-            file: 'archetype_history.json',
-            loaded: files.archetype_history?.loaded,
-            detail: files.archetype_history?.loaded
-              ? `${files.archetype_history.entries} historical entries`
-              : 'Not loaded',
-          },
-          {
-            file: 'bracket_lookup',
-            loaded: !!status.bracket_lookup,
-            detail: status.bracket_lookup ? 'Populated' : 'Missing',
-          },
-        ];
+    function renderDataStatusFromPayload(status) {
+      const files = status.files || {};
+      const predictionCount = files.predictions?.predictions ?? status.predictions ?? 0;
+      const teamCount = files.predictions?.teams ?? status.teams ?? 0;
+      const profilesCount = files.team_profiles?.profiles ?? status.profiles ?? 0;
+      const seedRounds = files.seed_matchups?.rounds ?? status.seed_rounds ?? 0;
+      const archetypeCount = files.archetype_summary?.archetypes ?? status.archetypes ?? 0;
+      const warningSuffix = Number(files.team_round_probs_csv?.warnings || 0) > 0
+        ? ` - ${files.team_round_probs_csv.warnings} warnings`
+        : '';
+      const warningSuffixJson = Number(files.team_round_probs_json?.warnings || 0) > 0
+        ? ` - ${files.team_round_probs_json.warnings} warnings`
+        : '';
 
-        renderDataStatusTable(rows);
-        $('data-status-loading').style.display = 'none';
-        $('data-status-table').style.display = 'table';
-      } catch (e) {
-        $('data-status-loading').textContent = 'Failed to load data status: ' + e.message;
-      }
+      const rows = [
+        {
+          file: 'bracket_ready_2026.json',
+          loaded: files.bracket_ready?.loaded,
+          detail: files.bracket_ready?.loaded
+            ? `${files.bracket_ready.matchups} R64 matchups - ${files.bracket_ready.teams} teams`
+            : 'Not loaded',
+        },
+        {
+          file: 'chatbot_predictions_v5.json',
+          loaded: files.predictions?.loaded,
+          detail: files.predictions?.loaded
+            ? `${predictionCount} predictions - ${teamCount} teams - ${files.predictions.version || 'v5.3'}`
+            : 'Not loaded',
+        },
+        {
+          file: 'bracket_2026.json',
+          loaded: files.bracket?.loaded,
+          detail: files.bracket?.loaded
+            ? `${files.bracket.teams} teams - ${files.bracket.r64_matchups} R64 matchups`
+            : 'Not loaded',
+        },
+        {
+          file: 'bracket_cache_2026.json',
+          loaded: files.bracket_cache?.loaded,
+          detail: files.bracket_cache?.loaded
+            ? `${files.bracket_cache.matchups} cached of ${files.bracket_cache.total_all_pairs} total`
+            : 'Not loaded',
+        },
+        {
+          file: 'bracketgpt_bracket_output_2026.json',
+          loaded: files.bracket_output?.loaded,
+          detail: files.bracket_output?.loaded
+            ? `${files.bracket_output.strategies} strategies - ${files.bracket_output.team_ep_rankings} teams ranked`
+            : 'Not loaded',
+        },
+        {
+          file: 'kenpom_2026.csv',
+          loaded: files.kenpom_csv?.loaded,
+          detail: files.kenpom_csv?.loaded
+            ? `${files.kenpom_csv.rows} rows - ${files.kenpom_csv.teams} teams`
+            : 'Not loaded',
+        },
+        {
+          file: 'espn_peoples_bracket_2026.csv',
+          loaded: files.espn_public_csv?.loaded,
+          detail: files.espn_public_csv?.loaded
+            ? `${files.espn_public_csv.rows} matchup rows`
+            : 'Not loaded',
+        },
+        {
+          file: 'bracket_tree_exact_probabilities_2026.csv',
+          loaded: files.team_round_probs_csv?.loaded,
+          detail: files.team_round_probs_csv?.loaded
+            ? `${files.team_round_probs_csv.rows} rows - ${files.team_round_probs_csv.teams} teams${warningSuffix}`
+            : 'Not loaded',
+        },
+        {
+          file: 'bracket_probabilities_with_yahoo_corrected_2026.json',
+          loaded: files.team_round_probs_json?.loaded,
+          detail: files.team_round_probs_json?.loaded
+            ? `${files.team_round_probs_json.rows} rows - ${files.team_round_probs_json.teams} teams${warningSuffixJson}`
+            : 'Not loaded',
+        },
+        {
+          file: 'team_profiles_2026.json',
+          loaded: files.team_profiles?.loaded,
+          detail: files.team_profiles?.loaded
+            ? `${profilesCount} team profiles`
+            : 'Not loaded',
+        },
+        {
+          file: 'seed_matchup_all_rounds.json',
+          loaded: files.seed_matchups?.loaded,
+          detail: files.seed_matchups?.loaded
+            ? `${seedRounds} rounds loaded`
+            : 'Not loaded',
+        },
+        {
+          file: 'archetype_summary_v5.json',
+          loaded: files.archetype_summary?.loaded,
+          detail: files.archetype_summary?.loaded
+            ? `${archetypeCount} archetypes`
+            : 'Not loaded',
+        },
+        {
+          file: 'archetype_history.json',
+          loaded: files.archetype_history?.loaded,
+          detail: files.archetype_history?.loaded
+            ? `${files.archetype_history.entries} historical entries`
+            : 'Not loaded',
+        },
+        {
+          file: 'bracket_lookup',
+          loaded: !!status.bracket_lookup,
+          detail: status.bracket_lookup ? 'Populated' : 'Missing',
+        },
+      ];
+
+      renderDataStatusTable(rows);
+      $('data-status-loading').style.display = 'none';
+      $('data-status-table').style.display = 'table';
     }
 
     async function uploadSingle(type, inputId, opts = {}) {
@@ -718,27 +730,21 @@
       }
     }
 
-    async function initUploadStatus() {
-      try {
-        const res = await fetch('/api/admin/data-status', {
-          headers: { 'x-admin-password': pw }
-        });
-        const s = await res.json();
-        const files = s.files || {};
-        setStatusBadge($('status-bracket_ready'), files.bracket_ready?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-predictions'), files.predictions?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-bracket'), files.bracket?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-bracket_cache'), files.bracket_cache?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-bracket_output'), files.bracket_output?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-kenpom_csv'), files.kenpom_csv?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-espn_public_csv'), files.espn_public_csv?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-team_round_probs_csv'), files.team_round_probs_csv?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-team_round_probs_json'), files.team_round_probs_json?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-team_profiles'), files.team_profiles?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-seed_matchups'), files.seed_matchups?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-archetype_summary'), files.archetype_summary?.loaded ? 'ok' : 'err');
-        setStatusBadge($('status-archetype_history'), files.archetype_history?.loaded ? 'ok' : 'err');
-      } catch (e) {}
+    function updateUploadBadgesFromPayload(status) {
+      const files = status.files || {};
+      setStatusBadge($('status-bracket_ready'), files.bracket_ready?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-predictions'), files.predictions?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-bracket'), files.bracket?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-bracket_cache'), files.bracket_cache?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-bracket_output'), files.bracket_output?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-kenpom_csv'), files.kenpom_csv?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-espn_public_csv'), files.espn_public_csv?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-team_round_probs_csv'), files.team_round_probs_csv?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-team_round_probs_json'), files.team_round_probs_json?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-team_profiles'), files.team_profiles?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-seed_matchups'), files.seed_matchups?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-archetype_summary'), files.archetype_summary?.loaded ? 'ok' : 'err');
+      setStatusBadge($('status-archetype_history'), files.archetype_history?.loaded ? 'ok' : 'err');
     }
 
     async function chpw() {
@@ -750,6 +756,8 @@
       if (r.ok) {
         pw = $('np').value;
         $('lpw').value = pw;
+        $('op').value = '';
+        $('np').value = '';
         toast('Changed');
       } else {
         toast('Check old password');
