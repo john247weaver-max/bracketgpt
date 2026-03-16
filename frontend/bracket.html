@@ -41,6 +41,9 @@
     margin: 0;
     font-family: 'Barlow', sans-serif;
     background: var(--bg-base);
+    background-image:
+      radial-gradient(1200px 420px at 16% -8%, rgba(46,116,212,0.16), transparent 62%),
+      radial-gradient(980px 360px at 88% 0%, rgba(232,96,31,0.12), transparent 64%);
     color: var(--text-primary);
     min-height: 100vh;
     height: 100vh;
@@ -113,6 +116,44 @@
     align-items: baseline;
     gap: 8px;
   }
+  .chat-pane.collapsed .chat-context,
+  .chat-pane.collapsed .chat-messages,
+  .chat-pane.collapsed .chat-input-area {
+    display: none;
+  }
+  .chat-pane.collapsed .chat-pane-sub,
+  .chat-pane.collapsed .chat-clear-btn {
+    display: none;
+  }
+  .chat-pane.collapsed {
+    width: 100px;
+    min-width: 100px;
+  }
+  .chat-pane.collapsed .chat-pane-header {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 6px;
+    gap: 6px;
+  }
+  .chat-collapse-btn {
+    border: 1px solid var(--border);
+    background: var(--bg-surface-2);
+    color: var(--text-muted);
+    border-radius: 6px;
+    width: 26px;
+    height: 24px;
+    padding: 0;
+    font-family: var(--fd);
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .chat-collapse-btn:hover {
+    color: var(--text);
+    border-color: var(--blue);
+  }
   .chat-clear-btn {
     margin-left: auto;
     border: 1px solid var(--border);
@@ -156,6 +197,59 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+  }
+  .chat-context {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    background: rgba(46,116,212,0.07);
+  }
+  .chat-context-title {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 6px;
+  }
+  .chat-context-main {
+    font-family: var(--fd);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .chat-quick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .chat-quick-btn {
+    border: 1px solid var(--border);
+    background: var(--bg-surface-2);
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 6px 7px;
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.12s, color 0.12s, transform 0.12s;
+  }
+  .chat-quick-btn:hover {
+    border-color: rgba(46,116,212,.7);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+  .chat-quick-btn:disabled {
+    opacity: .5;
+    cursor: default;
+    transform: none;
   }
   .chat-input-area {
     padding: 10px 12px 14px;
@@ -276,6 +370,21 @@
     border-radius: 2px;
     padding: 16px;
     margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.28);
+  }
+  .topbar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(46,116,212,0.16), rgba(232,96,31,0.08) 45%, transparent 100%);
+    opacity: 0.55;
+  }
+  .topbar > * {
+    position: relative;
+    z-index: 1;
   }
   .tophead { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .tophead h1 {
@@ -325,6 +434,46 @@
   }
   .progress { height: 4px; border: 1px solid var(--bg-line); border-radius: 2px; background: var(--bg-surface-2); overflow: hidden; }
   .progress > span { display: block; width: 0; height: 100%; background: var(--accent); transition: width .16s ease; }
+  .impact-strip {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .impact-card {
+    border: 1px solid var(--bg-line);
+    border-radius: 8px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+    padding: 9px 10px;
+    min-height: 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+  }
+  .impact-label {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .impact-value {
+    font-family: var(--fd);
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text);
+    line-height: 1;
+  }
+  .impact-sub {
+    font-family: var(--fb);
+    font-size: 11px;
+    color: var(--dim);
+    line-height: 1.3;
+  }
 
   .strategy-bar {
     display: flex;
@@ -335,6 +484,97 @@
     background: var(--bg-surface);
     padding: 12px;
     margin-bottom: 12px;
+  }
+  .optimizer-checklist {
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    background: var(--bg-surface);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+  .optimizer-checklist-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .optimizer-checklist-title {
+    font-family: var(--fd);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .10em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .optimizer-checklist-badge {
+    border: 1px solid var(--bg-line);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg-surface-2);
+  }
+  .optimizer-checklist-badge.pass {
+    color: #0d0f12;
+    background: var(--green);
+    border-color: var(--green);
+  }
+  .optimizer-checklist-badge.warn {
+    color: #0d0f12;
+    background: var(--orange);
+    border-color: var(--orange);
+  }
+  .optimizer-checklist-badge.pending {
+    color: var(--text);
+    border-color: var(--blue);
+  }
+  .optimizer-checklist-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 10px;
+  }
+  .optimizer-check-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    background: var(--bg-surface-2);
+    padding: 6px 8px;
+    min-height: 32px;
+  }
+  .optimizer-check-label {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .optimizer-check-value {
+    font-family: var(--fd);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .optimizer-check-value.good { color: var(--green); }
+  .optimizer-check-value.warn { color: var(--orange); }
+  .optimizer-check-value.bad { color: var(--red); }
+  .optimizer-check-foot {
+    margin-top: 8px;
+    font-family: var(--fb);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--muted);
   }
   .strategy-control {
     flex: 1 1 auto;
@@ -586,6 +826,10 @@
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   }
+  .matchup-pair.active {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 1px rgba(46,116,212,0.45), 0 10px 18px rgba(0,0,0,0.30);
+  }
   .matchup-pair:active {
     transform: translateY(0);
     box-shadow: none;
@@ -606,6 +850,36 @@
     width: 1px;
     background: var(--border-mid);
     pointer-events: none;
+  }
+  .mp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  }
+  .mp-meta {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .mp-confidence {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 2px 7px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    background: rgba(255,255,255,0.02);
+    white-space: nowrap;
   }
   .mp-team {
     display: flex;
@@ -632,6 +906,19 @@
     height: 1px;
     background: var(--border);
     margin: 0 14px;
+  }
+  .mp-prob-track {
+    margin: 0 14px 12px;
+    height: 5px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+  }
+  .mp-prob-a, .mp-prob-b {
+    height: 100%;
+    transition: width 180ms ease;
   }
   .mp-seed {
     font-family: var(--fd);
@@ -1192,6 +1479,7 @@
   @media (max-width: 1200px) {
     .grid { grid-template-columns: repeat(2, minmax(260px,1fr)); }
     .final-grid { grid-template-columns: 1fr; }
+    .impact-strip { grid-template-columns: 1fr; }
   }
   @media (max-width: 900px) {
     body {
@@ -1214,6 +1502,11 @@
       border-top: 1px solid var(--border);
       height: 420px;
     }
+    .chat-pane.collapsed {
+      width: 100%;
+      min-width: 0;
+      height: auto;
+    }
   }
   @media (max-width: 760px) {
     .nav-links { display: none; }
@@ -1226,6 +1519,8 @@
     .nav-inner { align-items: stretch; flex-direction: column; gap: 6px; }
     .round-tabs { display: flex; width: 100%; }
     .pool-size-control { width: 100%; justify-content: flex-end; }
+    .optimizer-checklist-grid { grid-template-columns: 1fr; }
+    .chat-quick-grid { grid-template-columns: 1fr; }
     .round-col { display: none; }
     .round-col.visible { display: block; }
     .mobile-tabs { display: grid; }
@@ -1282,6 +1577,23 @@
           <div class="progress-wrap">
             <div class="progress-label"><span id="progress-text">0 <span class="slash">/</span> 63</span><span id="completion-text">0%</span></div>
             <div class="progress"><span id="progress-bar"></span></div>
+            <div class="impact-strip">
+              <div class="impact-card">
+                <div class="impact-label">Bracket Status</div>
+                <div class="impact-value" id="impactCompletion">0%</div>
+                <div class="impact-sub" id="impactPicks">0 of 63 picks locked</div>
+              </div>
+              <div class="impact-card">
+                <div class="impact-label">Expected Points</div>
+                <div class="impact-value" id="impactEp">0</div>
+                <div class="impact-sub">Projected from your current selections</div>
+              </div>
+              <div class="impact-card">
+                <div class="impact-label">Upset Posture</div>
+                <div class="impact-value" id="impactUpsets">0 / 0</div>
+                <div class="impact-sub" id="impactUpsetNote">Waiting on matchup choices</div>
+              </div>
+            </div>
           </div>
         </section>
         <section class="strategy-bar" id="strategyBar">
@@ -1302,6 +1614,49 @@
               <div class="upset-rec-circle" id="upsetRecCircle">0</div>
               <div class="upset-rec-text" id="upsetRecText"></div>
             </div>
+          </div>
+        </section>
+        <section class="optimizer-checklist" id="optimizerChecklist" aria-live="polite">
+          <div class="optimizer-checklist-head">
+            <span class="optimizer-checklist-title">Bracket Checklist</span>
+            <span class="optimizer-checklist-badge pending" id="checklistBaselineBadge">IN PROGRESS</span>
+          </div>
+          <div class="optimizer-checklist-grid">
+            <div class="optimizer-check-row">
+              <span class="optimizer-check-label">R1 true upsets (ex 8/9)</span>
+              <span class="optimizer-check-value" id="checkTrueUpsets">0 / 6-7</span>
+            </div>
+            <div class="optimizer-check-row">
+              <span class="optimizer-check-label">R1 underdog wins (inc 9/8)</span>
+              <span class="optimizer-check-value" id="checkUnderdogWins">0 / 8-9</span>
+            </div>
+            <div class="optimizer-check-row">
+              <span class="optimizer-check-label">9 seed wins</span>
+              <span class="optimizer-check-value" id="checkSeed9">0 / ~2</span>
+            </div>
+            <div class="optimizer-check-row">
+              <span class="optimizer-check-label">10 seed wins</span>
+              <span class="optimizer-check-value" id="checkSeed10">0 / 1-2</span>
+            </div>
+            <div class="optimizer-check-row">
+              <span class="optimizer-check-label">11 seed wins</span>
+              <span class="optimizer-check-value" id="checkSeed11">0 / ~2</span>
+            </div>
+            <div class="optimizer-check-row">
+              <span class="optimizer-check-label">12 seed wins</span>
+              <span class="optimizer-check-value" id="checkSeed12">0 / 1-2</span>
+            </div>
+            <div class="optimizer-check-row">
+              <span class="optimizer-check-label">13/14/15/16 wins</span>
+              <span class="optimizer-check-value" id="checkSeedLongshots">0 / 0-2 total</span>
+            </div>
+            <div class="optimizer-check-row">
+              <span class="optimizer-check-label">Structure quality</span>
+              <span class="optimizer-check-value" id="checkStructureQuality">Pending</span>
+            </div>
+          </div>
+          <div class="optimizer-check-foot" id="checklistNote">
+            Finish Round 1 picks to run full historical baseline validation.
           </div>
         </section>
         <div class="nav-inner">
@@ -1342,7 +1697,18 @@
       <div class="chat-pane-header">
         <span class="chat-pane-title">ASK BRACKETGPT</span>
         <span class="chat-pane-sub">AI bracket advisor</span>
+        <button id="chatCollapseBtn" class="chat-collapse-btn" onclick="toggleChatPane()" title="Collapse panel">◀</button>
         <button id="clearChatBtn" class="chat-clear-btn" onclick="clearChat()">Clear</button>
+      </div>
+      <div class="chat-context" id="chatContext">
+        <div class="chat-context-title">Matchup Context</div>
+        <div class="chat-context-main" id="chatContextMain">Select a matchup to get targeted prompts.</div>
+        <div class="chat-quick-grid">
+          <button class="chat-quick-btn" onclick="askQuickPrompt('explain')">Explain this prediction</button>
+          <button class="chat-quick-btn" onclick="askQuickPrompt('upset')">What is the upset risk?</button>
+          <button class="chat-quick-btn" onclick="askQuickPrompt('stats')">Which stats matter most?</button>
+          <button class="chat-quick-btn" onclick="askQuickPrompt('strategy')">Safe pick vs contrarian</button>
+        </div>
       </div>
       <div class="chat-messages" id="messages"></div>
       <div class="chat-input-area">
@@ -1578,6 +1944,7 @@
     const CHAT_STORAGE_KEY = 'bracketgpt_bracket_chat_history';
     let chatHistory = [];
     let chatBusy = false;
+    let chatContext = { nodeId: '', teamA: '', teamB: '', round: '', region: '' };
 
     const bracketState = {
       picks: {},
@@ -1856,6 +2223,14 @@
       text.innerHTML = rec.message;
 
       const actualUpsets = countUserUpsets();
+      const impactUpsets = document.getElementById('impactUpsets');
+      const impactUpsetNote = document.getElementById('impactUpsetNote');
+      if (impactUpsets) impactUpsets.textContent = actualUpsets + ' / ' + rec.count;
+      if (impactUpsetNote) {
+        impactUpsetNote.textContent = actualUpsets >= rec.count
+          ? 'You are meeting your upset target for this pool size'
+          : 'Add selective leverage picks to hit target range';
+      }
       if (actualUpsets >= rec.count) {
         circle.style.background = 'rgba(0, 168, 70, 0.25)';
         circle.style.borderColor = 'var(--green)';
@@ -1884,6 +2259,62 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    function setActiveMatchupCard(nodeId = '') {
+      document.querySelectorAll('.matchup-pair.active').forEach((el) => el.classList.remove('active'));
+      if (!nodeId) return;
+      const card = document.querySelector('.matchup-pair[data-matchup-id="' + String(nodeId) + '"]');
+      if (card) card.classList.add('active');
+    }
+
+    function setChatContextFromNode(node) {
+      const contextMain = document.getElementById('chatContextMain');
+      if (!node) {
+        chatContext = { nodeId: '', teamA: '', teamB: '', round: '', region: '' };
+        if (contextMain) contextMain.textContent = 'Select a matchup to get targeted prompts.';
+        return;
+      }
+      const [t1, t2] = getMatchTeams(node);
+      chatContext = {
+        nodeId: node.id || '',
+        teamA: t1?.name || '',
+        teamB: t2?.name || '',
+        round: node.round || '',
+        region: node.region || ''
+      };
+      const roundLabel = PICK_ROUND_LABELS[chatContext.round] || chatContext.round || '';
+      const label = t1 && t2
+        ? (getDisplayName(t1.name) + ' vs ' + getDisplayName(t2.name) + ' - ' + roundLabel)
+        : 'Matchup selected';
+      if (contextMain) contextMain.textContent = label;
+    }
+
+    function askQuickPrompt(kind) {
+      if (chatBusy) return;
+      const hasContext = !!(chatContext.teamA && chatContext.teamB);
+      const tA = getDisplayName(chatContext.teamA || 'Team A');
+      const tB = getDisplayName(chatContext.teamB || 'Team B');
+      const roundLabel = PICK_ROUND_LABELS[chatContext.round] || chatContext.round || 'this game';
+      let prompt = '';
+      if (kind === 'explain') {
+        prompt = hasContext
+          ? `Explain why ${tA} or ${tB} has the edge in ${roundLabel}. Focus on model confidence, matchup edge, and what would change this pick.`
+          : 'Explain my strongest current prediction and why the model is confident.';
+      } else if (kind === 'upset') {
+        prompt = hasContext
+          ? `What is the upset risk in ${tA} vs ${tB}? Quantify risk, leverage, and pool-size implications for ${poolSize} entries.`
+          : `Which current picks in my bracket are most vulnerable to upsets for a ${poolSize}-entry pool?`;
+      } else if (kind === 'stats') {
+        prompt = hasContext
+          ? `Which stats matter most in ${tA} vs ${tB}? Translate advanced metrics into plain-English decision factors.`
+          : 'Which advanced metrics are driving my model most right now? Keep it plain English.';
+      } else {
+        prompt = hasContext
+          ? `For ${tA} vs ${tB}, give me the safe pick and the contrarian pick, with expected-points vs upside tradeoff for a ${poolSize}-entry pool.`
+          : `Give me safe-pick vs contrarian-pick guidance for my full bracket in a ${poolSize}-entry pool.`;
+      }
+      send(prompt);
     }
 
     function formatBot(text) {
@@ -1955,10 +2386,12 @@
       const sendBtn = document.getElementById('sendBtn');
       const clearBtn = document.getElementById('clearChatBtn');
       const analyzeBtn = document.getElementById('analyzeBracketBtn');
+      const quickBtns = document.querySelectorAll('.chat-quick-btn');
       const picksCount = Object.keys(bracketState?.picks || {}).length;
       if (sendBtn) sendBtn.disabled = !!chatBusy;
       if (clearBtn) clearBtn.disabled = !!chatBusy || chatHistory.length === 0;
       if (analyzeBtn) analyzeBtn.disabled = !!chatBusy || picksCount === 0;
+      quickBtns.forEach((btn) => { btn.disabled = !!chatBusy; });
     }
 
     function loadChatHistory() {
@@ -2004,6 +2437,15 @@
       if (!picksCount || chatBusy) return;
       const prompt = `Analyze my current bracket (${picksCount}/63 picks made, pool size ${poolSize}). Use chatbot_predictions_v5.json matchup probabilities and my current picks to identify strengths, risks, upset balance, and the top 3 improvements to maximize ESPN expected points.`;
       send(prompt);
+    }
+
+    function toggleChatPane() {
+      const pane = document.getElementById('chatPane');
+      const btn = document.getElementById('chatCollapseBtn');
+      if (!pane || !btn) return;
+      pane.classList.toggle('collapsed');
+      btn.textContent = pane.classList.contains('collapsed') ? '▶' : '◀';
+      btn.title = pane.classList.contains('collapsed') ? 'Expand panel' : 'Collapse panel';
     }
 
     async function send(textOverride = null) {
@@ -2071,6 +2513,7 @@
       });
       loadChatHistory();
       renderChatHistory();
+      setChatContextFromNode(null);
       updateChatControlState();
     }
 
@@ -3303,6 +3746,113 @@
       return counts;
     }
 
+    function setChecklistCell(id, text, cls = '') {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.classList.remove('good', 'warn', 'bad');
+      if (cls) el.classList.add(cls);
+    }
+
+    function classifyBand(value, min, max) {
+      if (!Number.isFinite(value)) return 'warn';
+      if (value < min || value > max) return 'bad';
+      return 'good';
+    }
+
+    function classifyApprox(value, target) {
+      if (!Number.isFinite(value)) return 'warn';
+      if (Math.abs(value - target) <= 1) return 'good';
+      if (Math.abs(value - target) <= 2) return 'warn';
+      return 'bad';
+    }
+
+    function updateBracketChecklist() {
+      const completion = computeCompletion();
+      let trueUpsets = 0;
+      let underdogWins = 0;
+      const seedWins = { 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0 };
+      let validR64Games = 0;
+
+      for (const node of nodesById.values()) {
+        if (node.round !== 'R64') continue;
+        const [t1, t2] = getMatchTeams(node);
+        if (!t1 || !t2) continue;
+        const pick = bracketState.picks[node.id];
+        if (!pick) continue;
+        const winner = (t1.name === pick) ? t1 : (t2.name === pick ? t2 : null);
+        if (!winner) continue;
+
+        const s1 = Number(t1.seed);
+        const s2 = Number(t2.seed);
+        const wSeed = Number(winner.seed);
+        if (!Number.isFinite(s1) || !Number.isFinite(s2) || !Number.isFinite(wSeed)) continue;
+        validR64Games += 1;
+        const favoriteSeed = Math.min(s1, s2);
+        const isUnderdogWin = wSeed > favoriteSeed;
+        if (!isUnderdogWin) continue;
+        underdogWins += 1;
+        if (!(Math.min(s1, s2) === 8 && Math.max(s1, s2) === 9)) trueUpsets += 1;
+        if (seedWins[wSeed] != null) seedWins[wSeed] += 1;
+      }
+
+      const longshotTotal = seedWins[13] + seedWins[14] + seedWins[15] + seedWins[16];
+      setChecklistCell('checkTrueUpsets', `${trueUpsets} / 6-7`, classifyBand(trueUpsets, 6, 7));
+      setChecklistCell('checkUnderdogWins', `${underdogWins} / 8-9`, classifyBand(underdogWins, 8, 9));
+      setChecklistCell('checkSeed9', `${seedWins[9]} / ~2`, classifyApprox(seedWins[9], 2));
+      setChecklistCell('checkSeed10', `${seedWins[10]} / 1-2`, classifyBand(seedWins[10], 1, 2));
+      setChecklistCell('checkSeed11', `${seedWins[11]} / ~2`, classifyApprox(seedWins[11], 2));
+      setChecklistCell('checkSeed12', `${seedWins[12]} / 1-2`, classifyBand(seedWins[12], 1, 2));
+      setChecklistCell('checkSeedLongshots', `${longshotTotal} / 0-2 total`, classifyBand(longshotTotal, 0, 2));
+
+      const s16Picks = completion.S16;
+      const e8Picks = completion.E8;
+      const f4Picks = completion.F4;
+      const ncgPicks = completion.NCG;
+      let quality = 'Pending';
+      let qualityClass = '';
+      if (validR64Games < 32) {
+        quality = 'Pending';
+      } else if (s16Picks < 8) {
+        quality = 'Build R2';
+        qualityClass = 'warn';
+      } else if (e8Picks < 4) {
+        quality = 'Build S16';
+        qualityClass = 'warn';
+      } else if (f4Picks < 2 || ncgPicks < 1) {
+        quality = 'Build F4/Title';
+        qualityClass = 'warn';
+      } else {
+        quality = 'Coherent';
+        qualityClass = 'good';
+      }
+      setChecklistCell('checkStructureQuality', quality, qualityClass);
+
+      const baselineBadge = document.getElementById('checklistBaselineBadge');
+      const note = document.getElementById('checklistNote');
+      if (!baselineBadge || !note) return;
+      baselineBadge.classList.remove('pass', 'warn', 'pending');
+      if (validR64Games < 32) {
+        baselineBadge.textContent = 'IN PROGRESS';
+        baselineBadge.classList.add('pending');
+        note.textContent = `Round 1 picks: ${validR64Games}/32 complete. Finish Round 1 to run pass/fail against the historical upset band.`;
+        return;
+      }
+
+      const baselinePass = (
+        trueUpsets >= 6 && trueUpsets <= 7 &&
+        underdogWins >= 8 && underdogWins <= 9 &&
+        seedWins[10] >= 1 && seedWins[10] <= 2 &&
+        seedWins[12] >= 1 && seedWins[12] <= 2 &&
+        longshotTotal <= 2
+      );
+      baselineBadge.textContent = baselinePass ? 'BASELINE PASS' : 'BASELINE FAIL';
+      baselineBadge.classList.add(baselinePass ? 'pass' : 'warn');
+      note.textContent = baselinePass
+        ? 'Round 1 allocation is within target bands. Next step is controlling deep-round chaos for your pool size.'
+        : 'Round 1 allocation is outside target bands. Tighten upset distribution before locking later rounds.';
+    }
+
     function prerequisiteRound(node) {
       if (!node?.children?.length) return node?.round || 'R64';
       const childRound = nodesById.get(node.children[0])?.round || node.round;
@@ -3364,6 +3914,17 @@
       const regionAttr = escAttr(String(node.region || '').toLowerCase());
       const roundAttr = escAttr(String(node.round || '').toLowerCase());
       const matchupAttr = escAttr(String(node.id || ''));
+      const n1 = normalizeProbability(p1, NaN);
+      const n2 = normalizeProbability(p2, NaN);
+      const hasProb = Number.isFinite(n1) && Number.isFinite(n2);
+      const favProb = hasProb ? Math.max(n1, n2) : 0.5;
+      const edgePct = hasProb ? Math.round(Math.abs(n1 - n2) * 100) : 0;
+      const conf = getConfidenceLabel(favProb);
+      const confHtml = hasProb
+        ? '<span class="mp-confidence" style="color:' + escAttr(conf.color) + ';border-color:' + escAttr(conf.color) + '">' + escHtml(conf.label) + '</span>'
+        : '<span class="mp-confidence">PROJECTED</span>';
+      const leftW = hasProb ? Math.max(0, Math.min(100, n1 * 100)) : 50;
+      const rightW = Math.max(0, 100 - leftW);
       return '<div class="matchup-pair signal-none"' +
         ' data-region="' + regionAttr + '"' +
         ' data-round="' + roundAttr + '"' +
@@ -3372,9 +3933,11 @@
         ' data-team-b="' + escAttr(t2?.name || '') + '"' +
         ' data-seed-a="' + escAttr(t1?.seed || '') + '"' +
         ' data-seed-b="' + escAttr(t2?.seed || '') + '">' +
+        '<div class="mp-head"><span class="mp-meta">' + (hasProb ? (edgePct + '% edge') : 'Awaiting teams') + '</span>' + confHtml + '</div>' +
         teamRow(node, t1, pick, p1, 'a') +
         '<div class="mp-divider"></div>' +
         teamRow(node, t2, pick, p2, 'b') +
+        '<div class="mp-prob-track"><span class="mp-prob-a" style="width:' + leftW.toFixed(1) + '%;background:rgba(46,116,212,.75)"></span><span class="mp-prob-b" style="width:' + rightW.toFixed(1) + '%;background:rgba(232,96,31,.75)"></span></div>' +
       '</div>';
     }
 
@@ -3445,6 +4008,12 @@
       document.getElementById('progress-text').innerHTML = c.total + ' <span class="slash">/</span> 63';
       document.getElementById('completion-text').textContent = pct + '%';
       document.getElementById('progress-bar').style.width = pct + '%';
+      const impactCompletion = document.getElementById('impactCompletion');
+      const impactPicks = document.getElementById('impactPicks');
+      const impactEp = document.getElementById('impactEp');
+      if (impactCompletion) impactCompletion.textContent = pct + '%';
+      if (impactPicks) impactPicks.textContent = c.total + ' of 63 picks locked';
+      if (impactEp) impactEp.textContent = totalEp.toFixed(0);
       const epEl = document.getElementById('custom-ep');
       if (epEl) epEl.textContent = totalEp.toFixed(0);
       const modeEl = document.getElementById('strategy-mode');
@@ -3454,6 +4023,7 @@
         const key = pill.dataset.strategy;
         pill.classList.toggle('active', !!activeStrategy && key === activeStrategy);
       });
+      updateBracketChecklist();
       bracketState.activeStrategy = activeStrategy || 'custom';
       saveState();
     }
@@ -3493,6 +4063,7 @@
       regionsEl.innerHTML = regions.map((region) => renderRegion(region)).join('');
       renderFinals();
       refreshAllSignals();
+      setActiveMatchupCard(currentPickCardMatchup?.matchup_id || guidedNodeId || '');
       renderProgress();
       applyMobileRoundVisibility();
       requestAnimationFrame(redrawBracketConnectors);
@@ -3537,6 +4108,7 @@
       guidedNodeId = '';
       analysisToken += 1;
       currentPickCardMatchup = null;
+      setActiveMatchupCard('');
       hideOverlay(instant);
     }
 
@@ -3546,6 +4118,8 @@
       if (target && target.closest && target.closest('button')) return;
       const node = nodesById.get(nodeId);
       if (!node || !isNodePickable(node)) return;
+      setChatContextFromNode(node);
+      setActiveMatchupCard(nodeId);
       openCard(nodeId, { manualResume: true, autoResume: false });
     }
 
@@ -4152,6 +4726,8 @@
       const [t1, t2] = getMatchTeams(node);
       if (!t1 || !t2) return;
       guidedNodeId = node.id;
+      setChatContextFromNode(node);
+      setActiveMatchupCard(node.id);
       const seqIdx = PICK_SEQUENCE_INDEX.get(node.id);
       if (Number.isInteger(seqIdx)) currentPickIndex = seqIdx;
       const data = await getCardData(node);
