@@ -144,6 +144,7 @@ const DATA_FILES = {
   kenpom_csv: 'kenpom_2026.csv',
   espn_public_csv: 'espn_peoples_bracket_2026.csv',
   team_round_probs_csv: 'bracket_tree_exact_probabilities_2026.csv',
+  team_round_probs_json: 'bracket_probabilities_with_yahoo_corrected_2026.json',
 };
 const CSV_UPLOAD_TYPES = new Set(['kenpom_csv', 'espn_public_csv', 'team_round_probs_csv']);
 const TEAM_MAPPING_FILE = 'team_name_mapping_2026.json';
@@ -266,7 +267,7 @@ function syncDataStoreAliases() {
   dataStore.seedMatchups = dataStore.seed_matchups || null;
   dataStore.archetypeSummary = dataStore.archetype_summary || null;
   dataStore.archetypeHistory = dataStore.archetype_history || null;
-  dataStore.teamRoundProbabilities = dataStore.team_round_probs_csv || null;
+  dataStore.teamRoundProbabilities = getActiveTeamRoundProbabilitiesPayload();
 }
 
 function loadDataFiles() {
@@ -277,9 +278,13 @@ function loadDataFiles() {
     try {
       if (fs.existsSync(filepath)) {
         const raw = fs.readFileSync(filepath, 'utf8');
-        dataStore[key] = CSV_UPLOAD_TYPES.has(key)
-          ? parseUploadedCsv(key, raw).parsed
-          : JSON.parse(raw);
+        if (key === 'team_round_probs_json') {
+          dataStore[key] = parseUploadedTeamRoundProbabilitiesJson(raw).parsed;
+        } else {
+          dataStore[key] = CSV_UPLOAD_TYPES.has(key)
+            ? parseUploadedCsv(key, raw).parsed
+            : JSON.parse(raw);
+        }
         const size = (Buffer.byteLength(raw) / 1024 / 1024).toFixed(1);
         console.log(`  [ok] ${filename} loaded (${size}MB)`);
         anyLoaded = true;
@@ -353,6 +358,89 @@ function parseUploadedJson(rawInput) {
     }
   }
   throw lastErr || new Error('Invalid JSON');
+}
+
+function pickFirstRoundProbability(source, candidates) {
+  for (const key of candidates) {
+    if (!source || source[key] == null) continue;
+    const value = parsePercentMaybe(source[key]);
+    if (Number.isFinite(Number(value))) return value;
+  }
+  return null;
+}
+
+function normalizeTeamRoundProbabilityRow(source) {
+  const row = source && typeof source === 'object' ? source : {};
+  return {
+    R32: pickFirstRoundProbability(row, ['R32', 'round_32', 'roundof32']),
+    S16: pickFirstRoundProbability(row, ['S16', 'Sweet16', 'sweet_16', 'roundof16']),
+    E8: pickFirstRoundProbability(row, ['E8', 'Elite8', 'elite_8', 'roundof8']),
+    F4: pickFirstRoundProbability(row, ['F4', 'Final4', 'final_4', 'finalfour']),
+    NCG: pickFirstRoundProbability(row, ['NCG', 'TitleGame', 'title_game', 'championship_game', 'roundof2']),
+    Championship: pickFirstRoundProbability(row, ['Championship', 'Champion', 'champion', 'Champ']),
+  };
+}
+
+function parseTeamRoundProbabilitiesFromJsonPayload(payload) {
+  const parsedPayload = payload && typeof payload === 'object' ? payload : {};
+  const teamRoundProbs = {};
+  const normalizedRows = [];
+
+  const teamEntries = [];
+  if (parsedPayload.team_round_probs && typeof parsedPayload.team_round_probs === 'object' && !Array.isArray(parsedPayload.team_round_probs)) {
+    teamEntries.push(...Object.entries(parsedPayload.team_round_probs));
+  }
+  if (parsedPayload.teams && typeof parsedPayload.teams === 'object' && !Array.isArray(parsedPayload.teams)) {
+    teamEntries.push(...Object.entries(parsedPayload.teams));
+  }
+  if (Array.isArray(parsedPayload.rows)) {
+    for (const row of parsedPayload.rows) {
+      const team = String(row?.team || row?.Team || row?.team_name || row?.school || row?.School || '').trim();
+      if (!team) continue;
+      teamEntries.push([team, row]);
+    }
+  }
+
+  const seen = new Set();
+  for (const [teamRaw, row] of teamEntries) {
+    const team = String(teamRaw || '').trim();
+    if (!team || seen.has(team.toLowerCase())) continue;
+    const parsedRow = normalizeTeamRoundProbabilityRow(row);
+    const hasRound = Object.values(parsedRow).some((value) => Number.isFinite(Number(value)));
+    if (!hasRound) continue;
+    teamRoundProbs[team] = parsedRow;
+    normalizedRows.push({ team, ...parsedRow });
+    seen.add(team.toLowerCase());
+  }
+
+  if (!Object.keys(teamRoundProbs).length) {
+    throw new Error('No team round probabilities detected in JSON. Expected teams/team_round_probs with R32/Sweet16/Elite8/Final4/TitleGame/Champion values.');
+  }
+
+  const validation = validateTeamRoundProbabilities(teamRoundProbs);
+  return {
+    rows: normalizedRows,
+    team_round_probs: teamRoundProbs,
+    count: normalizedRows.length,
+    validation,
+    source: 'team_round_probs_json',
+    metadata: parsedPayload.metadata || null,
+  };
+}
+
+function parseUploadedTeamRoundProbabilitiesJson(rawInput) {
+  const parsedJson = parseUploadedJson(rawInput);
+  return {
+    parsed: parseTeamRoundProbabilitiesFromJsonPayload(parsedJson.parsed),
+    normalized: parsedJson.normalized,
+    mode: `json:${parsedJson.mode}`,
+  };
+}
+
+function getActiveTeamRoundProbabilitiesPayload() {
+  const jsonPayload = dataStore.team_round_probs_json;
+  if (Object.keys(jsonPayload?.team_round_probs || {}).length > 0) return jsonPayload;
+  return dataStore.team_round_probs_csv || null;
 }
 
 function parseCsvRows(rawInput) {
@@ -676,6 +764,7 @@ function parseUploadedCsv(type, rawInput) {
 }
 
 function parseUploadedData(rawInput, type) {
+  if (type === 'team_round_probs_json') return parseUploadedTeamRoundProbabilitiesJson(rawInput);
   if (CSV_UPLOAD_TYPES.has(type)) return parseUploadedCsv(type, rawInput);
   return parseUploadedJson(rawInput);
 }
@@ -3486,14 +3575,18 @@ app.get('/api/public-perception', (req, res) => {
 });
 
 app.get('/api/team-round-probabilities', (req, res) => {
-  const payload = dataStore.team_round_probs_csv || {};
+  const payload = getActiveTeamRoundProbabilitiesPayload() || {};
   const map = payload?.team_round_probs || {};
   const rows = payload?.rows || [];
+  const source = payload === dataStore.team_round_probs_json
+    ? 'team_round_probs_json'
+    : (payload === dataStore.team_round_probs_csv ? 'team_round_probs_csv' : null);
   return res.json({
     loaded: Object.keys(map).length > 0,
     count: Number(payload?.count || rows.length || 0),
     team_round_probs: map,
     validation: payload?.validation || null,
+    source,
   });
 });
 
@@ -3768,6 +3861,10 @@ app.post('/api/seed-bucket-analysis', async (req, res) => {
 });
 
 app.get('/api/admin/data-status', auth, (req, res) => {
+  const activeTeamRoundProbs = getActiveTeamRoundProbabilitiesPayload() || {};
+  const activeTeamRoundType = activeTeamRoundProbs === dataStore.team_round_probs_json
+    ? 'team_round_probs_json'
+    : (activeTeamRoundProbs === dataStore.team_round_probs_csv ? 'team_round_probs_csv' : null);
   const summary = {
     predictions: dataStore.predictions?.predictions?.length || 0,
     bracket: dataStore.bracket?.teams?.length || 0,
@@ -3780,7 +3877,8 @@ app.get('/api/admin/data-status', auth, (req, res) => {
     bracket_output_strategies: Object.keys(store.bracketOutput?.strategies || {}).length,
     kenpom_rows: Number(dataStore.kenpom_csv?.count || dataStore.kenpom_csv?.rows?.length || 0),
     espn_public_rows: Number(dataStore.espn_public_csv?.count || dataStore.espn_public_csv?.rows?.length || 0),
-    team_round_probs_rows: Number(dataStore.team_round_probs_csv?.count || dataStore.team_round_probs_csv?.rows?.length || 0),
+    team_round_probs_rows: Number(activeTeamRoundProbs?.count || activeTeamRoundProbs?.rows?.length || 0),
+    team_round_probs_source: activeTeamRoundType,
   };
 
   return res.json({
@@ -3845,6 +3943,14 @@ app.get('/api/admin/data-status', auth, (req, res) => {
         teams: Object.keys(dataStore.team_round_probs_csv?.team_round_probs || {}).length,
         warnings: Array.isArray(dataStore.team_round_probs_csv?.validation?.warnings)
           ? dataStore.team_round_probs_csv.validation.warnings.length
+          : 0,
+      },
+      team_round_probs_json: {
+        loaded: Number(dataStore.team_round_probs_json?.count || 0) > 0,
+        rows: Number(dataStore.team_round_probs_json?.count || 0),
+        teams: Object.keys(dataStore.team_round_probs_json?.team_round_probs || {}).length,
+        warnings: Array.isArray(dataStore.team_round_probs_json?.validation?.warnings)
+          ? dataStore.team_round_probs_json.validation.warnings.length
           : 0,
       },
     },
@@ -3939,6 +4045,7 @@ app.post('/admin/upload', auth, (req, res) => {
       kenpom_csv: 'kenpom_2026.csv',
       espn_public_csv: 'espn_peoples_bracket_2026.csv',
       team_round_probs_csv: 'bracket_tree_exact_probabilities_2026.csv',
+      team_round_probs_json: 'bracket_probabilities_with_yahoo_corrected_2026.json',
     };
     const typeAliases = {
       base: 'predictions',
@@ -3978,6 +4085,10 @@ app.post('/admin/upload', auth, (req, res) => {
       bracket_tree_exact_probabilities: 'team_round_probs_csv',
       bracket_exact_probabilities: 'team_round_probs_csv',
       full_bracket_probabilities: 'team_round_probs_csv',
+      bracket_probabilities_with_yahoo_corrected: 'team_round_probs_json',
+      bracket_probabilities_with_yahoo: 'team_round_probs_json',
+      team_round_probs_json: 'team_round_probs_json',
+      teamroundprobsjson: 'team_round_probs_json',
     };
     if (!req.file) return res.status(400).json({ success: false, error: 'File required' });
 
@@ -4002,6 +4113,7 @@ app.post('/admin/upload', auth, (req, res) => {
       if (key.includes('archetypehistory')) return 'archetype_history';
       if (key.includes('kenpom') || key.includes('summary26')) return 'kenpom_csv';
       if (key.includes('espnpeoplesbracket') || key.includes('peoplesbracket') || key.includes('yahoobracketpickdistribution') || key.includes('pickdistribution')) return 'espn_public_csv';
+      if (key.includes('bracketprobabilitieswithyahoocorrected') || key.includes('bracketprobabilitieswithyahoo')) return 'team_round_probs_json';
       if (key.includes('brackettreeexactprobabilities') || key.includes('teamroundprobabilities') || key.includes('bracketexactprobabilities') || key.includes('fullbracketprobabilities')) return 'team_round_probs_csv';
       return '';
     }
@@ -4014,7 +4126,7 @@ app.post('/admin/upload', auth, (req, res) => {
     if (!resolvedType) {
       return res.status(400).json({
         success: false,
-        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_ready_2026*.json, bracket_2026*.json, bracket_cache_2026*.json, bracketgpt_bracket_output_2026*.json, bracket_output_enriched_2026*.json, kenpom_2026*.csv, summary26*.csv, espn_peoples_bracket_2026*.csv, yahoo_bracket_pick_distribution*.csv, bracket_tree_exact_probabilities_2026*.csv, team_round_probabilities_2026*.csv, bracket_exact_probabilities_2026*.csv, team_profiles_2026*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
+        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_ready_2026*.json, bracket_2026*.json, bracket_cache_2026*.json, bracketgpt_bracket_output_2026*.json, bracket_output_enriched_2026*.json, kenpom_2026*.csv, summary26*.csv, espn_peoples_bracket_2026*.csv, yahoo_bracket_pick_distribution*.csv, bracket_tree_exact_probabilities_2026*.csv, team_round_probabilities_2026*.csv, bracket_exact_probabilities_2026*.csv, bracket_probabilities_with_yahoo_corrected_2026*.json, team_profiles_2026*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
       });
     }
 

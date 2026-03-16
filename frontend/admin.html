@@ -214,6 +214,16 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-team_round_probs_json" style="font-size:20px;">...</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">bracket_probabilities_with_yahoo_corrected_2026.json</div>
+            <div style="font-size:12px; color:#888;">Preferred corrected probabilities JSON (teams + R32/Sweet16/Elite8/Final4/TitleGame/Champion)</div>
+          </div>
+          <input type="file" id="file-team_round_probs_json" data-type="team_round_probs_json" accept=".json" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('team_round_probs_json', 'file-team_round_probs_json')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-team_profiles" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">team_profiles_2026.json</div>
@@ -279,6 +289,7 @@
             <option value="kenpom_csv">kenpom_csv</option>
             <option value="espn_public_csv">espn_public_csv</option>
             <option value="team_round_probs_csv">team_round_probs_csv</option>
+            <option value="team_round_probs_json">team_round_probs_json</option>
             <option value="base">base (old)</option>
             <option value="teams">teams (old)</option>
             <option value="upset">upset (old)</option>
@@ -313,7 +324,7 @@
     const $ = (id) => document.getElementById(id);
     let pw = '';
     const STATUS_TEXT = { pending: '...', ok: 'OK', err: 'ERR' };
-    const uploadTypes = ['bracket_ready', 'predictions', 'bracket', 'bracket_cache', 'bracket_output', 'kenpom_csv', 'espn_public_csv', 'team_round_probs_csv', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
+    const uploadTypes = ['bracket_ready', 'predictions', 'bracket', 'bracket_cache', 'bracket_output', 'kenpom_csv', 'espn_public_csv', 'team_round_probs_csv', 'team_round_probs_json', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
 
     function toast(msg) {
       const t = $('toast');
@@ -493,6 +504,9 @@
         const warningSuffix = Number(files.team_round_probs_csv?.warnings || 0) > 0
           ? ` - ${files.team_round_probs_csv.warnings} warnings`
           : '';
+        const warningSuffixJson = Number(files.team_round_probs_json?.warnings || 0) > 0
+          ? ` - ${files.team_round_probs_json.warnings} warnings`
+          : '';
         const rows = [
           {
             file: 'bracket_ready_2026.json',
@@ -548,6 +562,13 @@
             loaded: files.team_round_probs_csv?.loaded,
             detail: files.team_round_probs_csv?.loaded
               ? `${files.team_round_probs_csv.rows} rows - ${files.team_round_probs_csv.teams} teams${warningSuffix}`
+              : 'Not loaded',
+          },
+          {
+            file: 'bracket_probabilities_with_yahoo_corrected_2026.json',
+            loaded: files.team_round_probs_json?.loaded,
+            detail: files.team_round_probs_json?.loaded
+              ? `${files.team_round_probs_json.rows} rows - ${files.team_round_probs_json.teams} teams${warningSuffixJson}`
               : 'Not loaded',
           },
           {
@@ -712,6 +733,7 @@
         setStatusBadge($('status-kenpom_csv'), files.kenpom_csv?.loaded ? 'ok' : 'err');
         setStatusBadge($('status-espn_public_csv'), files.espn_public_csv?.loaded ? 'ok' : 'err');
         setStatusBadge($('status-team_round_probs_csv'), files.team_round_probs_csv?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-team_round_probs_json'), files.team_round_probs_json?.loaded ? 'ok' : 'err');
         setStatusBadge($('status-team_profiles'), files.team_profiles?.loaded ? 'ok' : 'err');
         setStatusBadge($('status-seed_matchups'), files.seed_matchups?.loaded ? 'ok' : 'err');
         setStatusBadge($('status-archetype_summary'), files.archetype_summary?.loaded ? 'ok' : 'err');
