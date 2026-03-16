@@ -381,9 +381,31 @@ function normalizeTeamRoundProbabilityRow(source) {
   };
 }
 
+function normalizeTeamPublicRoundProbabilityRow(source) {
+  const row = source && typeof source === 'object' ? source : {};
+  const base =
+    (row.yahoo_pick_pct && typeof row.yahoo_pick_pct === 'object' ? row.yahoo_pick_pct : null)
+    || (row.yahoo_pick_percentages && typeof row.yahoo_pick_percentages === 'object' ? row.yahoo_pick_percentages : null)
+    || (row.public_pick_pct && typeof row.public_pick_pct === 'object' ? row.public_pick_pct : null)
+    || (row.public_round_probs && typeof row.public_round_probs === 'object' ? row.public_round_probs : null);
+  if (!base) return null;
+  const out = {
+    R64: pickFirstRoundProbability(base, ['R64', '64', 'round_64', 'roundof64']),
+    R32: pickFirstRoundProbability(base, ['R32', '32', 'round_32', 'roundof32']),
+    S16: pickFirstRoundProbability(base, ['S16', '16', 'Sweet16', 'sweet_16', 'roundof16']),
+    E8: pickFirstRoundProbability(base, ['E8', '8', 'Elite8', 'elite_8', 'roundof8']),
+    F4: pickFirstRoundProbability(base, ['F4', '4', 'Final4', 'final_4', 'finalfour']),
+    NCG: pickFirstRoundProbability(base, ['NCG', '2', 'TitleGame', 'title_game', 'championship_game', 'roundof2']),
+    Championship: pickFirstRoundProbability(base, ['Championship', 'Champion', 'champion', 'Champ']),
+  };
+  const hasAny = Object.values(out).some((value) => Number.isFinite(Number(value)));
+  return hasAny ? out : null;
+}
+
 function parseTeamRoundProbabilitiesFromJsonPayload(payload) {
   const parsedPayload = payload && typeof payload === 'object' ? payload : {};
   const teamRoundProbs = {};
+  const teamPublicRoundProbs = {};
   const normalizedRows = [];
 
   const teamEntries = [];
@@ -404,13 +426,20 @@ function parseTeamRoundProbabilitiesFromJsonPayload(payload) {
   const seen = new Set();
   for (const [teamRaw, row] of teamEntries) {
     const team = String(teamRaw || '').trim();
-    if (!team || seen.has(team.toLowerCase())) continue;
+    if (!team) continue;
+    const teamKey = team.toLowerCase();
+    const publicRow = normalizeTeamPublicRoundProbabilityRow(row);
+    if (seen.has(teamKey)) {
+      if (publicRow && !teamPublicRoundProbs[team]) teamPublicRoundProbs[team] = publicRow;
+      continue;
+    }
     const parsedRow = normalizeTeamRoundProbabilityRow(row);
     const hasRound = Object.values(parsedRow).some((value) => Number.isFinite(Number(value)));
     if (!hasRound) continue;
     teamRoundProbs[team] = parsedRow;
+    if (publicRow) teamPublicRoundProbs[team] = publicRow;
     normalizedRows.push({ team, ...parsedRow });
-    seen.add(team.toLowerCase());
+    seen.add(teamKey);
   }
 
   if (!Object.keys(teamRoundProbs).length) {
@@ -421,6 +450,7 @@ function parseTeamRoundProbabilitiesFromJsonPayload(payload) {
   return {
     rows: normalizedRows,
     team_round_probs: teamRoundProbs,
+    team_public_round_probs: teamPublicRoundProbs,
     count: normalizedRows.length,
     validation,
     source: 'team_round_probs_json',
@@ -3577,6 +3607,7 @@ app.get('/api/public-perception', (req, res) => {
 app.get('/api/team-round-probabilities', (req, res) => {
   const payload = getActiveTeamRoundProbabilitiesPayload() || {};
   const map = payload?.team_round_probs || {};
+  const publicMap = payload?.team_public_round_probs || {};
   const rows = payload?.rows || [];
   const source = payload === dataStore.team_round_probs_json
     ? 'team_round_probs_json'
@@ -3585,6 +3616,7 @@ app.get('/api/team-round-probabilities', (req, res) => {
     loaded: Object.keys(map).length > 0,
     count: Number(payload?.count || rows.length || 0),
     team_round_probs: map,
+    team_public_round_probs: publicMap,
     validation: payload?.validation || null,
     source,
   });
