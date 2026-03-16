@@ -5578,26 +5578,47 @@
       return Number.isFinite(parsed) ? parsed : null;
     }
 
+    function buildNameKeySet(value) {
+      const out = new Set();
+      for (const key of buildTeamLookupKeys(value)) {
+        if (key) out.add(key);
+      }
+      const direct = normalizeLookupKey(value);
+      if (direct) out.add(direct);
+      return out;
+    }
+
+    function keySetIntersects(aSet, bSet) {
+      if (!(aSet instanceof Set) || !(bSet instanceof Set) || !aSet.size || !bSet.size) return false;
+      const [small, large] = aSet.size <= bSet.size ? [aSet, bSet] : [bSet, aSet];
+      for (const key of small) {
+        if (large.has(key)) return true;
+      }
+      return false;
+    }
+
     function findBestPublicRowForTeam(teamName, roundKey, context = {}) {
       if (!Array.isArray(publicPerceptionRows) || !publicPerceptionRows.length) return null;
-      const teamNorm = normalizeName(teamName);
-      if (!teamNorm) return null;
+      const teamKeys = buildNameKeySet(teamName);
+      if (!teamKeys.size) return null;
       const targetRound = normalizeRoundKeyClient(roundKey);
-      const opponentNorm = normalizeName(context?.opponent || '');
+      const opponentKeys = buildNameKeySet(context?.opponent || '');
       const regionNorm = normalizeLookupKey(context?.region || '');
       const matchupNumber = parseMatchupNumber(context?.matchupNumber);
       let best = null;
       for (const row of publicPerceptionRows) {
         const rowRound = normalizeRoundKeyClient(row?.round || row?.round_raw || row?.round_key);
         if (rowRound !== targetRound) continue;
-        const r1 = normalizeName(row?.team_1);
-        const r2 = normalizeName(row?.team_2);
+        const rowTeam1 = String(row?.team_1 || '').trim();
+        const rowTeam2 = String(row?.team_2 || '').trim();
+        const rowTeam1Keys = buildNameKeySet(rowTeam1);
+        const rowTeam2Keys = buildNameKeySet(rowTeam2);
         let pct = null;
         let paired = false;
-        if (r1 === teamNorm) {
+        if (keySetIntersects(rowTeam1Keys, teamKeys)) {
           pct = normalizeProbability(row?.team_1_pct, null);
-          paired = !!r2;
-        } else if (r2 === teamNorm) {
+          paired = !!rowTeam2;
+        } else if (keySetIntersects(rowTeam2Keys, teamKeys)) {
           pct = normalizeProbability(row?.team_2_pct, null);
           paired = true;
         } else {
@@ -5607,13 +5628,16 @@
         const rowRegion = normalizeLookupKey(row?.region_or_stage || row?.region || '');
         const rowMatchNum = parseMatchupNumber(row?.matchup_number || row?.game_number || row?.game_id);
         const rowSource = String(row?.source_format || '').toLowerCase();
+        const matchedOpponent = opponentKeys.size
+          ? (keySetIntersects(rowTeam1Keys, opponentKeys) || keySetIntersects(rowTeam2Keys, opponentKeys))
+          : false;
         let score = 0;
         if (paired) score += 2;
-        if (opponentNorm && (r1 === opponentNorm || r2 === opponentNorm)) score += 5;
+        if (matchedOpponent) score += 5;
         if (regionNorm && rowRegion && regionNorm === rowRegion) score += 2;
         if (Number.isFinite(matchupNumber) && Number.isFinite(rowMatchNum) && matchupNumber === rowMatchNum) score += 3;
         if (rowSource === 'matchup') score += 1;
-        if (!best || score > best.score) best = { score, pct, row };
+        if (!best || score > best.score) best = { score, pct, row, paired, matchedOpponent, source: rowSource };
       }
       return best;
     }
@@ -5625,15 +5649,15 @@
       let sum = 0;
       let count = 0;
       const targetRound = normalizeRoundKeyClient(roundKey);
-      const teamNorm = normalizeName(teamName);
+      const teamKeys = buildNameKeySet(teamName);
       for (const row of (publicPerceptionRows || [])) {
         const rowRound = normalizeRoundKeyClient(row?.round || row?.round_raw || row?.round_key);
         if (rowRound !== targetRound) continue;
-        const r1 = normalizeName(row?.team_1);
-        const r2 = normalizeName(row?.team_2);
+        const r1 = buildNameKeySet(row?.team_1);
+        const r2 = buildNameKeySet(row?.team_2);
         let pct = null;
-        if (r1 === teamNorm) pct = normalizeProbability(row?.team_1_pct, null);
-        else if (r2 === teamNorm) pct = normalizeProbability(row?.team_2_pct, null);
+        if (keySetIntersects(r1, teamKeys)) pct = normalizeProbability(row?.team_1_pct, null);
+        else if (keySetIntersects(r2, teamKeys)) pct = normalizeProbability(row?.team_2_pct, null);
         if (pct == null) continue;
         sum += pct;
         count += 1;
@@ -5653,29 +5677,34 @@
     function getPublicPerceptionForMatchup(matchup, teamAName, teamBName) {
       if (!Array.isArray(publicPerceptionRows) || !publicPerceptionRows.length) return null;
       const targetRound = normalizeRoundKeyClient(matchup?.round);
-      const nA = normalizeName(teamAName);
-      const nB = normalizeName(teamBName);
+      const aKeys = buildNameKeySet(teamAName);
+      const bKeys = buildNameKeySet(teamBName);
+      if (!aKeys.size || !bKeys.size) return null;
       const region = normalizeLookupKey(matchup?.region || '');
       const matchNum = parseMatchupNumber(matchup?.matchup_number || matchup?.game_number);
       let best = null;
       for (const row of publicPerceptionRows) {
         const rowRound = normalizeRoundKeyClient(row?.round || row?.round_raw || row?.round_key);
         if (rowRound !== targetRound) continue;
-        const r1 = normalizeName(row?.team_1);
-        const r2 = normalizeName(row?.team_2);
-        if (!((r1 === nA && r2 === nB) || (r1 === nB && r2 === nA))) continue;
+        const rowTeam1 = String(row?.team_1 || '').trim();
+        const rowTeam2 = String(row?.team_2 || '').trim();
+        const rowTeam1Keys = buildNameKeySet(rowTeam1);
+        const rowTeam2Keys = buildNameKeySet(rowTeam2);
+        const forward = keySetIntersects(rowTeam1Keys, aKeys) && keySetIntersects(rowTeam2Keys, bKeys);
+        const reverse = keySetIntersects(rowTeam1Keys, bKeys) && keySetIntersects(rowTeam2Keys, aKeys);
+        if (!forward && !reverse) continue;
         const rowRegion = normalizeLookupKey(row?.region_or_stage || '');
         const rowNum = parseMatchupNumber(row?.matchup_number || row?.game_number || row?.game_id);
         const score =
           (region && rowRegion && region === rowRegion ? 2 : 0) +
           (Number.isFinite(matchNum) && Number.isFinite(rowNum) && matchNum === rowNum ? 1 : 0);
-        if (!best || score > best.score) best = { row, score };
+        if (!best || score > best.score) best = { row, score, forward };
       }
       if (best) {
         const row = best.row;
         const team1Pct = normalizeProbability(row?.team_1_pct, null);
         const team2Pct = normalizeProbability(row?.team_2_pct, null);
-        const directOrder = normalizeName(row?.team_1) === nA;
+        const directOrder = !!best.forward;
         return {
           roundLabel: roundLabelForKey(row?.round || matchup?.round),
           teamA: {
@@ -5697,6 +5726,11 @@
       const rowA = findBestPublicRowForTeam(teamAName, targetRound, { ...context, opponent: teamBName });
       const rowB = findBestPublicRowForTeam(teamBName, targetRound, { ...context, opponent: teamAName });
       if (!rowA && !rowB) return null;
+      const hasOpponent = !!(rowA?.matchedOpponent || rowB?.matchedOpponent);
+      const hasPairedRow = !!(rowA?.paired || rowB?.paired);
+      const mapping = hasOpponent
+        ? 'team_then_game'
+        : (hasPairedRow ? 'team_game_partial' : 'team_only');
       return {
         roundLabel: roundLabelForKey(targetRound || matchup?.round),
         teamA: {
@@ -5707,7 +5741,7 @@
           name: teamBName,
           pct: rowB?.pct ?? null,
         },
-        mapping: 'team_then_game'
+        mapping
       };
     }
 
@@ -5802,6 +5836,67 @@
       return { code: 'neutral', label: 'Neutral', note: 'Net swing sits near break-even: ' + formatSignedPoints(swing) + ' pts.' };
     }
 
+    function computeBracketLeverageTotals() {
+      const totals = {
+        picked: 0,
+        mapped: 0,
+        missingPublic: 0,
+        missingModel: 0,
+        net: 0,
+        gained: 0,
+        drag: 0
+      };
+      for (const node of nodesById.values()) {
+        const pickName = bracketState?.picks?.[node?.id];
+        if (!pickName) continue;
+        const [t1, t2] = getMatchTeams(node);
+        if (!t1 || !t2) continue;
+        const pickNorm = normalizeName(pickName);
+        const t1Norm = normalizeName(t1?.name);
+        const t2Norm = normalizeName(t2?.name);
+        let team = null;
+        let opp = null;
+        if (pickNorm === t1Norm) {
+          team = t1;
+          opp = t2;
+        } else if (pickNorm === t2Norm) {
+          team = t2;
+          opp = t1;
+        } else {
+          continue;
+        }
+        totals.picked += 1;
+        const model = normalizeProbability(getPickWinProbability(node, team?.name), null);
+        if (model == null) {
+          totals.missingModel += 1;
+          continue;
+        }
+        const publicPct = getPublicRoundProbability(team?.name, node?.round, {
+          region: node?.region,
+          matchupNumber: node?.round === 'R64'
+            ? (node?.source?.game_number || node?.source?.matchup_number || (Number(node?.slot) + 1))
+            : null,
+          opponent: opp?.name,
+          seed: team?.seed,
+          fallbackPublic: team?.pool?.public_pick_pct
+        });
+        if (publicPct == null) {
+          totals.missingPublic += 1;
+          continue;
+        }
+        totals.mapped += 1;
+        const swing = leverageEvForRound(model, publicPct, node?.round, team?.seed);
+        if (!Number.isFinite(swing)) continue;
+        totals.net += swing;
+        if (swing > 0) totals.gained += swing;
+        if (swing < 0) totals.drag += swing;
+      }
+      totals.net = Number(totals.net || 0);
+      totals.gained = Number(totals.gained || 0);
+      totals.drag = Number(totals.drag || 0);
+      return totals;
+    }
+
     function renderLeverageSection(matchup, teamA, teamB, perception) {
       const host = document.getElementById('pcLeverage');
       if (!host) return;
@@ -5826,9 +5921,22 @@
           let model = rk === roundKey
             ? normalizeProbability(modelCurrent, null)
             : getRoundModelProbability(team?.name, rk, null);
+          if (model == null && rk === roundKey) {
+            model = getRoundModelProbability(team?.name, rk, null);
+          }
+          const context = rk === roundKey
+            ? matchupContext
+            : {
+                region: matchup?.region,
+                seed: team?.seed,
+                fallbackPublic: team?.pool?.public_pick_pct
+              };
           let publicPct = rk === roundKey
             ? normalizeProbability(publicCurrent, null)
-            : getPublicRoundProbability(team?.name, rk, matchupContext);
+            : getPublicRoundProbability(team?.name, rk, context);
+          if (publicPct == null && rk === roundKey) {
+            publicPct = getPublicRoundProbability(team?.name, rk, context);
+          }
           if (model == null && publicPct == null) continue;
           const edge = (model == null || publicPct == null) ? null : (model - publicPct);
           const levEv = leverageEvForRound(model, publicPct, rk, team?.seed);
@@ -5903,13 +6011,33 @@
         '</div>';
       }
 
+      function renderBracketSummaryCard(totals) {
+        const mapTxt = Number(totals?.picked || 0) > 0
+          ? (String(totals?.mapped || 0) + '/' + String(totals?.picked || 0) + ' picks mapped')
+          : 'No picks yet';
+        const issues = [];
+        if (Number(totals?.missingPublic || 0) > 0) issues.push(String(totals.missingPublic) + ' public missing');
+        if (Number(totals?.missingModel || 0) > 0) issues.push(String(totals.missingModel) + ' model missing');
+        const issueTxt = issues.length ? issues.join(' | ') : 'All picked games have model + public coverage.';
+        return '<div class="pc-lev-side-card">' +
+          '<div class="pc-lev-side-team">Full Bracket</div>' +
+          '<div class="pc-lev-side-metric"><span>Net EV Swing</span><strong>' + escHtml(formatSignedPoints(totals?.net)) + '</strong></div>' +
+          '<div class="pc-lev-side-metric"><span>Leverage Gained</span><strong>' + escHtml(formatSignedPoints(totals?.gained)) + '</strong></div>' +
+          '<div class="pc-lev-side-metric"><span>Leverage Drag</span><strong>' + escHtml(formatSignedPoints(totals?.drag)) + '</strong></div>' +
+          '<div class="pc-lev-side-reason">' + escHtml(mapTxt + '. ' + issueTxt) + '</div>' +
+        '</div>';
+      }
+
       const rowsA = buildTeamRoundRows(teamA, teamB, matchup?.win_prob_t1 ?? teamA?.win_pct, perception?.teamA?.pct ?? matchup?.pool_meta?.public_pick_pct_t1);
       const rowsB = buildTeamRoundRows(teamB, teamA, matchup?.win_prob_t2 ?? teamB?.win_pct, perception?.teamB?.pct ?? matchup?.pool_meta?.public_pick_pct_t2);
       const summaryA = summarizeTeam(teamA, rowsA);
       const summaryB = summarizeTeam(teamB, rowsB);
+      const bracketTotals = computeBracketLeverageTotals();
       const mappingLabel = perception?.mapping === 'team+game_pair'
         ? 'mapped by team + game'
-        : (perception?.mapping === 'team_then_game' ? 'mapped by team then game' : 'mapped by team');
+        : (perception?.mapping === 'team_then_game'
+          ? 'mapped by team then game'
+          : (perception?.mapping === 'team_game_partial' ? 'mapped by team, partial game match' : 'mapped by team only'));
       host.innerHTML =
         '<div class="pc-lev-head"><span>Net EV Swing vs Public</span><span class="pc-lev-sub">Pool ' + escHtml(String(poolSize)) + ' | ' + escHtml(mappingLabel) + '</span></div>' +
         '<div class="pc-lev-layout">' +
@@ -5919,6 +6047,7 @@
           '</div>' +
           '<aside class="pc-lev-sidebar">' +
             '<div class="pc-lev-side-title">Leverage Sidebar</div>' +
+            renderBracketSummaryCard(bracketTotals) +
             renderSummaryCard(summaryA, teamA?.color_primary || '#2E74D4') +
             renderSummaryCard(summaryB, teamB?.color_primary || '#E8601F') +
             '<div class="pc-lev-guardrail">Math: EV swing = round points x (1 - public pick %) x (2 x model - 1). 15/16 seeds are capped at non-positive swing.</div>' +
@@ -6110,7 +6239,9 @@
         const bTxt = Number.isFinite(bPct) ? (bPct * 100).toFixed(0) + '%' : '--';
         const mapTxt = perception.mapping === 'team+game_pair'
           ? ' (team + game mapped)'
-          : (perception.mapping === 'team_then_game' ? ' (team->game mapped)' : '');
+          : (perception.mapping === 'team_then_game'
+            ? ' (team->game mapped)'
+            : (perception.mapping === 'team_game_partial' ? ' (partial game mapped)' : ' (team mapped)'));
         insightTxtEl.textContent =
           `${perception.roundLabel}: ${getDisplayName(tA.name)} ${aTxt} vs ${getDisplayName(tB.name)} ${bTxt}${mapTxt}`;
       } else {
