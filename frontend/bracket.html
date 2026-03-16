@@ -10,40 +10,40 @@
   :root {
     --fd: 'Barlow Condensed', sans-serif;
     --fb: 'Barlow', -apple-system, sans-serif;
-    --bg: #111116;
-    --surface: #1A1A22;
-    --border: rgba(255,255,255,0.10);
-    --blue: #2E74D4;
-    --orange: #E8601F;
-    --gold: #D4A800;
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --border: #e0e0e0;
+    --blue: #1A5CB5;
+    --orange: #FF6B2B;
+    --gold: #D4A012;
     --green: #00A846;
-    --red: #CC3333;
-    --text: #EEEEF3;
-    --muted: #7A7A90;
-    --dim: #3A3A50;
+    --red: #D32F2F;
+    --text: #1a1a1a;
+    --muted: #555555;
+    --dim: #999999;
     --bg-base: var(--bg);
     --bg-surface: var(--surface);
-    --bg-surface-2: #20202a;
+    --bg-surface-2: #f7f7f8;
     --bg-card: var(--bg-surface);
     --bg-line: var(--border);
-    --border-mid: rgba(255,255,255,0.22);
+    --border-mid: rgba(0,0,0,0.16);
     --accent: var(--gold);
     --accent-hot: var(--orange);
-    --accent-dim: rgba(46,116,212,0.12);
+    --accent-dim: rgba(26,92,181,0.12);
     --text-primary: var(--text);
     --text-muted: var(--muted);
-    --text-label: var(--dim);
+    --text-label: #555555;
     --surface-2: var(--bg-surface-2);
     --yellow: var(--gold);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: 'Barlow', sans-serif;
+    font-family: 'Barlow Condensed', 'Outfit', sans-serif;
     background: var(--bg-base);
     background-image:
-      radial-gradient(1200px 420px at 16% -8%, rgba(46,116,212,0.16), transparent 62%),
-      radial-gradient(980px 360px at 88% 0%, rgba(232,96,31,0.12), transparent 64%);
+      radial-gradient(1200px 420px at 16% -8%, rgba(26,92,181,0.10), transparent 62%),
+      radial-gradient(980px 360px at 88% 0%, rgba(255,107,43,0.08), transparent 64%);
     color: var(--text-primary);
     min-height: 100vh;
     height: 100vh;
@@ -264,7 +264,7 @@
     width: 100%;
     border: 1px solid rgba(46,116,212,.45);
     background: rgba(46,116,212,.14);
-    color: #dbe9ff;
+    color: #1A5CB5;
     border-radius: 6px;
     padding: 7px 10px;
     font-family: var(--fd);
@@ -350,11 +350,68 @@
   .msg.user .msg-bubble {
     background: var(--blue);
     border-color: var(--blue);
+    color: #fff;
     border-radius: 10px 10px 2px 10px;
   }
   .msg.bot .msg-bubble {
     background: var(--bg-surface-2);
     border-radius: 10px 10px 10px 2px;
+  }
+  .chat-welcome {
+    padding: 18px 12px;
+    text-align: center;
+    font-family: var(--fb);
+    color: var(--muted);
+    font-size: 13px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    background: #fff;
+  }
+  .chat-prompts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 10px;
+  }
+  .chat-prompts button {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: #333;
+    font-family: var(--fb);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .chat-prompts button:hover {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: #fff;
+  }
+  .chat-typing {
+    align-self: flex-start;
+    padding: 8px 14px;
+    background: #f0f0f0;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+  }
+  .typing-dots {
+    display: flex;
+    gap: 4px;
+  }
+  .typing-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #999;
+    animation: chatBlink 1.4s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes chatBlink {
+    0%, 80%, 100% { opacity: 0.3; }
+    40% { opacity: 1; }
   }
 
   .container {
@@ -372,7 +429,7 @@
     margin-bottom: 12px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.28);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
   }
   .topbar::before {
     content: '';
@@ -443,7 +500,7 @@
   .impact-card {
     border: 1px solid var(--bg-line);
     border-radius: 8px;
-    background: linear-gradient(160deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+    background: linear-gradient(160deg, rgba(0,0,0,0.03), rgba(0,0,0,0));
     padding: 9px 10px;
     min-height: 72px;
     display: flex;
@@ -1008,7 +1065,7 @@
     gap: 8px;
     padding: 7px 10px;
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    background: linear-gradient(90deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01));
   }
   .mp-meta {
     font-family: var(--fd);
@@ -1028,7 +1085,7 @@
     padding: 2px 7px;
     border: 1px solid var(--border);
     color: var(--text);
-    background: rgba(255,255,255,0.02);
+    background: rgba(0,0,0,0.03);
     white-space: nowrap;
   }
   .mp-team {
@@ -1039,7 +1096,7 @@
     transition: background 0.1s;
   }
   .mp-team:hover {
-    background: rgba(255,255,255,0.03);
+    background: rgba(0,0,0,0.05);
   }
   .mp-team.picked {
     background: rgba(0,168,70,0.09);
@@ -1388,7 +1445,7 @@
   }
   .pc-flag.tossup {
     color: var(--muted);
-    background: rgba(255,255,255,.06);
+    background: rgba(0,0,0,0.05);
     border: 1px solid var(--border);
   }
 
@@ -1404,7 +1461,7 @@
     transition: background 0.12s;
   }
   .pc-team:last-child { border-right: none; }
-  .pc-team:hover { background: rgba(255,255,255,0.03); }
+  .pc-team:hover { background: rgba(0,0,0,0.03); }
   .pc-team.picked { background: rgba(0,168,70,.08); }
   .pc-team.dimmed .pc-name { color: var(--muted); }
   .pc-model-badge {
@@ -1461,6 +1518,86 @@
     gap: 10px;
   }
   .pc-bar-lbls span:last-child { text-align: right; }
+  .pc-stats-grid {
+    padding: 0 16px 4px;
+  }
+  .pc-stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 6px 0;
+  }
+  .pc-stats-table th {
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #666;
+    padding: 6px 8px;
+    border-bottom: 2px solid #ddd;
+    text-align: center;
+  }
+  .pc-stats-table th:first-child { text-align: left; }
+  .pc-stats-table td {
+    padding: 7px 8px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+    color: #444;
+    font-variant-numeric: tabular-nums;
+  }
+  .pc-stats-table .stat-label {
+    text-align: left;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #666;
+    font-size: 11px;
+  }
+  .pc-stats-table .stat-better {
+    color: var(--green);
+    font-weight: 800;
+  }
+  .pc-stats-table .stat-worse {
+    color: #999;
+  }
+  .pc-stats-table .stat-rank {
+    color: #aaa;
+    font-size: 11px;
+    font-weight: 400;
+  }
+  .pc-section-label {
+    margin: 10px 16px 4px;
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .pc-seed-history {
+    margin: 0 16px 8px;
+    font-family: var(--fb);
+    font-size: 13px;
+    color: #444;
+    line-height: 1.5;
+  }
+  .upset-zone-tag {
+    display: inline-block;
+    background: #FFF3E0;
+    color: #E65100;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .pc-no-data {
+    color: #999;
+    font-size: 13px;
+    text-align: center;
+    padding: 8px 0 12px;
+    margin: 0;
+  }
 
   .pc-breakdown {
     display: flex;
@@ -1876,7 +2013,7 @@
       <div class="chat-pane-header">
         <span class="chat-pane-title">ASK BRACKETGPT</span>
         <span class="chat-pane-sub">AI bracket advisor</span>
-        <button id="chatCollapseBtn" class="chat-collapse-btn" onclick="toggleChatPane()" title="Collapse panel">◀</button>
+        <button id="chatCollapseBtn" class="chat-collapse-btn" onclick="toggleChatPane()" title="Collapse panel">&lt;</button>
         <button id="clearChatBtn" class="chat-clear-btn" onclick="clearChat()">Clear</button>
       </div>
       <div class="chat-context" id="chatContext">
@@ -1889,7 +2026,19 @@
           <button class="chat-quick-btn" onclick="askQuickPrompt('strategy')">Safe pick vs contrarian</button>
         </div>
       </div>
-      <div class="chat-messages" id="messages"></div>
+      <div class="chat-messages" id="chatMessages">
+        <div id="chatWelcome" class="chat-welcome">
+          <p>Ask about any matchup, upset picks, or bracket strategy.</p>
+          <div class="chat-prompts">
+            <button onclick="sendChatMessage('Best upset picks this year?')">Best upsets?</button>
+            <button onclick="sendChatMessage('Compare the 1-seeds')">Compare 1-seeds</button>
+            <button onclick="sendChatMessage('Big pool strategy')">Pool strategy</button>
+          </div>
+        </div>
+        <div id="chatTyping" class="chat-typing" style="display:none">
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>
+      </div>
       <div class="chat-input-area">
         <div class="chat-actions">
           <button id="analyzeBracketBtn" class="chat-analyze-btn" onclick="analyzeMyBracket()">Analyze My Bracket</button>
@@ -1897,12 +2046,12 @@
         <div class="chat-input-row">
           <input
             type="text"
-            id="input"
+            id="chatInput"
             placeholder="Ask about any matchup..."
-            onkeydown="if(event.key==='Enter') send()"
+            onkeydown="if(event.key==='Enter') sendChatMessage()"
             autocomplete="off"
           >
-          <button id="sendBtn" onclick="send()">
+          <button id="sendBtn" onclick="sendChatMessage()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="2.5"
               stroke-linecap="round" stroke-linejoin="round">
@@ -1956,6 +2105,9 @@
           <span id="pcBarLblB"></span>
         </div>
       </div>
+      <div id="pcStatsGrid" class="pc-stats-grid"></div>
+      <div class="pc-section-label">Seed Matchup History</div>
+      <div id="pcSeedHistory" class="pc-seed-history"></div>
 
       <div class="pc-breakdown">
         <div class="pc-col" id="pcColA">
@@ -2170,6 +2322,7 @@
     let regionPreviewFadeTimer = null;
     const aliasLookup = new Map();
     const CHAT_STORAGE_KEY = 'bracketgpt_bracket_chat_history';
+    const API_BASE = window.location.origin;
     let chatHistory = [];
     let chatBusy = false;
     let chatContext = { nodeId: '', teamA: '', teamB: '', round: '', region: '' };
@@ -2543,7 +2696,7 @@
           ? `For ${tA} vs ${tB}, give me the safe pick and the contrarian pick, with expected-points vs upside tradeoff for a ${poolSize}-entry pool.`
           : `Give me safe-pick vs contrarian-pick guidance for my full bracket in a ${poolSize}-entry pool.`;
       }
-      send(prompt);
+      sendChatMessage(prompt);
     }
 
     function formatBot(text) {
@@ -2558,8 +2711,10 @@
     }
 
     function renderChatMessage(role, content) {
-      const messagesEl = document.getElementById('messages');
+      const messagesEl = document.getElementById('chatMessages');
       if (!messagesEl) return;
+      const welcomeEl = document.getElementById('chatWelcome');
+      if (welcomeEl) welcomeEl.style.display = 'none';
       const safeRole = role === 'user' ? 'user' : 'bot';
       const row = document.createElement('div');
       row.className = 'msg ' + safeRole;
@@ -2576,7 +2731,7 @@
     }
 
     async function streamParagraphs(fullText, bubbleEl) {
-      const messagesEl = document.getElementById('messages');
+      const messagesEl = document.getElementById('chatMessages');
       const paragraphs = String(fullText || '')
         .split(/\n\n+/)
         .map((p) => p.trim())
@@ -2636,12 +2791,36 @@
     }
 
     function renderChatHistory() {
-      const messagesEl = document.getElementById('messages');
+      const messagesEl = document.getElementById('chatMessages');
       if (!messagesEl) return;
       messagesEl.innerHTML = '';
+      let welcomeEl = document.getElementById('chatWelcome');
+      if (!welcomeEl) {
+        welcomeEl = document.createElement('div');
+        welcomeEl.id = 'chatWelcome';
+        welcomeEl.className = 'chat-welcome';
+        welcomeEl.innerHTML = '<p>Ask about any matchup, upset picks, or bracket strategy.</p>' +
+          '<div class="chat-prompts">' +
+          '<button onclick="sendChatMessage(\'Best upset picks this year?\')">Best upsets?</button>' +
+          '<button onclick="sendChatMessage(\'Compare the 1-seeds\')">Compare 1-seeds</button>' +
+          '<button onclick="sendChatMessage(\'Big pool strategy\')">Pool strategy</button>' +
+          '</div>';
+      }
+      let typingEl = document.getElementById('chatTyping');
+      if (!typingEl) {
+        typingEl = document.createElement('div');
+        typingEl.id = 'chatTyping';
+        typingEl.className = 'chat-typing';
+        typingEl.style.display = 'none';
+        typingEl.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+      }
+      messagesEl.appendChild(welcomeEl);
       for (const msg of chatHistory) {
         renderChatMessage(msg.role === 'user' ? 'user' : 'bot', msg.content || '');
       }
+      typingEl.style.display = 'none';
+      messagesEl.appendChild(typingEl);
+      if (welcomeEl) welcomeEl.style.display = chatHistory.length ? 'none' : '';
       updateChatControlState();
     }
 
@@ -2657,7 +2836,7 @@
         localStorage.removeItem(CHAT_STORAGE_KEY);
       } catch (e) {}
       renderChatHistory();
-      const inputEl = document.getElementById('input');
+      const inputEl = document.getElementById('chatInput');
       if (inputEl) inputEl.focus();
     }
 
@@ -2665,7 +2844,7 @@
       const picksCount = Object.keys(bracketState?.picks || {}).length;
       if (!picksCount || chatBusy) return;
       const prompt = `Analyze my current bracket (${picksCount}/63 picks made, pool size ${poolSize}). Use chatbot_predictions_v5.json matchup probabilities and my current picks to identify strengths, risks, upset balance, and the top 3 improvements to maximize ESPN expected points.`;
-      send(prompt);
+      sendChatMessage(prompt);
     }
 
     function toggleChatPane() {
@@ -2673,12 +2852,12 @@
       const btn = document.getElementById('chatCollapseBtn');
       if (!pane || !btn) return;
       pane.classList.toggle('collapsed');
-      btn.textContent = pane.classList.contains('collapsed') ? '▶' : '◀';
+      btn.textContent = pane.classList.contains('collapsed') ? '>' : '<';
       btn.title = pane.classList.contains('collapsed') ? 'Expand panel' : 'Collapse panel';
     }
 
     async function send(textOverride = null) {
-      const inputEl = document.getElementById('input');
+      const inputEl = document.getElementById('chatInput');
       const sendBtn = document.getElementById('sendBtn');
       if (!inputEl || !sendBtn || chatBusy) return;
       const baseText = textOverride == null ? inputEl.value : textOverride;
@@ -2690,23 +2869,30 @@
       chatBusy = true;
       inputEl.disabled = true;
       updateChatControlState();
+      const typingEl = document.getElementById('chatTyping');
+      const messagesEl = document.getElementById('chatMessages');
+      if (typingEl && messagesEl) {
+        typingEl.style.display = 'flex';
+        messagesEl.appendChild(typingEl);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
 
       chatHistory.push({ role: 'user', content: text });
       renderChatMessage('user', text);
       saveChatHistory();
 
       try {
-        const res = await fetch('/api/bracket-chat', {
+        const res = await fetch(API_BASE + '/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: chatHistory, bracketState })
+          body: JSON.stringify({ messages: chatHistory })
         });
+        if (!res.ok) throw new Error('API error ' + res.status);
         const data = await res.json();
         const rawReply = typeof data.reply === 'string' ? data.reply : (typeof data.error === 'string' ? data.error : '');
-        const reply = rawReply.trim() ? rawReply : 'Something went wrong.';
+        const reply = rawReply.trim() ? rawReply : 'No response received.';
         chatHistory.push({ role: 'assistant', content: reply });
 
-        const messagesEl = document.getElementById('messages');
         if (messagesEl && rawReply.trim()) {
           const row = document.createElement('div');
           row.className = 'msg bot';
@@ -2721,20 +2907,24 @@
 
         saveChatHistory();
       } catch (e) {
-        const fallback = 'Lost connection. Try again.';
+        const fallback = 'Sorry, something went wrong. Try again.';
         chatHistory.push({ role: 'assistant', content: fallback });
         renderChatMessage('bot', fallback);
         saveChatHistory();
       }
 
       chatBusy = false;
+      if (typingEl) typingEl.style.display = 'none';
       inputEl.disabled = false;
       updateChatControlState();
       inputEl.focus();
     }
 
+    function sendChatMessage(textOverride = null) {
+      return send(textOverride);
+    }
     function initChat() {
-      const inputEl = document.getElementById('input');
+      const inputEl = document.getElementById('chatInput');
       const sendBtn = document.getElementById('sendBtn');
       if (!inputEl || !sendBtn) return;
       inputEl.addEventListener('input', () => {
@@ -4820,7 +5010,22 @@
         matchup_id: String(node?.id || data?.matchup_id || ''),
         region: String(data?.region || node?.region || ''),
         round: String(data?.round || node?.round || 'R64'),
+        confidence_tier: String(
+          data?.confidence_tier ||
+          data?.confidence ||
+          meta?.confidence_tier ||
+          meta?.confidence ||
+          'moderate'
+        ).toLowerCase(),
+        upset_flag: String(data?.upset_flag || meta?.upset_flag || data?.display_flag || meta?.display_flag || 'chalk').toLowerCase(),
         display_flag: String(data?.display_flag || data?.upset_flag || meta?.display_flag || meta?.upset_flag || ''),
+        win_prob_t1: normalizeProbability(data?.win_prob_t1 ?? srcA?.win_pct ?? srcA?.win_probability, pA),
+        win_prob_t2: normalizeProbability(data?.win_prob_t2 ?? srcB?.win_pct ?? srcB?.win_probability, 1 - pA),
+        recommended_pick: String(data?.recommended_pick || meta?.predicted_winner || ''),
+        historical_seed_matchup: data?.historical_seed_matchup || meta?.seed_matchup || null,
+        kenpom: data?.kenpom || meta?.kenpom || null,
+        risk: data?.risk || meta?.risk || null,
+        pool_meta_full: data?.pool_meta || meta?.pool_meta || {},
         pool_meta: {
           public_pick_pct_t1: data?.pool_meta?.public_pick_pct_t1 ?? meta?.pool_meta?.public_pick_pct_t1 ?? srcA?.pool?.public_pick_pct ?? null,
           public_pick_pct_t2: data?.pool_meta?.public_pick_pct_t2 ?? meta?.pool_meta?.public_pick_pct_t2 ?? srcB?.pool?.public_pick_pct ?? null
@@ -4832,6 +5037,8 @@
           seed: Number.isFinite(Number(srcA?.seed)) ? Number(srcA.seed) : '-',
           region: String(data?.region || node?.region || ''),
           color_primary: srcA?.color_primary || '#2E74D4',
+          abbreviation: String(srcA?.abbreviation || ''),
+          kenpom: srcA?.kenpom || {},
           win_pct: pA,
           momentum: String(srcA?.momentum || 'steady'),
           strengths: Array.isArray(srcA?.strengths) ? srcA.strengths : [],
@@ -4842,6 +5049,8 @@
           seed: Number.isFinite(Number(srcB?.seed)) ? Number(srcB.seed) : '-',
           region: String(data?.region || node?.region || ''),
           color_primary: srcB?.color_primary || '#E8601F',
+          abbreviation: String(srcB?.abbreviation || ''),
+          kenpom: srcB?.kenpom || {},
           win_pct: 1 - pA,
           momentum: String(srcB?.momentum || 'steady'),
           strengths: Array.isArray(srcB?.strengths) ? srcB.strengths : [],
@@ -4856,8 +5065,8 @@
       const tB = m.team2;
       const colorA = tA.color_primary || '#2E74D4';
       const colorB = tB.color_primary || '#E8601F';
-      const pctA = Math.round(parseFloat(tA.win_pct) * 100) || 50;
-      const pctB = 100 - pctA;
+      const pctA = Math.max(0, Math.min(100, normalizeProbability(m.win_prob_t1 ?? tA.win_pct, 0.5) * 100));
+      const pctB = Math.max(0, 100 - pctA);
 
       pickCardContext = { matchupId: m.matchup_id, teamA: tA.name, teamB: tB.name };
       currentPickCardMatchup = m;
@@ -4874,7 +5083,7 @@
       const roundLabel = PICK_ROUND_LABELS[m.round] || (m.round || 'R64');
       document.getElementById('pcRegion').textContent =
         (m.region || '') + ' \u00b7 ' + roundLabel + netCompare;
-      setFlag(m.display_flag);
+      setFlag(m.display_flag || m.upset_flag, m.confidence_tier);
 
       setTeam('A', tA, pctA, colorA, currentPick === 'a');
       setTeam('B', tB, pctB, colorB, currentPick === 'b');
@@ -4890,14 +5099,16 @@
 
       document.getElementById('pcBarA').style.cssText = `width:${pctA}%; background:${colorA}`;
       document.getElementById('pcBarB').style.cssText = `width:${pctB}%; background:${colorB}`;
-      document.getElementById('pcBarLblA').textContent = `${getDisplayName(tA.name)} ${pctA}%`;
-      document.getElementById('pcBarLblB').textContent = `${getDisplayName(tB.name)} ${pctB}%`;
+      document.getElementById('pcBarLblA').textContent = `${getDisplayName(tA.name)} ${pctA.toFixed(1)}%`;
+      document.getElementById('pcBarLblB').textContent = `${getDisplayName(tB.name)} ${pctB.toFixed(1)}%`;
+      renderKenPomComparison(m, tA, tB);
+      renderSeedHistory(m, tA, tB);
 
       renderCol('A', tA, colorA);
       renderCol('B', tB, colorB);
 
       const insightLblEl = document.getElementById('pcInsight').querySelector('.pc-insight-lbl');
-      document.getElementById('pcInsightTxt').textContent = m.recommended_pick_reason || m.historical_blurb || '-';
+      document.getElementById('pcInsightTxt').textContent = m.recommended_pick_reason || m.risk?.reason || m.historical_blurb || '-';
       if (insightLblEl) insightLblEl.textContent = 'AI Read';
       const matchupUpset = (upsetScoresData || []).find((u) => {
         const nA = normalizeName(tA.name);
@@ -4937,8 +5148,8 @@
       const btnA = document.getElementById('pcBtnA');
       const btnB = document.getElementById('pcBtnB');
       const pickSide = getUserPick(m.matchup_id);
-      btnA.textContent = (pickSide === 'a' ? '\u2713 ' : '') + getDisplayName(tA.name);
-      btnB.textContent = (pickSide === 'b' ? '\u2713 ' : '') + getDisplayName(tB.name);
+      btnA.textContent = (pickSide === 'a' ? '\u2713 ' : '') + 'Pick ' + getDisplayName(tA.name);
+      btnB.textContent = (pickSide === 'b' ? '\u2713 ' : '') + 'Pick ' + getDisplayName(tB.name);
       btnA.style.background = colorA;
       btnB.style.background = colorB;
       btnA.classList.toggle('unchosen', pickSide === 'b');
@@ -4956,7 +5167,7 @@
       document.getElementById(`pcName${side}`).textContent = String(getDisplayName(team.name || '') || '').toUpperCase();
 
       const pctEl = document.getElementById(`pcPct${side}`);
-      pctEl.textContent = `${pct}%`;
+      pctEl.textContent = `${Number(pct).toFixed(1)}%`;
       pctEl.style.color = isFav ? color : 'var(--muted)';
 
       el.style.borderTop = `3px solid ${color}`;
@@ -5042,18 +5253,96 @@
       return row;
     }
 
-    function setFlag(flag) {
+    function fmtNum(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n.toFixed(1) : '-';
+    }
+
+    function fmtRank(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? '(#' + n + ')' : '';
+    }
+
+    function renderKenPomComparison(m, tA, tB) {
+      const grid = document.getElementById('pcStatsGrid');
+      if (!grid) return;
+      const s1 = teamStats[tA?.name] || teamStats[getDisplayName(tA?.name)] || {};
+      const s2 = teamStats[tB?.name] || teamStats[getDisplayName(tB?.name)] || {};
+      const k1 = { ...s1, ...(tA?.kenpom || {}) };
+      const k2 = { ...s2, ...(tB?.kenpom || {}) };
+      const hasData = [k1.adjoe, k1.adjde, k1.adjem, k1.tempo, k2.adjoe, k2.adjde, k2.adjem, k2.tempo]
+        .some((x) => Number.isFinite(Number(x)));
+      if (!hasData) {
+        grid.innerHTML = '<p class="pc-no-data">KenPom data not available.</p>';
+        return;
+      }
+      const oeA = Number(k1.adjoe);
+      const oeB = Number(k2.adjoe);
+      const deA = Number(k1.adjde);
+      const deB = Number(k2.adjde);
+      const emA = Number(k1.adjem);
+      const emB = Number(k2.adjem);
+      grid.innerHTML =
+        '<table class="pc-stats-table"><thead><tr><th></th><th>' + escHtml(tA.abbreviation || getDisplayName(tA.name)) +
+        '</th><th>' + escHtml(tB.abbreviation || getDisplayName(tB.name)) +
+        '</th></tr></thead><tbody>' +
+        '<tr><td class="stat-label">Adj OE</td><td class="' + (oeA >= oeB ? 'stat-better' : 'stat-worse') + '">' +
+        fmtNum(k1.adjoe) + ' <span class="stat-rank">' + fmtRank(k1.adjoe_rank) + '</span></td><td class="' +
+        (oeB >= oeA ? 'stat-better' : 'stat-worse') + '">' + fmtNum(k2.adjoe) +
+        ' <span class="stat-rank">' + fmtRank(k2.adjoe_rank) + '</span></td></tr>' +
+        '<tr><td class="stat-label">Adj DE</td><td class="' + (deA <= deB ? 'stat-better' : 'stat-worse') + '">' +
+        fmtNum(k1.adjde) + ' <span class="stat-rank">' + fmtRank(k1.adjde_rank) + '</span></td><td class="' +
+        (deB <= deA ? 'stat-better' : 'stat-worse') + '">' + fmtNum(k2.adjde) +
+        ' <span class="stat-rank">' + fmtRank(k2.adjde_rank) + '</span></td></tr>' +
+        '<tr><td class="stat-label">Adj EM</td><td class="' + (emA >= emB ? 'stat-better' : 'stat-worse') + '">' +
+        fmtNum(k1.adjem) + ' <span class="stat-rank">' + fmtRank(k1.adjem_rank) + '</span></td><td class="' +
+        (emB >= emA ? 'stat-better' : 'stat-worse') + '">' + fmtNum(k2.adjem) +
+        ' <span class="stat-rank">' + fmtRank(k2.adjem_rank) + '</span></td></tr>' +
+        '<tr><td class="stat-label">Tempo</td><td>' + fmtNum(k1.tempo) + '</td><td>' + fmtNum(k2.tempo) + '</td></tr>' +
+        '</tbody></table>';
+    }
+
+    function renderSeedHistory(m, tA, tB) {
+      const el = document.getElementById('pcSeedHistory');
+      if (!el) return;
+      const sh = m?.historical_seed_matchup || {};
+      const h = Number(sh.higher_seed_wins);
+      const l = Number(sh.lower_seed_wins);
+      const upsetPct = Number(sh.upset_pct);
+      if (!Number.isFinite(h) || !Number.isFinite(l)) {
+        el.textContent = `${tA.seed}-seed vs ${tB.seed}-seed historical record unavailable`;
+        return;
+      }
+      const total = h + l;
+      const favoritePct = total > 0 ? ((h / total) * 100).toFixed(1) : '-';
+      const label = sh.label || `${tA.seed}-seeds vs ${tB.seed}-seeds`;
+      el.innerHTML = escHtml(`${label}: ${h}-${l} (${favoritePct}% favorite)`);
+      if (Number.isFinite(upsetPct) && upsetPct > 25) {
+        el.innerHTML += ' <span class="upset-zone-tag">Upset Zone</span>';
+      }
+    }
+
+    function setFlag(flag, confidenceTier) {
       const el = document.getElementById('pcFlag');
+      const tier = String(confidenceTier || 'moderate').toLowerCase();
+      const tierIcon = { lock: '[LOCK]', strong: '[STRONG]', moderate: '[MOD]', lean: '[LEAN]' };
       const map = {
-        upset_alert: { cls: 'upset', label: 'Upset Alert' },
-        leverage_play: { cls: 'upset', label: 'Leverage Play' },
-        chalk: { cls: 'chalk', label: 'Chalk' },
-        toss_up: { cls: 'tossup', label: 'Toss-Up' },
+        upset_alert: { bg: '#FFF3E0', color: '#E65100', border: '#FFB74D', label: 'UPSET ALERT' },
+        upset_watch: { bg: '#FFF3E0', color: '#E65100', border: '#FFB74D', label: 'UPSET ALERT' },
+        competitive: { bg: '#FFF8E1', color: '#F57F17', border: '#FFD54F', label: 'TOSS UP' },
+        leverage_play: { bg: '#E3F2FD', color: '#1565C0', border: '#64B5F6', label: 'LEVERAGE PLAY' },
+        chalk: { bg: '#f0f0f0', color: '#666', border: '#ddd', label: 'CHALK' },
+        toss_up: { bg: '#FFF8E1', color: '#F57F17', border: '#FFD54F', label: 'TOSS UP' },
+        lock: { bg: '#f0f0f0', color: '#666', border: '#ddd', label: 'CHALK' }
       };
-      const info = map[String(flag || '').toLowerCase()];
+      const flagKey = String(flag || '').toLowerCase().replace(/\s+/g, '_');
+      const info = map[flagKey] || map.chalk;
       if (info) {
-        el.className = `pc-flag ${info.cls}`;
-        el.textContent = info.label;
+        el.className = 'pc-flag';
+        el.style.background = info.bg;
+        el.style.color = info.color;
+        el.style.border = '1px solid ' + info.border;
+        el.textContent = (tierIcon[tier] || '[MOD]') + ' ' + tier.toUpperCase() + ' - ' + info.label;
         el.style.display = '';
       } else {
         el.style.display = 'none';
@@ -5541,3 +5830,8 @@
   </script>
 </body>
 </html>
+
+
+
+
+
