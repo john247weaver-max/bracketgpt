@@ -1750,7 +1750,8 @@ function findCtx(query, opts = {}) {
   };
 
   // Team profiles
-  const profiles = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
+  const profilesRaw = store.teams?.profiles || store.teams?.teams || (Array.isArray(store.teams) ? store.teams : []);
+  const profiles = Array.isArray(profilesRaw) ? profilesRaw : [];
   if (c.includeTeamProfiles !== false) {
     for (const t of profiles) {
       const name = (t.name || t.school || '').toLowerCase();
@@ -1759,8 +1760,11 @@ function findCtx(query, opts = {}) {
   }
 
   // Bracket games (if loaded)
-  const bracketGames = store.bracket?.games || store.bracket?.predictions || [];
-  const bracketMatchups = store.bracketMatchups?.matchups || [];
+  const bracketGamesRaw = store.bracket?.games || store.bracket?.predictions || [];
+  const bracketGames = Array.isArray(bracketGamesRaw) ? bracketGamesRaw : [];
+  const bracketMatchupsRaw = store.bracketMatchups?.matchups || [];
+  const bracketMatchups = Array.isArray(bracketMatchupsRaw) ? bracketMatchupsRaw : [];
+  const basePredictions = Array.isArray(store.base?.predictions) ? store.base.predictions : [];
 
   const parsedPair = parseTeamPairFromQuery(query);
   if (parsedPair) {
@@ -1779,7 +1783,8 @@ function findCtx(query, opts = {}) {
 
   // Prediction search across all models
   for (const model of ['base', 'upset', 'floor']) {
-    for (const p of (store[model]?.predictions || [])) {
+    const modelPredictions = Array.isArray(store[model]?.predictions) ? store[model].predictions : [];
+    for (const p of modelPredictions) {
       const t1 = (p.t1_name || '').toLowerCase();
       const t2 = (p.t2_name || '').toLowerCase();
       let hit = (t1 && lc.includes(t1)) || (t2 && lc.includes(t2));
@@ -1803,7 +1808,7 @@ function findCtx(query, opts = {}) {
 
   // V5: Momentum/trending queries â€” find teams that are rising or fading
   if (/momentum|trending|hot|cold|streak|surge|slump|fading|rising|peaking|form/.test(lc)) {
-    for (const p of (store.base?.predictions || [])) {
+    for (const p of basePredictions) {
       const fr = p.form_and_risk || {};
       const t1_rising = fr.t1_momentum === 'rising';
       const t2_rising = fr.t2_momentum === 'rising';
@@ -1822,7 +1827,7 @@ function findCtx(query, opts = {}) {
 
   // V5: Injury/risk queries
   if (/injur|hurt|risk|concern|health|questionable|doubtful|alert|monitor/.test(lc)) {
-    for (const p of (store.base?.predictions || [])) {
+    for (const p of basePredictions) {
       const fr = p.form_and_risk || {};
       if (fr.t1_injury_alert || fr.t2_injury_alert) {
         ctx.push({ type: 'pred', model: 'base', data: p });
@@ -1832,7 +1837,7 @@ function findCtx(query, opts = {}) {
 
   // V5: Volatility/variance queries
   if (/volatil|variance|inconsisten|unpredictable|wild.card|chaos|bust|reliable|steady|consistent|safe/.test(lc)) {
-    for (const p of (store.base?.predictions || [])) {
+    for (const p of basePredictions) {
       const fr = p.form_and_risk || {};
       const v1 = fr.t1_volatility_score || 0;
       const v2 = fr.t2_volatility_score || 0;
@@ -1846,7 +1851,7 @@ function findCtx(query, opts = {}) {
 
   // V5: Conference tourney champion queries
   if (/conference.tourn|conf.champ|conf.winner|tournament.champ/.test(lc)) {
-    for (const p of (store.base?.predictions || [])) {
+    for (const p of basePredictions) {
       const fr = p.form_and_risk || {};
       if (fr.t1_conf_tourney_result === 'champion' || fr.t2_conf_tourney_result === 'champion') {
         ctx.push({ type: 'pred', model: 'base', data: p });
@@ -1867,7 +1872,7 @@ function findCtx(query, opts = {}) {
     }
     // V5 enhancement: also surface high-volatility opponents + rising underdogs
     if (count < (c.upsetItems || 8)) {
-      for (const p of (store.base?.predictions || [])) {
+      for (const p of basePredictions) {
         if (p.upset_flag && p.upset_flag !== '' && p.upset_flag !== 'chalk') {
           ctx.push({ type: 'pred', model: 'base', data: p });
           count++;
@@ -1886,7 +1891,8 @@ function findCtx(query, opts = {}) {
 
   // Optimizer / strategy queries
   if (c.includeOptimizer !== false && /bracket|strateg|pool|optim|espn|points/.test(lc)) {
-    for (const o of (store.optimizer?.results || []).slice(0, c.optimizerItems || 5)) {
+    const optimizerResults = Array.isArray(store.optimizer?.results) ? store.optimizer.results : [];
+    for (const o of optimizerResults.slice(0, c.optimizerItems || 5)) {
       ctx.push({ type: 'opt', data: o });
     }
   }
@@ -1899,7 +1905,7 @@ function findCtx(query, opts = {}) {
       }
     }
     // Also surface base predictions for top seeds
-    for (const p of (store.base?.predictions || [])) {
+    for (const p of basePredictions) {
       if ((p.t1_seed || 99) <= 2 && (p.t2_seed || 99) <= 2) {
         ctx.push({ type: 'pred', model: 'base', data: p });
       }
@@ -2701,6 +2707,65 @@ async function generateSeedBucketNarrative(userRequest) {
   };
 }
 
+function normalizeMessageContent(rawContent) {
+  if (typeof rawContent === 'string') return rawContent.trim();
+  if (Array.isArray(rawContent)) {
+    const parts = rawContent
+      .map((part) => {
+        if (typeof part === 'string') return part;
+        if (part && typeof part === 'object') {
+          if (typeof part.text === 'string') return part.text;
+          if (typeof part.content === 'string') return part.content;
+        }
+        return '';
+      })
+      .filter(Boolean);
+    return parts.join('\n').trim();
+  }
+  if (rawContent == null) return '';
+  return String(rawContent).trim();
+}
+
+function sanitizeIncomingMessages(rawMessages) {
+  if (!Array.isArray(rawMessages)) return [];
+  const out = [];
+  for (const msg of rawMessages.slice(-40)) {
+    if (!msg || typeof msg !== 'object') continue;
+    const roleRaw = String(msg.role || '').toLowerCase();
+    const role = (roleRaw === 'assistant' || roleRaw === 'system') ? roleRaw : 'user';
+    const content = normalizeMessageContent(msg.content);
+    if (!content) continue;
+    out.push({ role, content });
+  }
+  return out;
+}
+
+function parseErrorMessage(payload) {
+  if (!payload) return '';
+  if (typeof payload === 'string') return payload;
+  if (typeof payload.error === 'string') return payload.error;
+  if (payload.error && typeof payload.error.message === 'string') return payload.error.message;
+  if (typeof payload.message === 'string') return payload.message;
+  return '';
+}
+
+async function parseJsonSafe(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return { _rawText: text };
+  }
+}
+
+function buildUpstreamError(providerName, statusCode, payload) {
+  const detail = parseErrorMessage(payload) || String(payload?._rawText || '').slice(0, 220);
+  return detail
+    ? `API error (${providerName} ${statusCode}): ${detail}`
+    : `API error (${providerName} ${statusCode})`;
+}
+
 async function callLLM(messages, ctxStr, options = {}) {
   const key = cfg.apiKey;
   if (!key) return 'Need an API key! Admin: set LLM_API_KEY in Railway env vars or go to /admin.';
@@ -2708,6 +2773,10 @@ async function callLLM(messages, ctxStr, options = {}) {
   const temperature = Number.isFinite(options.temperature) ? options.temperature : cfg.temperature;
 
   try {
+    if (typeof fetch !== 'function') {
+      return 'Server runtime is missing fetch(). Use Node.js 18+ or add a fetch polyfill.';
+    }
+
     if (cfg.provider === 'deepseek') {
       const r = await fetch('https://api.deepseek.com/chat/completions', {
         method: 'POST',
@@ -2719,7 +2788,8 @@ async function callLLM(messages, ctxStr, options = {}) {
           max_tokens: cfg.maxTokens,
         }),
       });
-      const d = await r.json();
+      const d = await parseJsonSafe(r);
+      if (!r.ok) return buildUpstreamError('deepseek', r.status, d);
       if (d.error) return `API error: ${d.error.message || JSON.stringify(d.error)}`;
       return d.choices?.[0]?.message?.content || 'No response.';
     }
@@ -2739,7 +2809,8 @@ async function callLLM(messages, ctxStr, options = {}) {
           messages,
         }),
       });
-      const d = await r.json();
+      const d = await parseJsonSafe(r);
+      if (!r.ok) return buildUpstreamError('claude', r.status, d);
       if (d.error) return `API error: ${d.error.message || JSON.stringify(d.error)}`;
       return d.content?.[0]?.text || 'No response.';
     }
@@ -2754,14 +2825,17 @@ async function callLLM(messages, ctxStr, options = {}) {
           generationConfig: { temperature, maxOutputTokens: cfg.maxTokens },
         }),
       });
-      const d = await r.json();
+      const d = await parseJsonSafe(r);
+      if (!r.ok) return buildUpstreamError('gemini', r.status, d);
+      if (d.error) return `API error: ${d.error.message || JSON.stringify(d.error)}`;
       return d.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.';
     }
 
     return `Unknown provider: ${cfg.provider}`;
   } catch (e) {
     console.error('LLM err:', e);
-    return 'Connection issue. Try again.';
+    const msg = String(e?.message || '').trim();
+    return msg ? `Connection issue: ${msg}` : 'Connection issue. Try again.';
   }
 }
 
@@ -2984,8 +3058,8 @@ app.get('/api/bracket/export', (req, res) => {
 async function handleChat(req, res, opts = {}) {
   try {
     if (!rateOk(req.ip || 'x')) return res.status(429).json({ error: 'Too many messages.' });
-    const msgs = req.body?.messages;
-    if (!Array.isArray(msgs) || !msgs.length) return res.status(400).json({ error: 'No message.' });
+    const msgs = sanitizeIncomingMessages(req.body?.messages);
+    if (!msgs.length) return res.status(400).json({ error: 'No valid message content.' });
 
     const joined = msgs.map((m) => m.content).join(' ');
     const intent = detectIntent(joined);
@@ -3010,7 +3084,8 @@ ${fmtCtx(ctx)}`);
     return res.json({ reply, intent });
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: 'Something broke.' });
+    const detail = String(e?.message || '').trim();
+    return res.status(500).json({ error: detail ? `Something broke: ${detail}` : 'Something broke.' });
   }
 }
 
