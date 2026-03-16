@@ -1271,7 +1271,7 @@
       <main class="container">
         <section class="topbar">
           <div class="tophead">
-            <h1>2025 Interactive Bracket</h1>
+            <h1>2026 Interactive Bracket</h1>
             <div class="actions">
               <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
               <button class="btn btn-secondary" onclick="startGuidedFlow()">Start Picking</button>
@@ -2524,7 +2524,7 @@
         : (Number.isFinite(Number(r64SlotByPair[pair])) ? Number(r64SlotByPair[pair]) : (gameNo - 1));
       return {
         matchup_id: String(m?.matchup_id || ('FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo)),
-        season: Number(m?.season || seasonFallback || 2025),
+        season: Number(m?.season || seasonFallback || 2026),
         round: 'R64',
         region,
         slot: Number.isFinite(inferredSlot) ? inferredSlot : (idx % 8),
@@ -2581,7 +2581,7 @@
           .sort((a, b) => Number(a?.game_number || 0) - Number(b?.game_number || 0))
           .slice(0, 32);
       }
-      return matchups.map((m, idx) => normalizeIncomingMatchup(m, idx, m?.season || 2025));
+      return matchups.map((m, idx) => normalizeIncomingMatchup(m, idx, m?.season || 2026));
     }
 
     function normalizeBracketPayload(raw) {
@@ -2601,7 +2601,7 @@
           : fallbackPairings(regionsFromRows));
       return {
         ...data,
-        season: Number(data?.season || matchups?.[0]?.season || 2025),
+        season: Number(data?.season || matchups?.[0]?.season || 2026),
         regions: regionsFromRows.length ? regionsFromRows : (Array.isArray(data?.regions) ? data.regions : []),
         matchups,
         finalFourPairings: pairingsArray,
@@ -2615,11 +2615,15 @@
     async function loadBracketFromUploadedJson() {
       try {
         const candidates = [
+          '/data/bracketgpt_matchups_2026_final.json',
           '/data/bracketgpt_matchups_2025_final.json',
+          '/data/bracketgpt_matchups_2026_v2.json',
           '/data/bracketgpt_matchups_2025_v2.json',
+          '/data/bracket_2026.json',
           '/data/bracket_2025.json',
           '/data/bracket_2025__1_.json',
           '/data/bracket_2025%20(1).json',
+          '/data/bracket_predictions_2026.json',
           '/data/bracket_predictions_2025.json',
           '/data/bracket_predictions.json'
         ];
@@ -2634,7 +2638,7 @@
             if (!matchups.length) continue;
             const regionsList = Array.from(new Set(matchups.map((m) => String(m.region || '').trim()).filter(Boolean)));
             return {
-              season: Number(raw?.season || 2025),
+              season: Number(raw?.season || 2026),
               regions: regionsList,
               matchups,
               finalFourPairings: Array.isArray(raw?.finalFourPairings) && raw.finalFourPairings.length >= 2
@@ -2673,7 +2677,7 @@
 
             matchups.push({
               matchup_id: 'FALLBACK_R64_' + region.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '_' + gameNo,
-              season: Number(raw?.season || 2025),
+              season: Number(raw?.season || 2026),
               round: 'R64',
               region,
               game_number: gameNo,
@@ -2702,7 +2706,7 @@
 
           const regionsList = Array.from(new Set(matchups.map((m) => String(m.region || '').trim()).filter(Boolean)));
           return {
-            season: Number(raw?.season || 2025),
+            season: Number(raw?.season || 2026),
             regions: regionsList,
             matchups,
             finalFourPairings: fallbackPairings(regionsList)
@@ -4443,7 +4447,7 @@
         const loser = t1?.name === pick ? t2?.name : t1?.name;
         lines.push(node.round + ': ' + pick + ' over ' + (loser || 'TBD'));
       }
-      const text = 'BracketGPT 2025 Picks\n' + lines.join('\n');
+      const text = 'BracketGPT 2026 Picks\n' + lines.join('\n');
       try { await navigator.clipboard.writeText(text); alert('Bracket copied to clipboard'); }
       catch (e) { alert(text); }
     }
@@ -4520,7 +4524,7 @@
         if (baseMatchups.length === 0) {
           document.getElementById('regions').innerHTML = '';
           document.getElementById('finals').innerHTML = '';
-          showError('No bracket data loaded. Upload bracket_ready_2025.json in admin.');
+          showError('No bracket data loaded. Upload bracket_ready_2026.json in admin.');
           return;
         }
         const byRegion = {};
@@ -4597,5 +4601,3 @@
   </script>
 </body>
 </html>
-
-

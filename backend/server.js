@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
@@ -66,7 +66,7 @@ const defaultContext = {
 };
 
 const cfg = {
-  adminPassword: process.env.ADMIN_PASSWORD || savedConfig.adminPassword || 'changeme2025',
+  adminPassword: process.env.ADMIN_PASSWORD || savedConfig.adminPassword || 'changeme2026',
   provider: process.env.LLM_PROVIDER || savedConfig.provider || 'deepseek',
   apiKey: process.env.LLM_API_KEY || savedConfig.apiKey || '',
   model: process.env.LLM_MODEL || savedConfig.model || '',
@@ -74,7 +74,7 @@ const cfg = {
   maxTokens: parseInt(process.env.LLM_MAX_TOKENS || savedConfig.maxTokens || 1200, 10),
   brandName: savedConfig.brandName || 'BracketGPT',
   tagline: savedConfig.tagline || 'v5.3 ENSEMBLE · 2,278 ALL-PAIRS PREDICTIONS · KENPOM + ARCHETYPES',
-  activeSeason: savedConfig.activeSeason || 2025,
+  activeSeason: savedConfig.activeSeason || 2026,
   messagesPerMinute: parseInt(savedConfig.messagesPerMinute || 30, 10),
   weights: savedConfig.weights || { baseWeight: 0.6, upsetWeight: 0.25, floorWeight: 0.15 },
   features: savedConfig.features || {
@@ -115,37 +115,37 @@ const store = {
   bracketOutput: null,
 };
 const FILE_MAP = {
-  teams: ['team_profiles_2025.json'],
-  humanSummaries: ['team_human_summaries_2025.json', 'team_human_summaries.json'],
+  teams: ['team_profiles_2026.json', 'team_profiles_2025.json'],
+  humanSummaries: ['team_human_summaries_2026.json', 'team_human_summaries_2025.json', 'team_human_summaries.json'],
   base: ['chatbot_predictions_v5.json'],
   upset: ['chatbot_predictions_v5.json'],
   floor: ['chatbot_predictions_v5.json'],
   optimizer: ['archetype_history.json'],
-  bracket: ['bracket_predictions_2025.json', 'bracket_predictions.json'],
-  bracket2025: ['bracket_2025.json'],
+  bracket: ['bracket_predictions_2026.json', 'bracket_predictions_2025.json', 'bracket_predictions.json'],
+  bracket2025: ['bracket_2026.json', 'bracket_2025.json'],
   ev: ['bracket_ev_espn.json'],
-  poolStrategy: ['pool_strategy_2025.json', 'pool_strategy.json'],
+  poolStrategy: ['pool_strategy_2026.json', 'pool_strategy_2025.json', 'pool_strategy.json'],
   seedMatchups: ['historical/seed_matchup_all_rounds.json', 'seed_matchup_all_rounds.json'],
-  bracketMatchups: ['bracketgpt_matchups_2025_v2.json', 'bracketgpt_matchups_2025_final.json'],
-  bracketOutput: ['bracketgpt_bracket_output_2025.json'],
-  context: ['context_2025.json', 'context.json'],
+  bracketMatchups: ['bracketgpt_matchups_2026_v2.json', 'bracketgpt_matchups_2026_final.json', 'bracketgpt_matchups_2025_v2.json', 'bracketgpt_matchups_2025_final.json'],
+  bracketOutput: ['bracketgpt_bracket_output_2026.json', 'bracketgpt_bracket_output_2025.json'],
+  context: ['context_2026.json', 'context_2025.json', 'context.json'],
 };
 
 const DATA_FILES = {
   predictions: 'chatbot_predictions_v5.json',
-  bracket: 'bracket_2025.json',
-  bracket_ready: 'bracket_ready_2025.json',
-  bracket_cache: 'bracket_cache_2025.json',
-  bracket_output: 'bracketgpt_bracket_output_2025.json',
-  team_profiles: 'team_profiles_2025.json',
+  bracket: 'bracket_2026.json',
+  bracket_ready: 'bracket_ready_2026.json',
+  bracket_cache: 'bracket_cache_2026.json',
+  bracket_output: 'bracketgpt_bracket_output_2026.json',
+  team_profiles: 'team_profiles_2026.json',
   seed_matchups: 'seed_matchup_all_rounds.json',
   archetype_summary: 'archetype_summary_v5.json',
   archetype_history: 'archetype_history.json',
 };
 const TEAM_MAPPING_FILE = 'team_name_mapping_2026.json';
 
-const REGION_ORDER_2025 = ['South', 'East', 'West', 'Midwest'];
-const FINAL_FOUR_PAIRINGS_2025 = [['South', 'East'], ['West', 'Midwest']];
+const REGION_ORDER_2026 = ['South', 'East', 'West', 'Midwest'];
+const FINAL_FOUR_PAIRINGS_2026 = [['South', 'East'], ['West', 'Midwest']];
 const bracketReadyPath = path.join(DATA_DIR, DATA_FILES.bracket_ready);
 let bracketReady = null;
 
@@ -153,14 +153,14 @@ function loadBracketReady() {
   try {
     if (fs.existsSync(bracketReadyPath)) {
       bracketReady = JSON.parse(fs.readFileSync(bracketReadyPath, 'utf8'));
-      console.log(`Loaded bracket_ready_2025.json: ${bracketReady?.matchups?.length || 0} matchups, ${Object.keys(bracketReady?.team_directory || {}).length} teams`);
+      console.log(`Loaded bracket_ready_2026.json: ${bracketReady?.matchups?.length || 0} matchups, ${Object.keys(bracketReady?.team_directory || {}).length} teams`);
     } else {
       bracketReady = null;
-      console.warn('bracket_ready_2025.json not found in', DATA_DIR);
+      console.warn('bracket_ready_2026.json not found in', DATA_DIR);
     }
   } catch (e) {
     bracketReady = null;
-    console.error('Failed to load bracket_ready_2025.json:', e.message);
+    console.error('Failed to load bracket_ready_2026.json:', e.message);
   }
 }
 
@@ -179,8 +179,8 @@ const bracketMatchupIndex = {
   byId: new Map(),
   byRegion: new Map(),
   byTeam: new Map(),
-  regions: REGION_ORDER_2025.slice(),
-  season: 2025,
+  regions: REGION_ORDER_2026.slice(),
+  season: 2026,
 };
 
 function firstExistingFile(candidates) {
@@ -566,7 +566,7 @@ function buildBracketMatchupIndex() {
   bracketMatchupIndex.byTeam = new Map();
   const payload = buildCanonicalR64Payload();
   const rows = Array.isArray(payload?.matchups) ? payload.matchups : [];
-  bracketMatchupIndex.season = Number(payload?.season || cfg.activeSeason || 2025);
+  bracketMatchupIndex.season = Number(payload?.season || cfg.activeSeason || 2026);
   const regionSet = new Set();
 
   for (const matchup of rows) {
@@ -580,7 +580,7 @@ function buildBracketMatchupIndex() {
     addBracketByTeam(matchup?.t2?.name, matchup);
   }
 
-  bracketMatchupIndex.regions = regionSet.size ? Array.from(regionSet) : REGION_ORDER_2025.slice();
+  bracketMatchupIndex.regions = regionSet.size ? Array.from(regionSet) : REGION_ORDER_2026.slice();
 }
 
 function normalizeRoundKey(value) {
@@ -602,7 +602,7 @@ function normalizeR64Matchups(rows, seasonFallback) {
       .slice(0, 32);
   }
   for (const m of r64) {
-    const season = Number(m?.season || seasonFallback || cfg.activeSeason || 2025);
+    const season = Number(m?.season || seasonFallback || cfg.activeSeason || 2026);
     const region = String(m?.region || 'Unknown').trim() || 'Unknown';
     const gameNo = Number(m?.game_number || 0) || 1;
     const t1 = m?.t1 || {
@@ -665,7 +665,7 @@ function deriveR64MatchupsFromBracketGames(games, seasonFallback) {
   const r64Games = games.filter((g) => isR64Round(g?.round));
   if (!r64Games.length) return [];
 
-  const season = Number(seasonFallback || cfg.activeSeason || 2025);
+  const season = Number(seasonFallback || cfg.activeSeason || 2026);
   const regionGameNo = new Map();
   const out = [];
 
@@ -783,9 +783,13 @@ function deriveR64MatchupsFromDisk() {
   if (!files.length) return [];
 
   const preferred = [
+    'bracketgpt_matchups_2026_final.json',
     'bracketgpt_matchups_2025_final.json',
+    'bracketgpt_matchups_2026_v2.json',
     'bracketgpt_matchups_2025_v2.json',
+    'bracket_2026.json',
     'bracket_2025.json',
+    'bracket_predictions_2026.json',
     'bracket_predictions_2025.json',
     'bracket_predictions.json',
   ];
@@ -811,7 +815,7 @@ function getFinalFourPairingsArray() {
   if (Array.isArray(store.bracketMatchups?.finalFourPairings) && store.bracketMatchups.finalFourPairings.length >= 2) {
     return store.bracketMatchups.finalFourPairings;
   }
-  return FINAL_FOUR_PAIRINGS_2025;
+  return FINAL_FOUR_PAIRINGS_2026;
 }
 
 function getFinalFourPairingsObject(pairings) {
@@ -999,8 +1003,8 @@ function buildR64PayloadFromBracketCache() {
 
 function buildLegacyCanonicalR64Payload() {
   return {
-    season: Number(cfg.activeSeason || 2025),
-    regions: REGION_ORDER_2025.slice(),
+    season: Number(cfg.activeSeason || 2026),
+    regions: REGION_ORDER_2026.slice(),
     matchups: [],
   };
 }
@@ -1010,8 +1014,8 @@ function buildCanonicalR64Payload() {
     return bracketReady;
   }
   return {
-    season: Number(cfg.activeSeason || 2025),
-    regions: REGION_ORDER_2025.slice(),
+    season: Number(cfg.activeSeason || 2026),
+    regions: REGION_ORDER_2026.slice(),
     matchups: [],
     team_directory: {},
     all_predictions: [],
@@ -1537,7 +1541,7 @@ function buildSyntheticMatchup(aKey, bKey) {
 
   return {
     matchup_id: `SYNTH_${aKey.replace(/\s+/g, '_')}_${bKey.replace(/\s+/g, '_')}`,
-    season: Number(pred.season || bracketMatchupIndex.season || cfg.activeSeason || 2025),
+    season: Number(pred.season || bracketMatchupIndex.season || cfg.activeSeason || 2026),
     round: 'Projected',
     region: 'Projected',
     game_number: null,
@@ -2507,7 +2511,7 @@ function buildBracketGroundingContext() {
     })
     .sort((a, b) => a.localeCompare(b));
 
-  return `BRACKET_GROUNDING_2025 (authoritative seed/region/path source; never override with memory):\n${lines.join('\n')}`;
+  return `BRACKET_GROUNDING_2026 (authoritative seed/region/path source; never override with memory):\n${lines.join('\n')}`;
 }
 
 function buildProfileLookup() {
@@ -2659,7 +2663,7 @@ function validateNarrativeAgainstBuckets(text, buckets) {
 async function generateSeedBucketNarrative(userRequest) {
   const rawBracket = readBracket2025Source();
   if (!rawBracket) {
-    return { error: 'Missing bracket_2025.json (or fallback bracket_predictions.json).' };
+    return { error: 'Missing bracket_2026.json (or fallback bracket_2025.json / bracket_predictions.json).' };
   }
 
   const buckets = buildCanonicalSeedBuckets(rawBracket);
@@ -2830,7 +2834,7 @@ app.get('/api/bracket', (req, res) => {
   if (!bracketReady || !Array.isArray(bracketReady.matchups) || bracketReady.matchups.length === 0) {
     return res.status(404).json({
       error: 'No bracket data loaded',
-      hint: 'Upload bracket_ready_2025.json to backend/data/ (generated by model_v5_4.py in Colab)',
+      hint: 'Upload bracket_ready_2026.json to backend/data/ (generated by model_v5_4.py in Colab)',
     });
   }
   return res.json(bracketReady);
@@ -2840,7 +2844,7 @@ app.get('/api/bracket/bootstrap', (req, res) => {
   if (!bracketReady || !Array.isArray(bracketReady.matchups) || bracketReady.matchups.length === 0) {
     return res.status(404).json({
       error: 'No bracket data loaded',
-      hint: 'Upload bracket_ready_2025.json to backend/data/ (generated by model_v5_4.py in Colab)',
+      hint: 'Upload bracket_ready_2026.json to backend/data/ (generated by model_v5_4.py in Colab)',
     });
   }
   return res.json(bracketReady);
@@ -3124,7 +3128,7 @@ app.get('/api/value-picks', (req, res) => {
 
 app.get('/api/pool-strategy', (req, res) => {
   if (!store.poolStrategy) {
-    return res.status(404).json({ error: 'Pool strategy data not loaded. Upload pool_strategy_2025.json via admin.' });
+    return res.status(404).json({ error: 'Pool strategy data not loaded. Upload pool_strategy_2026.json via admin.' });
   }
 
   const tier = String(req.query.tier || '').toLowerCase();
@@ -3293,25 +3297,29 @@ app.post('/admin/upload', auth, (req, res) => {
     const t = String(req.body.type || '').trim();
     const uploadTypeMap = {
       predictions: 'chatbot_predictions_v5.json',
-      bracket: 'bracket_2025.json',
-      bracket_ready: 'bracket_ready_2025.json',
-      bracket_cache: 'bracket_cache_2025.json',
-      bracket_output: 'bracketgpt_bracket_output_2025.json',
-      team_profiles: 'team_profiles_2025.json',
+      bracket: 'bracket_2026.json',
+      bracket_ready: 'bracket_ready_2026.json',
+      bracket_cache: 'bracket_cache_2026.json',
+      bracket_output: 'bracketgpt_bracket_output_2026.json',
+      team_profiles: 'team_profiles_2026.json',
       seed_matchups: 'seed_matchup_all_rounds.json',
       archetype_summary: 'archetype_summary_v5.json',
       archetype_history: 'archetype_history.json',
     };
     const typeAliases = {
       base: 'predictions',
+      bracket2026: 'bracket',
       bracket2025: 'bracket',
       bracketReady: 'bracket_ready',
       bracket_ready_2025: 'bracket_ready',
+      bracket_ready_2026: 'bracket_ready',
       bracketCache: 'bracket_cache',
       bracket_cache_2025: 'bracket_cache',
+      bracket_cache_2026: 'bracket_cache',
       cache: 'bracket_cache',
       bracketOutput: 'bracket_output',
       bracket_output_2025: 'bracket_output',
+      bracket_output_2026: 'bracket_output',
       monte_carlo: 'bracket_output',
       montecarlo: 'bracket_output',
       teams: 'team_profiles',
@@ -3336,11 +3344,11 @@ app.post('/admin/upload', auth, (req, res) => {
       const key = normalizeFileKey(fileName);
       if (!key) return '';
       if (key.includes('chatbotpredictionsv5') || key.includes('predictionsv5') || key.includes('allpairs')) return 'predictions';
-      if (key.includes('bracketready2025') || key.includes('bracketready')) return 'bracket_ready';
-      if (key.includes('bracket2025') || key === 'bracket') return 'bracket';
-      if (key.includes('bracketcache2025') || key.includes('bracketcache')) return 'bracket_cache';
-      if (key.includes('bracketgptbracketoutput2025') || key.includes('bracketoutput2025') || key.includes('bracketoutput') || key.includes('montecarlooutput') || key.includes('montecarlo')) return 'bracket_output';
-      if (key.includes('teamprofiles2025') || key.includes('teamprofiles')) return 'team_profiles';
+      if (key.includes('bracketready2026') || key.includes('bracketready2025') || key.includes('bracketready')) return 'bracket_ready';
+      if (key.includes('bracket2026') || key.includes('bracket2025') || key === 'bracket') return 'bracket';
+      if (key.includes('bracketcache2026') || key.includes('bracketcache2025') || key.includes('bracketcache')) return 'bracket_cache';
+      if (key.includes('bracketgptbracketoutput2026') || key.includes('bracketoutput2026') || key.includes('bracketgptbracketoutput2025') || key.includes('bracketoutput2025') || key.includes('bracketoutput') || key.includes('montecarlooutput') || key.includes('montecarlo')) return 'bracket_output';
+      if (key.includes('teamprofiles2026') || key.includes('teamprofiles2025') || key.includes('teamprofiles')) return 'team_profiles';
       if (key.includes('seedmatchupallrounds') || key.includes('seedmatchups') || key.includes('seedhistory')) return 'seed_matchups';
       if (key.includes('archetypesummaryv5') || key.includes('archetypesummary')) return 'archetype_summary';
       if (key.includes('archetypehistory')) return 'archetype_history';
@@ -3355,7 +3363,7 @@ app.post('/admin/upload', auth, (req, res) => {
     if (!resolvedType) {
       return res.status(400).json({
         success: false,
-        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_ready_2025*.json, bracket_2025*.json, bracket_cache_2025*.json, bracketgpt_bracket_output_2025*.json, team_profiles_2025*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
+        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_ready_2026*.json, bracket_2026*.json, bracket_cache_2026*.json, bracketgpt_bracket_output_2026*.json, team_profiles_2026*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
       });
     }
 
@@ -3421,6 +3429,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`BracketGPT on :${PORT} | ${cfg.provider} | key:${cfg.apiKey ? 'yes' : 'NO'} | data:${hasData ? 'yes' : 'NO'}`);
 });
-
-
-

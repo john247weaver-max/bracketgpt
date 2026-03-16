@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -136,7 +136,7 @@
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-bracket_ready" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
-            <div style="font-weight:600;">bracket_ready_2025.json</div>
+            <div style="font-weight:600;">bracket_ready_2026.json</div>
             <div style="font-size:12px; color:#888;">Single precomputed bracket payload (R64 + team directory + all predictions)</div>
           </div>
           <input type="file" id="file-bracket_ready" data-type="bracket_ready" accept=".json" style="max-width:200px;" />
@@ -156,7 +156,7 @@
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-bracket" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
-            <div style="font-weight:600;">bracket_2025.json</div>
+            <div style="font-weight:600;">bracket_2026.json</div>
             <div style="font-size:12px; color:#888;">Bracket structure: 68 teams + regions + R64 matchups (~25KB)</div>
           </div>
           <input type="file" id="file-bracket" data-type="bracket" accept=".json" style="max-width:200px;" />
@@ -166,7 +166,7 @@
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-bracket_cache" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
-            <div style="font-weight:600;">bracket_cache_2025.json</div>
+            <div style="font-weight:600;">bracket_cache_2026.json</div>
             <div style="font-size:12px; color:#888;">~300-400 realistic matchups — frontend cache-first lookups (~2-4MB)</div>
           </div>
           <input type="file" id="file-bracket_cache" data-type="bracket_cache" accept=".json" style="max-width:200px;" />
@@ -176,7 +176,7 @@
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-bracket_output" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
-            <div style="font-weight:600;">bracketgpt_bracket_output_2025.json</div>
+            <div style="font-weight:600;">bracketgpt_bracket_output_2026.json</div>
             <div style="font-size:12px; color:#888;">Monte Carlo output: strategy EP, champion probabilities, team stats, upset thresholds</div>
           </div>
           <input type="file" id="file-bracket_output" data-type="bracket_output" accept=".json" style="max-width:200px;" />
@@ -186,7 +186,7 @@
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-team_profiles" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
-            <div style="font-weight:600;">team_profiles_2025.json</div>
+            <div style="font-weight:600;">team_profiles_2026.json</div>
             <div style="font-size:12px; color:#888;">68 team profiles — powers "tell me about Duke" (~160KB)</div>
           </div>
           <input type="file" id="file-team_profiles" data-type="team_profiles" accept=".json" style="max-width:200px;" />
@@ -409,7 +409,7 @@
         const files = status.files || {};
         const rows = [
           {
-            file: 'bracket_ready_2025.json',
+            file: 'bracket_ready_2026.json',
             loaded: files.bracket_ready?.loaded,
             detail: files.bracket_ready?.loaded
               ? `${files.bracket_ready.matchups} R64 matchups · ${files.bracket_ready.teams} teams`
@@ -423,28 +423,28 @@
               : 'Not loaded',
           },
           {
-            file: 'bracket_2025.json',
+            file: 'bracket_2026.json',
             loaded: files.bracket?.loaded,
             detail: files.bracket?.loaded
               ? `${files.bracket.teams} teams · ${files.bracket.r64_matchups} R64 matchups`
               : 'Not loaded',
           },
           {
-            file: 'bracket_cache_2025.json',
+            file: 'bracket_cache_2026.json',
             loaded: files.bracket_cache?.loaded,
             detail: files.bracket_cache?.loaded
               ? `${files.bracket_cache.matchups} cached of ${files.bracket_cache.total_all_pairs} total`
               : 'Not loaded',
           },
           {
-            file: 'bracketgpt_bracket_output_2025.json',
+            file: 'bracketgpt_bracket_output_2026.json',
             loaded: files.bracket_output?.loaded,
             detail: files.bracket_output?.loaded
               ? `${files.bracket_output.strategies} strategies · ${files.bracket_output.team_ep_rankings} teams ranked`
               : 'Not loaded',
           },
           {
-            file: 'team_profiles_2025.json',
+            file: 'team_profiles_2026.json',
             loaded: files.team_profiles?.loaded,
             detail: files.team_profiles?.loaded
               ? `${status.profiles} team profiles`
