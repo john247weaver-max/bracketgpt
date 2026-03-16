@@ -587,7 +587,7 @@
       right: 0;
       bottom: 0;
       z-index: 1000;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       background: rgba(8, 9, 13, 0.98);
       border-top: 1px solid var(--border);
     }
@@ -739,7 +739,7 @@
     }
 
     @media (max-width: 700px) {
-      .app { padding: 10px; gap: 10px; }
+      .app { padding: 10px; gap: 10px; padding-bottom: 74px; }
       .hdr { padding: 10px 12px; }
       .sub { display: none; }
       .msgs { padding: 10px; }
@@ -851,7 +851,7 @@
       <div class="logo">BG</div>
       <div class="title-wrap">
         <h1 id="an">BracketGPT</h1>
-        <div class="sub" id="at">AI Bracket Advisor · 2026 Tournament</div>
+        <div class="sub" id="at">AI Bracket Advisor - 2026 Tournament</div>
       </div>
       <div class="hdr-nav">
         <a href="/bracket">Bracket</a>
@@ -878,8 +878,6 @@
             <button onclick="go('Which 12-seeds profile best this year?')">Top 12-seed profiles</button>
             <button onclick="go('Compare the top 1-seeds')">Compare top 1-seeds</button>
             <button onclick="go('Give me a contrarian Final Four for a large pool')">Contrarian Final Four</button>
-            <button onclick="go('What are the safest chalk picks?')">Safest chalk picks</button>
-            <button onclick="go('How should I optimize for a 50-person pool?')">50-person pool plan</button>
           </div>
 
           <div class="hypo">
@@ -926,6 +924,7 @@
     let busy = false;
     let onboardingAnswers = {};
     let currentStep = 1;
+    const queryPrefill = new URLSearchParams(window.location.search).get('q');
 
     (async () => {
       try {
@@ -948,24 +947,28 @@
 
     inp.addEventListener('input', () => btn.classList.toggle('active', inp.value.trim().length > 0));
 
-    (function prefillFromQuery() {
-      const q = new URLSearchParams(window.location.search).get('q');
-      if (!q) return;
-      inp.value = q;
-      btn.classList.add('active');
-      setTimeout(() => go(q), 0);
+    (function initOnboarding() {
+      const overlay = $('onboarding');
+      const saved = sessionStorage.getItem('bracketgpt_profile');
+      if (saved) {
+        try {
+          onboardingAnswers = JSON.parse(saved) || {};
+        } catch (e) {
+          onboardingAnswers = {};
+        }
+      }
+      if (queryPrefill) {
+        if (overlay) overlay.classList.add('hidden');
+        return;
+      }
+      if (saved && overlay) overlay.classList.add('hidden');
     })();
 
-    (function initOnboarding() {
-      const saved = sessionStorage.getItem('bracketgpt_profile');
-      if (!saved) return;
-      try {
-        onboardingAnswers = JSON.parse(saved) || {};
-      } catch (e) {
-        onboardingAnswers = {};
-      }
-      const overlay = $('onboarding');
-      if (overlay) overlay.classList.add('hidden');
+    (function prefillFromQuery() {
+      if (!queryPrefill) return;
+      inp.value = queryPrefill;
+      btn.classList.add('active');
+      setTimeout(() => go(queryPrefill), 0);
     })();
 
     function selectOption(btnEl) {
@@ -1016,10 +1019,36 @@
 
     function scroll() { msgs.scrollTop = msgs.scrollHeight; }
 
-    function esc(t) {
+    function escapeHtml(t) {
       const d = document.createElement('div');
       d.textContent = t;
       return d.innerHTML;
+    }
+
+    function formatInlineMarkdown(text) {
+      return escapeHtml(text)
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    }
+
+    function renderMarkdownLite(text) {
+      const blocks = String(text || '').split(/\n{2,}/);
+      let html = '';
+      for (const block of blocks) {
+        const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+        if (!lines.length) continue;
+        const isList = lines.length > 1 && lines.every((l) => /^\s*[-*]\s|^\s*\d+[.)]\s/.test(l));
+        if (isList) {
+          html += '<ul style="margin:8px 0 8px 18px">' + lines.map((l) => {
+            const item = l.replace(/^\s*[-*]\s*/, '').replace(/^\s*\d+[.)]\s*/, '');
+            return `<li>${formatInlineMarkdown(item)}</li>`;
+          }).join('') + '</ul>';
+          continue;
+        }
+        html += '<p style="margin:0 0 8px">' + lines.map((l) => formatInlineMarkdown(l)).join('<br>') + '</p>';
+      }
+      return html || '<p></p>';
     }
 
     function parseMatchupCard(text) {
@@ -1039,17 +1068,17 @@
       return `<div class="scoreboard">
         <div class="teams">
           <div class="team ${winner === teamA ? 'winner' : ''}">
-            <div class="name">${esc(teamA)}</div>
+            <div class="name">${escapeHtml(teamA)}</div>
             <div class="score" data-score="${scoreA}">0</div>
           </div>
           <div class="vs">VS</div>
           <div class="team ${winner === teamB ? 'winner' : ''}">
-            <div class="name">${esc(teamB)}</div>
+            <div class="name">${escapeHtml(teamB)}</div>
             <div class="score" data-score="${scoreB}">0</div>
           </div>
         </div>
         <div class="metrics">
-          <div class="bar-head"><span>${esc(winner)} win probability</span><span>${winPct}%</span></div>
+          <div class="bar-head"><span>${escapeHtml(winner)} win probability</span><span>${winPct}%</span></div>
           <div class="bar-track"><div class="bar-fill" data-width="${winPct}"></div></div>
           ${upsetPct > 30 ? `<div class="upset">Upset risk ${upsetPct}%</div>` : ''}
         </div>
@@ -1058,25 +1087,7 @@
 
     function fmt(t) {
       const card = parseMatchupCard(t);
-      let s = t
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>');
-
-      const blocks = s.split(/\n{2,}/);
-      let h = card;
-      for (const b of blocks) {
-        const tr = b.trim();
-        if (!tr) continue;
-        const lines = tr.split('\n');
-        const isList = lines.length > 1 && lines.filter((l) => l.trim()).every((l) => /^\s*[-*]\s|^\s*\d+[.)]\s/.test(l));
-        if (isList) {
-          h += '<ul style="margin:8px 0 8px 18px">' + lines.filter((l) => l.trim()).map((l) => `<li>${l.replace(/^\s*[-*]\s*/, '').replace(/^\s*\d+[.)]\s*/, '')}</li>`).join('') + '</ul>';
-        } else {
-          h += `<p style="margin:0 0 8px">${tr.replace(/\n/g, '<br>')}</p>`;
-        }
-      }
-      return h || `<p>${s}</p>`;
+      return card + renderMarkdownLite(t);
     }
 
     function animateMessage(el) {
@@ -1120,7 +1131,7 @@
 
       const bubble = document.createElement('div');
       bubble.className = 'msg-bubble';
-      bubble.innerHTML = role === 'bot' ? fmt(content) : esc(content);
+      bubble.innerHTML = role === 'bot' ? fmt(content) : escapeHtml(content);
 
       msgEl.appendChild(label);
       msgEl.appendChild(bubble);
@@ -1173,3 +1184,4 @@
   </script>
 </body>
 </html>
+

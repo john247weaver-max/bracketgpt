@@ -301,11 +301,11 @@
 
     <div class="sort-bar animate-in delay-3">
       <span>Sort by</span>
-      <button class="sort-pill active" data-sort="total_lev" onclick="setSort('total_lev')">Leverage EV</button>
-      <button class="sort-pill" data-sort="champ_lev" onclick="setSort('champ_lev')">Champ Leverage</button>
-      <button class="sort-pill" data-sort="deep_lev" onclick="setSort('deep_lev')">Deep Run EV</button>
+      <button class="sort-pill active" data-sort="tier_score" onclick="setSort('tier_score')">Pool Score</button>
+      <button class="sort-pill" data-sort="model_probability" onclick="setSort('model_probability')">Model Win%</button>
+      <button class="sort-pill" data-sort="ep_total" onclick="setSort('ep_total')">Total EP</button>
       <button class="sort-pill" data-sort="ownership" onclick="setSort('ownership')">Lowest Owned</button>
-      <button class="sort-pill" data-sort="chalk_ev" onclick="setSort('chalk_ev')">Raw EV (Chalk)</button>
+      <button class="sort-pill" data-sort="raw_ev" onclick="setSort('raw_ev')">Raw EV (Model x EP)</button>
       <a class="chat-link" href="/">&#8592; Chat with BracketGPT</a>
     </div>
 
@@ -319,31 +319,63 @@
 
   <script>
     let valueData = null;
+    let baseRows = [];
     let currentTier = 'small';
-    let currentSort = 'total_lev';
+    let currentSort = 'tier_score';
+    let customPoolSize = 75;
     const TIER_LABELS = {
-      small: 'Model edge using v2 matchup probabilities and public pick rates.',
-      medium: 'Focus on slight upsets and vulnerable favorites with positive model edge.',
-      large: 'Prioritize high-leverage mispriced teams and total EP upside.',
-      mega: 'Maximize differentiation: low-owned teams with strong model edge.',
+      small: 'Small pools reward win probability and stable expected points.',
+      medium: 'Medium pools balance model confidence with moderate differentiation.',
+      large: 'Large pools require more leverage against public ownership.',
+      mega: 'Mega pools prioritize uniqueness and leverage over chalk duplication.',
+    };
+    const TIER_WEIGHTS = {
+      small:  { edge: 0.70, ep: 0.25, own: 0.05 },
+      medium: { edge: 0.60, ep: 0.25, own: 0.15 },
+      large:  { edge: 0.45, ep: 0.25, own: 0.30 },
+      mega:   { edge: 0.30, ep: 0.20, own: 0.50 },
+    };
+    const TIER_FILTERS = {
+      small:  { minEdge: 0.12, maxOwn: 0.35, fadeGap: 0.18 },
+      medium: { minEdge: 0.10, maxOwn: 0.30, fadeGap: 0.15 },
+      large:  { minEdge: 0.08, maxOwn: 0.25, fadeGap: 0.12 },
+      mega:   { minEdge: 0.06, maxOwn: 0.20, fadeGap: 0.10 },
+    };
+    const TIER_BANDS = {
+      small: '2-15',
+      medium: '16-50',
+      large: '51-250',
+      mega: '250+',
     };
 
+    function escHtml(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function setTier(tier) {
+      currentTier = tier;
       if (tier === 'custom') {
         document.getElementById('custom-pool').classList.add('show');
         document.querySelectorAll('.pool-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tier === 'custom'); });
-        document.getElementById('pool-desc').innerHTML = 'Custom tier selected. Table still uses v2 matchup/public edge.';
+        render();
         return;
       }
       document.getElementById('custom-pool').classList.remove('show');
-      currentTier = tier;
       document.querySelectorAll('.pool-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tier === tier); });
-      document.getElementById('pool-desc').innerHTML = TIER_LABELS[tier] || TIER_LABELS.small;
       render();
     }
 
     function applyCustom() {
-      document.getElementById('pool-desc').innerHTML = 'Custom view active. Using v2 model edge and EP rankings.';
+      const raw = Number(document.getElementById('custom-n').value);
+      customPoolSize = Math.max(2, Math.min(10000, Number.isFinite(raw) ? Math.round(raw) : customPoolSize));
+      document.getElementById('custom-n').value = String(customPoolSize);
+      currentTier = 'custom';
+      document.querySelectorAll('.pool-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tier === 'custom'); });
       render();
     }
 
@@ -355,59 +387,146 @@
 
     function fmtNum(v, d) { return Number(v || 0).toFixed(d === undefined ? 1 : d); }
     function fmtPct(v) { return v == null ? '--' : (Number(v) * 100).toFixed(1) + '%'; }
-    function edgeClass(v) { return Number(v || 0) > 0 ? 'pos' : (Number(v || 0) < 0 ? 'neg' : 'neutral'); }
+    function fmtScore(v) { return Number(v || 0).toFixed(3); }
+
+    function poolSizeToTier(size) {
+      const n = Number(size || 0);
+      if (n <= 15) return 'small';
+      if (n <= 50) return 'medium';
+      if (n <= 250) return 'large';
+      return 'mega';
+    }
+
+    function getTierContext() {
+      if (currentTier !== 'custom') {
+        return { tierKey: currentTier, poolSize: null, isCustom: false };
+      }
+      const n = Math.max(2, Math.min(10000, Number(customPoolSize || 75)));
+      return { tierKey: poolSizeToTier(n), poolSize: n, isCustom: true };
+    }
+
+    function updatePoolDescription(ctx) {
+      const tierLabel = TIER_BANDS[ctx.tierKey] || TIER_BANDS.small;
+      if (ctx.isCustom) {
+        document.getElementById('pool-desc').innerHTML =
+          'Custom <strong>' + String(ctx.poolSize) + '</strong> entries mapped to <strong>' + escHtml(tierLabel) + '</strong> profile. ' +
+          (TIER_LABELS[ctx.tierKey] || '');
+        return;
+      }
+      document.getElementById('pool-desc').innerHTML =
+        '<strong>' + escHtml(tierLabel) + '</strong> pool profile. ' + (TIER_LABELS[ctx.tierKey] || TIER_LABELS.small);
+    }
+
+    function normalizeRows(rows) {
+      const source = Array.isArray(rows) ? rows : [];
+      const epVals = source.map(function(r) { return Number(r.ep_total || 0); });
+      const epMin = epVals.length ? Math.min.apply(null, epVals) : 0;
+      const epMax = epVals.length ? Math.max.apply(null, epVals) : 1;
+      const epRange = Math.max(1e-9, epMax - epMin);
+      return source.map(function(r) {
+        const edge = Number(r.edge || 0);
+        const model = Number(r.model_probability || 0);
+        const ownRaw = Number(r.public_pick_pct);
+        const ownership = Number.isFinite(ownRaw) ? Math.max(0, Math.min(1, ownRaw)) : 0;
+        const epTotal = Number(r.ep_total || 0);
+        const epNorm = Math.max(0, Math.min(1, (epTotal - epMin) / epRange));
+        return {
+          ...r,
+          edge,
+          model_probability: model,
+          public_pick_pct: ownership,
+          ep_total: epTotal,
+          ep_normalized: epNorm,
+          raw_ev: model * epTotal,
+          tier_score: 0,
+        };
+      });
+    }
+
+    function applyTierScore(rows, tierKey) {
+      const w = TIER_WEIGHTS[tierKey] || TIER_WEIGHTS.small;
+      return rows.map(function(r) {
+        return {
+          ...r,
+          tier_score: (r.edge * w.edge) + (r.ep_normalized * w.ep) - (r.public_pick_pct * w.own),
+        };
+      });
+    }
+
+    function computeTierDataset() {
+      const ctx = getTierContext();
+      const rows = applyTierScore(baseRows, ctx.tierKey);
+      const filters = TIER_FILTERS[ctx.tierKey] || TIER_FILTERS.small;
+      const hiddenGems = rows
+        .filter(function(r) { return r.edge >= filters.minEdge && r.public_pick_pct <= filters.maxOwn; })
+        .sort(function(a, b) { return Number(b.tier_score || 0) - Number(a.tier_score || 0); });
+      const fadeThese = rows
+        .filter(function(r) { return (r.public_pick_pct - r.model_probability) >= filters.fadeGap; })
+        .sort(function(a, b) {
+          return Number((b.public_pick_pct - b.model_probability) || 0) - Number((a.public_pick_pct - a.model_probability) || 0);
+        });
+      return { ctx, rows, hiddenGems, fadeThese };
+    }
 
     function sortFn(a, b) {
-      if (currentSort === 'total_lev') return Number(b.edge || 0) - Number(a.edge || 0);
-      if (currentSort === 'champ_lev') return Number(b.model_probability || 0) - Number(a.model_probability || 0);
-      if (currentSort === 'deep_lev') return Number(b.ep_total || 0) - Number(a.ep_total || 0);
+      if (currentSort === 'tier_score') return Number(b.tier_score || 0) - Number(a.tier_score || 0);
+      if (currentSort === 'model_probability') return Number(b.model_probability || 0) - Number(a.model_probability || 0);
+      if (currentSort === 'ep_total') return Number(b.ep_total || 0) - Number(a.ep_total || 0);
       if (currentSort === 'ownership') return Number(a.public_pick_pct || 0) - Number(b.public_pick_pct || 0);
-      if (currentSort === 'chalk_ev') return Number(a.seed || 99) - Number(b.seed || 99);
+      if (currentSort === 'raw_ev') return Number(b.raw_ev || 0) - Number(a.raw_ev || 0);
       return 0;
     }
 
-    function renderStrategy() {
-      var champs = (valueData.leaderboard || []).slice().sort(function(a, b) {
+    function renderStrategy(dataset) {
+      var champs = dataset.rows.slice().sort(function(a, b) {
+        var byScore = Number(b.tier_score || 0) - Number(a.tier_score || 0);
+        if (Math.abs(byScore) > 0.000001) return byScore;
         return Number(b.model_probability || 0) - Number(a.model_probability || 0);
       }).slice(0, 3);
       document.getElementById('strat-champ').innerHTML = champs.map(function(c, i) {
         var prefix = i === 0 ? '' : '<br><span style="color:var(--text-dim);font-size:14px;font-weight:400">or </span>';
-        return prefix + '<span class="strat-champ">' + c.team +
-          '<span class="seed-tag">#' + c.seed + '</span>' +
+        return prefix + '<span class="strat-champ">' + escHtml(c.team) +
+          '<span class="seed-tag">#' + escHtml(String(c.seed)) + '</span>' +
           '<span class="own-tag">' + fmtPct(c.model_probability) + ' model</span></span>';
       }).join('') || '<span class="strat-champ">No data</span>';
 
-      var upsets = valueData.hiddenGems || [];
+      var upsets = dataset.hiddenGems || [];
       document.getElementById('strat-upsets').innerHTML = upsets.length
-        ? upsets.slice(0, 6).map(function(u) { return '<li>' + u.team + ' <span style="color:var(--text-dim)">(' + u.upset_flag + ', edge ' + fmtPct(u.edge) + ')</span></li>'; }).join('')
-        : '<li style="color:var(--text-dim)">No hidden gems over 15% edge</li>';
+        ? upsets.slice(0, 6).map(function(u) {
+          return '<li>' + escHtml(u.team) +
+            ' <span style="color:var(--text-dim)">(edge ' + fmtPct(u.edge) + ', own ' + fmtPct(u.public_pick_pct) + ')</span></li>';
+        }).join('')
+        : '<li style="color:var(--text-dim)">No strong value upsets in this tier profile</li>';
 
-      var fades = valueData.fadeThese || [];
+      var fades = dataset.fadeThese || [];
       document.getElementById('strat-fades').innerHTML = fades.length
-        ? fades.slice(0, 6).map(function(f) { return '<li class="fade-item">' + f.team + ' <span style="color:var(--text-dim)">(' + f.confidence + ', overpicked by ' + fmtPct((f.public_pick_pct || 0) - (f.model_probability || 0)) + ')</span></li>'; }).join('')
+        ? fades.slice(0, 6).map(function(f) {
+          return '<li class="fade-item">' + escHtml(f.team) +
+            ' <span style="color:var(--text-dim)">(overpicked by ' + fmtPct((f.public_pick_pct || 0) - (f.model_probability || 0)) + ')</span></li>';
+        }).join('')
         : '<li style="color:var(--text-dim)">No major fade flags</li>';
     }
 
-    function renderTable() {
-      var sorted = (valueData.leaderboard || []).slice().sort(sortFn);
+    function renderTable(dataset) {
+      var sorted = dataset.rows.slice().sort(sortFn);
       var html = '<div class="table-wrap" style="overflow-x:auto"><table><thead><tr>' +
         '<th>Team</th><th>Region</th>' +
-        '<th class="' + (currentSort==='total_lev'?'sorted':'') + '" onclick="setSort(\'total_lev\')">Model Edge</th>' +
-        '<th class="' + (currentSort==='champ_lev'?'sorted':'') + '" onclick="setSort(\'champ_lev\')">Model Win%</th>' +
+        '<th class="' + (currentSort==='tier_score'?'sorted':'') + '" onclick="setSort(\'tier_score\')">Pool Score</th>' +
+        '<th class="' + (currentSort==='model_probability'?'sorted':'') + '" onclick="setSort(\'model_probability\')">Model Win%</th>' +
         '<th class="' + (currentSort==='ownership'?'sorted':'') + '" onclick="setSort(\'ownership\')">Public Pick%</th>' +
         '<th>Confidence</th><th>Upset Flag</th>' +
-        '<th class="' + (currentSort==='deep_lev'?'sorted':'') + '" onclick="setSort(\'deep_lev\')">Total EP</th>' +
+        '<th class="' + (currentSort==='ep_total'?'sorted':'') + '" onclick="setSort(\'ep_total\')">Total EP</th>' +
         '<th></th></tr></thead><tbody>';
 
       sorted.forEach(function(t) {
         html += '<tr>' +
-          '<td class="team-cell"><a href=\"/bracket?team=' + encodeURIComponent(t.team) + '\" style=\"color:var(--text)\">' + t.team + '</a><span class="seed">' + t.seed + '</span></td>' +
-          '<td class="region-cell">' + (t.region || '--') + '</td>' +
-          '<td class="num ' + edgeClass(t.edge) + '">' + fmtPct(t.edge) + '</td>' +
+          '<td class="team-cell"><a href=\"/bracket?team=' + encodeURIComponent(t.team) + '\" style=\"color:var(--text)\">' + escHtml(t.team) + '</a><span class="seed">' + escHtml(String(t.seed)) + '</span></td>' +
+          '<td class="region-cell">' + escHtml(t.region || '--') + '</td>' +
+          '<td class="num">' + fmtScore(t.tier_score) + '</td>' +
           '<td class="num">' + fmtPct(t.model_probability) + '</td>' +
           '<td class="num">' + fmtPct(t.public_pick_pct) + '</td>' +
-          '<td class="num">' + (t.confidence || '--') + '</td>' +
-          '<td class="num">' + (t.upset_flag || '--') + '</td>' +
+          '<td class="num">' + escHtml(t.confidence || '--') + '</td>' +
+          '<td class="num">' + escHtml(t.upset_flag || '--') + '</td>' +
           '<td class="num" style="color:var(--accent)">' + fmtNum(t.ep_total) + '</td>' +
           '<td><a class="ask-btn" href="/?q=' + encodeURIComponent('Break down ' + t.team + ' as a value pick') + '">Ask</a></td>' +
           '</tr>';
@@ -417,14 +536,14 @@
       html += '<div class="mobile-cards">';
       sorted.slice(0, 30).forEach(function(t) {
         html += '<div class="m-card">' +
-          '<div class="m-card-head"><span class="m-card-team"><a href=\"/bracket?team=' + encodeURIComponent(t.team) + '\" style=\"color:var(--text)\">' + t.team + '</a><span class="seed">#' + t.seed + '</span></span>' +
-          '<span class="m-card-region">' + (t.region || '--') + '</span></div>' +
+          '<div class="m-card-head"><span class="m-card-team"><a href=\"/bracket?team=' + encodeURIComponent(t.team) + '\" style=\"color:var(--text)\">' + escHtml(t.team) + '</a><span class="seed">#' + escHtml(String(t.seed)) + '</span></span>' +
+          '<span class="m-card-region">' + escHtml(t.region || '--') + '</span></div>' +
           '<div class="m-card-grid">' +
-          '<div class="m-card-stat"><div class="label">Model Edge</div><div class="val ' + edgeClass(t.edge) + '">' + fmtPct(t.edge) + '</div></div>' +
+          '<div class="m-card-stat"><div class="label">Pool Score</div><div class="val">' + fmtScore(t.tier_score) + '</div></div>' +
           '<div class="m-card-stat"><div class="label">Model Win%</div><div class="val">' + fmtPct(t.model_probability) + '</div></div>' +
           '<div class="m-card-stat"><div class="label">Public%</div><div class="val">' + fmtPct(t.public_pick_pct) + '</div></div>' +
-          '<div class="m-card-stat"><div class="label">Confidence</div><div class="val">' + (t.confidence || '--') + '</div></div>' +
-          '<div class="m-card-stat"><div class="label">Upset Flag</div><div class="val">' + (t.upset_flag || '--') + '</div></div>' +
+          '<div class="m-card-stat"><div class="label">Confidence</div><div class="val">' + escHtml(t.confidence || '--') + '</div></div>' +
+          '<div class="m-card-stat"><div class="label">Upset Flag</div><div class="val">' + escHtml(t.upset_flag || '--') + '</div></div>' +
           '<div class="m-card-stat"><div class="label">Total EP</div><div class="val" style="color:var(--accent)">' + fmtNum(t.ep_total) + '</div></div>' +
           '</div>' +
           '<a class="ask-btn" href="/?q=' + encodeURIComponent('Break down ' + t.team + ' as a value pick') + '">Ask BracketGPT &#8594;</a>' +
@@ -436,8 +555,10 @@
 
     function render() {
       if (!valueData) return;
-      renderStrategy();
-      renderTable();
+      const dataset = computeTierDataset();
+      updatePoolDescription(dataset.ctx);
+      renderStrategy(dataset);
+      renderTable(dataset);
     }
 
     async function loadData() {
@@ -445,6 +566,7 @@
         var r = await fetch('/api/value-picks');
         if (!r.ok) throw new Error('bad response');
         valueData = await r.json();
+        baseRows = normalizeRows(valueData.leaderboard || []);
         document.getElementById('loading').style.display = 'none';
         setTier('small');
       } catch (e) {

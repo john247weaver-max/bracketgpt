@@ -2548,6 +2548,7 @@
     let championProbs = {};
     let teamStats = {};
     let roundAdvanceProbs = {};
+    let exactTeamRoundProbs = {};
     let upsetScoresData = [];
     let upsetThresholdsData = [];
     let kenpomCsvTeams = {};
@@ -3017,6 +3018,13 @@
         .replace(/'/g, '&#39;');
     }
 
+    function formatInlineMarkdown(text) {
+      return escHtml(text)
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    }
+
     function setActiveMatchupCard(nodeId = '') {
       document.querySelectorAll('.matchup-pair.active').forEach((el) => el.classList.remove('active'));
       if (!nodeId) return;
@@ -3074,14 +3082,22 @@
     }
 
     function formatBot(text) {
-      const raw = String(text || '');
-      const withInline = raw
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>');
-      return withInline
-        .replace(/(?:^|\n)- (.*?)(?=\n|$)/g, '<br>&bull; $1')
-        .replace(/\n/g, '<br>');
+      const blocks = String(text || '').split(/\n{2,}/);
+      let html = '';
+      for (const block of blocks) {
+        const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+        if (!lines.length) continue;
+        const isList = lines.length > 1 && lines.every((l) => /^\s*[-*]\s|^\s*\d+[.)]\s/.test(l));
+        if (isList) {
+          html += '<ul style="margin:6px 0 8px 18px">' + lines.map((l) => {
+            const item = l.replace(/^\s*[-*]\s*/, '').replace(/^\s*\d+[.)]\s*/, '');
+            return '<li>' + formatInlineMarkdown(item) + '</li>';
+          }).join('') + '</ul>';
+          continue;
+        }
+        html += '<p style="margin:0 0 8px">' + lines.map((l) => formatInlineMarkdown(l)).join('<br>') + '</p>';
+      }
+      return html || '<p></p>';
     }
 
     function renderChatMessage(role, content) {
@@ -3116,15 +3132,15 @@
       if (typingEl) typingEl.style.display = 'none';
 
       for (let i = 0; i < paragraphs.length; i += 1) {
-        const p = document.createElement('p');
-        p.innerHTML = formatBot(paragraphs[i]);
-        p.style.opacity = '0';
-        p.style.transition = 'opacity 0.2s ease';
-        bubbleEl.appendChild(p);
+        const chunk = document.createElement('div');
+        chunk.innerHTML = formatBot(paragraphs[i]);
+        chunk.style.opacity = '0';
+        chunk.style.transition = 'opacity 0.2s ease';
+        bubbleEl.appendChild(chunk);
 
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            p.style.opacity = '1';
+            chunk.style.opacity = '1';
           });
         });
 
@@ -3849,7 +3865,18 @@
 
     function normalizeRoundProbMap(rawMap) {
       const out = {};
-      if (!rawMap || typeof rawMap !== 'object') return out;
+      if (!rawMap) return out;
+      if (Array.isArray(rawMap)) {
+        for (const row of rawMap) {
+          const teamName = String(row?.team || row?.Team || row?.team_name || row?.name || '').trim();
+          if (!teamName) continue;
+          const normalized = normalizeRoundProbRow(row?.probs || row?.rounds || row);
+          if (!Object.keys(normalized).length) continue;
+          out[teamName] = normalized;
+        }
+        return out;
+      }
+      if (typeof rawMap !== 'object') return out;
       for (const [teamName, row] of Object.entries(rawMap)) {
         const normalized = normalizeRoundProbRow(row);
         if (!Object.keys(normalized).length) continue;
@@ -3883,6 +3910,8 @@
         const directRoundMap = normalizeRoundProbMap(
           data?.round_advance_probs ||
           data?.team_round_probs ||
+          data?.team_round_probabilities ||
+          data?.round_probabilities ||
           data?.bracket_structure?.round_advance_probs ||
           {}
         );
@@ -3892,6 +3921,17 @@
         upsetThresholdsData = Array.isArray(data?.upset_thresholds) ? data.upset_thresholds : [];
       } catch (e) {
         // Keep client fallback behavior if Monte Carlo payload is unavailable.
+      }
+    }
+
+    async function loadExactTeamRoundProbData() {
+      try {
+        const res = await fetch('/api/team-round-probabilities');
+        if (!res.ok) return;
+        const data = await res.json();
+        exactTeamRoundProbs = normalizeRoundProbMap(data?.team_round_probs || {});
+      } catch (e) {
+        exactTeamRoundProbs = {};
       }
     }
 
@@ -5257,23 +5297,29 @@
       }, 200);
     }
 
-    function closeCard(instant = true, cancelAuto = false) {
-      const overlay = document.getElementById('overlay');
-      if (!overlay) return;
-      if (cancelAuto) {
-        exitGuidedFlow();
-        clearPreviewTimers();
-        setInteractionLock(false);
-        const container = document.querySelector('.container');
-        if (container) container.style.transform = 'scale(1)';
-        const banner = document.getElementById('flowBanner');
-        if (banner) banner.classList.remove('show');
-      }
+    function clearFlowArtifacts() {
+      clearPreviewTimers();
+      setInteractionLock(false);
+      const container = document.querySelector('.container');
+      if (container) container.style.transform = 'scale(1)';
+      const banner = document.getElementById('flowBanner');
+      if (banner) banner.classList.remove('show');
+    }
+
+    function resetPickCardState(instant = true) {
       guidedNodeId = '';
       analysisToken += 1;
       currentPickCardMatchup = null;
       setActiveMatchupCard('');
       hideOverlay(instant);
+    }
+
+    function closeCard(instant = true, cancelAuto = false) {
+      if (cancelAuto) {
+        exitGuidedFlow();
+        clearFlowArtifacts();
+      }
+      resetPickCardState(instant);
     }
 
     function onMatchClick(event, nodeId) {
@@ -5752,6 +5798,8 @@
 
     function getTeamRoundProbMap(teamName) {
       const displayName = getDisplayName(teamName);
+      const exact = getByTeamNameLoose(exactTeamRoundProbs, teamName) || getByTeamNameLoose(exactTeamRoundProbs, displayName);
+      if (exact && typeof exact === 'object') return exact;
       const direct = getByTeamNameLoose(roundAdvanceProbs, teamName) || getByTeamNameLoose(roundAdvanceProbs, displayName);
       if (direct && typeof direct === 'object') return direct;
       const stats = getByTeamNameLoose(teamStats, teamName) || getByTeamNameLoose(teamStats, displayName) || {};
@@ -5764,11 +5812,43 @@
       let prob = normalizeProbability(probs?.[roundKey], null);
       if (prob == null && roundKey === 'NCG') {
         prob = normalizeProbability(
+          probs?.Championship ?? probs?.championship ?? probs?.Champion ?? probs?.champion,
+          null
+        );
+      }
+      if (prob == null && roundKey === 'NCG') {
+        prob = normalizeProbability(
           getByTeamNameLoose(championProbs, teamName) || getByTeamNameLoose(championProbs, displayName),
           null
         );
       }
       return prob == null ? fallback : prob;
+    }
+
+    function nextRoundKey(roundKey) {
+      const key = normalizeRoundKeyClient(roundKey);
+      const map = { R64: 'R32', R32: 'S16', S16: 'E8', E8: 'F4', F4: 'NCG' };
+      return map[key] || null;
+    }
+
+    function getModelProbabilityForLeverageDisplay(teamName, roundKey, fallback = null) {
+      const key = normalizeRoundKeyClient(roundKey);
+      if (key === 'NCG') {
+        const probs = getTeamRoundProbMap(teamName) || {};
+        const localChamp = normalizeProbability(
+          probs?.Championship ?? probs?.championship ?? probs?.Champion ?? probs?.champion,
+          null
+        );
+        if (localChamp != null) return localChamp;
+        const champ = normalizeProbability(
+          getByTeamNameLoose(championProbs, teamName) || getByTeamNameLoose(championProbs, getDisplayName(teamName)),
+          null
+        );
+        return champ == null ? fallback : champ;
+      }
+      const mapped = nextRoundKey(key);
+      if (!mapped) return getRoundModelProbability(teamName, key, fallback);
+      return getRoundModelProbability(teamName, mapped, fallback);
     }
 
     function roundPathFrom(roundKey) {
@@ -5791,19 +5871,19 @@
 
     function formatPctShort(prob) {
       const p = normalizeProbability(prob, null);
-      return p == null ? '--' : (p * 100).toFixed(1) + '%';
+      return p == null ? 'N/A' : (p * 100).toFixed(1) + '%';
     }
 
     function formatSignedPct(prob) {
       const p = Number(prob);
-      if (!Number.isFinite(p)) return '--';
+      if (!Number.isFinite(p)) return 'N/A';
       const s = p >= 0 ? '+' : '';
       return s + (p * 100).toFixed(1) + '%';
     }
 
     function formatSignedPoints(value) {
       const v = Number(value);
-      if (!Number.isFinite(v)) return '--';
+      if (!Number.isFinite(v)) return 'N/A';
       const s = v >= 0 ? '+' : '';
       return s + v.toFixed(2);
     }
@@ -5920,7 +6000,7 @@
           const label = rk === roundKey ? 'Win This Game' : roundLabelForKey(rk);
           let model = rk === roundKey
             ? normalizeProbability(modelCurrent, null)
-            : getRoundModelProbability(team?.name, rk, null);
+            : getModelProbabilityForLeverageDisplay(team?.name, rk, null);
           if (model == null && rk === roundKey) {
             model = getRoundModelProbability(team?.name, rk, null);
           }
@@ -6206,8 +6286,8 @@
         (m.region || '') + ' \u00b7 ' + roundLabel + netCompare;
       setFlag(m.display_flag || m.upset_flag, m.confidence_tier);
 
-      setTeam('A', tA, pctA, colorA, currentPick === 'a');
-      setTeam('B', tB, pctB, colorB, currentPick === 'b');
+      setTeam('A', tA, pctA, colorA, currentPick === 'a', !!currentPick);
+      setTeam('B', tB, pctB, colorB, currentPick === 'b', !!currentPick);
       const modelPick = pctA >= pctB ? 'A' : 'B';
       const modelEl = document.getElementById('pcTeam' + modelPick);
       document.querySelectorAll('.pc-model-badge').forEach((el) => el.remove());
@@ -6285,8 +6365,8 @@
       const btnA = document.getElementById('pcBtnA');
       const btnB = document.getElementById('pcBtnB');
       const pickSide = getUserPick(m.matchup_id);
-      btnA.textContent = (pickSide === 'a' ? '\u2713 ' : '') + 'Pick ' + getDisplayName(tA.name);
-      btnB.textContent = (pickSide === 'b' ? '\u2713 ' : '') + 'Pick ' + getDisplayName(tB.name);
+      btnA.textContent = 'Pick ' + getDisplayName(tA.name);
+      btnB.textContent = 'Pick ' + getDisplayName(tB.name);
       btnA.style.background = colorA;
       btnB.style.background = colorB;
       btnA.classList.toggle('unchosen', pickSide === 'b');
@@ -6296,7 +6376,7 @@
       showOverlay();
     }
 
-    function setTeam(side, team, pct, color, isPicked) {
+    function setTeam(side, team, pct, color, isPicked, hasLocalPick = false) {
       const el = document.getElementById(`pcTeam${side}`);
       const isFav = pct >= 50;
 
@@ -6309,7 +6389,7 @@
 
       el.style.borderTop = `3px solid ${color}`;
       el.classList.toggle('picked', isPicked);
-      el.classList.toggle('dimmed', !isPicked && currentPickExists());
+      el.classList.toggle('dimmed', !isPicked && hasLocalPick);
 
       const old = el.querySelector('.pc-pick-tag');
       if (old) old.remove();
@@ -6635,10 +6715,6 @@
       if (normalizeName(selected) === normalizeName(pickCardContext.teamA)) return 'a';
       if (normalizeName(selected) === normalizeName(pickCardContext.teamB)) return 'b';
       return '';
-    }
-
-    function currentPickExists() {
-      return Object.keys(bracketState?.picks || {}).length > 0;
     }
 
     function closeOverlay(e) {
@@ -7054,6 +7130,7 @@
         championProbs = {};
         teamStats = {};
         roundAdvanceProbs = {};
+        exactTeamRoundProbs = {};
         upsetScoresData = [];
         upsetThresholdsData = [];
         kenpomCsvTeams = {};
@@ -7063,6 +7140,7 @@
         }
         await Promise.all([
           loadMonteCarloData(),
+          loadExactTeamRoundProbData(),
           loadKenpomCsvData(),
           loadPublicPerceptionData()
         ]);

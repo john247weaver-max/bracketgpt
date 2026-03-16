@@ -126,15 +126,15 @@
     </div>
 
     <div class="card">
-      <div class="title" style="font-size:14px;margin-bottom:8px;">📁 Upload Model Data (from Colab)</div>
+      <div class="title" style="font-size:14px;margin-bottom:8px;">Upload Model Data (from Colab)</div>
       <p style="color:#888; margin-bottom:16px;">
         Run <code>model_v5_4.py</code> in Colab, download the output files, then upload them here.<br>
-        Upload order doesn't matter. All files validated as JSON before saving.
+        Upload order doesn't matter. All files are validated before saving.
       </p>
 
       <div style="display:flex; flex-direction:column; gap:14px;">
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-bracket_ready" style="font-size:20px;">⏳</span>
+          <span id="status-bracket_ready" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">bracket_ready_2026.json</div>
             <div style="font-size:12px; color:#888;">Single precomputed bracket payload (R64 + team directory + all predictions)</div>
@@ -144,17 +144,17 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-predictions" style="font-size:20px;">⏳</span>
+          <span id="status-predictions" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">chatbot_predictions_v5.json</div>
-            <div style="font-size:12px; color:#888;">2,278 matchup predictions — the main data file (~2-4MB)</div>
+            <div style="font-size:12px; color:#888;">2,278 matchup predictions - main data file (~2-4MB)</div>
           </div>
           <input type="file" id="file-predictions" data-type="predictions" accept=".json" style="max-width:200px;" />
           <button class="btn" onclick="uploadSingle('predictions', 'file-predictions')">Upload</button>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-bracket" style="font-size:20px;">⏳</span>
+          <span id="status-bracket" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">bracket_2026.json</div>
             <div style="font-size:12px; color:#888;">Bracket structure: 68 teams + regions + R64 matchups (~25KB)</div>
@@ -164,17 +164,17 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-bracket_cache" style="font-size:20px;">⏳</span>
+          <span id="status-bracket_cache" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">bracket_cache_2026.json</div>
-            <div style="font-size:12px; color:#888;">~300-400 realistic matchups — frontend cache-first lookups (~2-4MB)</div>
+            <div style="font-size:12px; color:#888;">~300-400 realistic matchups - frontend cache-first lookups (~2-4MB)</div>
           </div>
           <input type="file" id="file-bracket_cache" data-type="bracket_cache" accept=".json" style="max-width:200px;" />
           <button class="btn" onclick="uploadSingle('bracket_cache', 'file-bracket_cache')">Upload</button>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-bracket_output" style="font-size:20px;">⏳</span>
+          <span id="status-bracket_output" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">bracketgpt_bracket_output_2026.json</div>
             <div style="font-size:12px; color:#888;">Monte Carlo output: strategy EP, champion probabilities, team stats, upset thresholds</div>
@@ -184,7 +184,7 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-kenpom_csv" style="font-size:20px;">⏳</span>
+          <span id="status-kenpom_csv" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">kenpom_2026.csv (or summary26.csv)</div>
             <div style="font-size:12px; color:#888;">KenPom team ratings CSV used by matchup cards</div>
@@ -194,7 +194,7 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-espn_public_csv" style="font-size:20px;">⏳</span>
+          <span id="status-espn_public_csv" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">espn_peoples_bracket_2026.csv (or yahoo_bracket_pick_distribution.csv)</div>
             <div style="font-size:12px; color:#888;">Public pick rates (matchup format or Yahoo team pick-distribution format)</div>
@@ -204,27 +204,37 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-team_profiles" style="font-size:20px;">⏳</span>
+          <span id="status-team_round_probs_csv" style="font-size:20px;">...</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">bracket_tree_exact_probabilities_2026.csv</div>
+            <div style="font-size:12px; color:#888;">Exact per-team round probabilities (Team,R32,Sweet16,Elite8,Final4,TitleGame,Champion)</div>
+          </div>
+          <input type="file" id="file-team_round_probs_csv" data-type="team_round_probs_csv" accept=".csv,text/csv" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('team_round_probs_csv', 'file-team_round_probs_csv')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-team_profiles" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">team_profiles_2026.json</div>
-            <div style="font-size:12px; color:#888;">68 team profiles — powers "tell me about Duke" (~160KB)</div>
+            <div style="font-size:12px; color:#888;">68 team profiles - powers "tell me about Duke" (~160KB)</div>
           </div>
           <input type="file" id="file-team_profiles" data-type="team_profiles" accept=".json" style="max-width:200px;" />
           <button class="btn" onclick="uploadSingle('team_profiles', 'file-team_profiles')">Upload</button>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-seed_matchups" style="font-size:20px;">⏳</span>
+          <span id="status-seed_matchups" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">seed_matchup_all_rounds.json</div>
-            <div style="font-size:12px; color:#888;">Historical seed-vs-seed records R64→Championship (~18KB)</div>
+            <div style="font-size:12px; color:#888;">Historical seed-vs-seed records R64-Championship (~18KB)</div>
           </div>
           <input type="file" id="file-seed_matchups" data-type="seed_matchups" accept=".json" style="max-width:200px;" />
           <button class="btn" onclick="uploadSingle('seed_matchups', 'file-seed_matchups')">Upload</button>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-archetype_summary" style="font-size:20px;">⏳</span>
+          <span id="status-archetype_summary" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">archetype_summary_v5.json</div>
             <div style="font-size:12px; color:#888;">Archetype descriptions + matchup matrix (~50KB)</div>
@@ -234,7 +244,7 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
-          <span id="status-archetype_history" style="font-size:20px;">⏳</span>
+          <span id="status-archetype_history" style="font-size:20px;">...</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">archetype_history.json</div>
             <div style="font-size:12px; color:#888;">Per-archetype tournament performance stats (~30KB)</div>
@@ -245,7 +255,7 @@
       </div>
 
       <div style="margin-top:16px; padding-top:16px; border-top:1px solid #333;">
-        <button class="btn" onclick="uploadAll()" style="padding:10px 24px; font-size:15px; font-weight:600;">🚀 Upload All Selected Files</button>
+        <button class="btn" onclick="uploadAll()" style="padding:10px 24px; font-size:15px; font-weight:600;">Upload All Selected Files</button>
         <span id="upload-all-status" style="margin-left:12px; color:#888;"></span>
       </div>
     </div>
@@ -268,6 +278,7 @@
             <option value="archetype_history">archetype_history</option>
             <option value="kenpom_csv">kenpom_csv</option>
             <option value="espn_public_csv">espn_public_csv</option>
+            <option value="team_round_probs_csv">team_round_probs_csv</option>
             <option value="base">base (old)</option>
             <option value="teams">teams (old)</option>
             <option value="upset">upset (old)</option>
@@ -301,6 +312,8 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let pw = '';
+    const STATUS_TEXT = { pending: '...', ok: 'OK', err: 'ERR' };
+    const uploadTypes = ['bracket_ready', 'predictions', 'bracket', 'bracket_cache', 'bracket_output', 'kenpom_csv', 'espn_public_csv', 'team_round_probs_csv', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
 
     function toast(msg) {
       const t = $('toast');
@@ -309,10 +322,30 @@
       setTimeout(() => { t.style.display = 'none'; }, 2500);
     }
 
+    function setStatusBadge(el, state) {
+      if (!el) return;
+      if (state === 'ok') {
+        el.textContent = STATUS_TEXT.ok;
+        el.style.color = '#3fb950';
+        return;
+      }
+      if (state === 'err') {
+        el.textContent = STATUS_TEXT.err;
+        el.style.color = '#f85149';
+        return;
+      }
+      el.textContent = STATUS_TEXT.pending;
+      el.style.color = '#8b949e';
+    }
+
     async function getConfig() {
       const r = await fetch('/admin/config', { headers: { 'x-admin-password': pw } });
       if (!r.ok) throw new Error('auth');
       return r.json();
+    }
+
+    async function refreshUploadViews() {
+      await Promise.all([loadDataStatus(), initUploadStatus()]);
     }
 
     async function doAuth() {
@@ -322,8 +355,7 @@
         $('login').style.display = 'none';
         $('panel').style.display = 'block';
         fill(c);
-        await loadDataStatus();
-        await initUploadStatus();
+        await refreshUploadViews();
         $('tag').textContent = 'Connected';
         $('tag').style.color = '#3fb950';
       } catch (e) {
@@ -370,8 +402,7 @@
     async function refresh() {
       try {
         fill(await getConfig());
-        await loadDataStatus();
-        await initUploadStatus();
+        await refreshUploadViews();
       } catch (e) {}
     }
 
@@ -424,31 +455,64 @@
       }
     }
 
+    function renderDataStatusTable(rows) {
+      const body = $('data-status-body');
+      body.textContent = '';
+      for (const row of rows) {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #222';
+
+        const fileTd = document.createElement('td');
+        fileTd.style.padding = '8px';
+        fileTd.style.fontFamily = 'JetBrains Mono,monospace';
+        fileTd.style.fontSize = '13px';
+        fileTd.textContent = row.file;
+
+        const statusTd = document.createElement('td');
+        statusTd.style.padding = '8px';
+        statusTd.textContent = row.loaded ? 'OK' : 'MISSING';
+        statusTd.style.color = row.loaded ? '#3fb950' : '#f85149';
+
+        const detailTd = document.createElement('td');
+        detailTd.style.padding = '8px';
+        detailTd.style.color = '#aaa';
+        detailTd.textContent = row.detail;
+
+        tr.appendChild(fileTd);
+        tr.appendChild(statusTd);
+        tr.appendChild(detailTd);
+        body.appendChild(tr);
+      }
+    }
+
     async function loadDataStatus() {
       try {
         const res = await fetch('/api/admin/data-status', { headers: { 'x-admin-password': pw } });
         const status = await res.json();
         const files = status.files || {};
+        const warningSuffix = Number(files.team_round_probs_csv?.warnings || 0) > 0
+          ? ` - ${files.team_round_probs_csv.warnings} warnings`
+          : '';
         const rows = [
           {
             file: 'bracket_ready_2026.json',
             loaded: files.bracket_ready?.loaded,
             detail: files.bracket_ready?.loaded
-              ? `${files.bracket_ready.matchups} R64 matchups · ${files.bracket_ready.teams} teams`
+              ? `${files.bracket_ready.matchups} R64 matchups - ${files.bracket_ready.teams} teams`
               : 'Not loaded',
           },
           {
             file: 'chatbot_predictions_v5.json',
             loaded: files.predictions?.loaded,
             detail: files.predictions?.loaded
-              ? `${status.predictions} predictions · ${status.teams} teams · ${files.predictions.version || 'v5.3'}`
+              ? `${status.predictions} predictions - ${status.teams} teams - ${files.predictions.version || 'v5.3'}`
               : 'Not loaded',
           },
           {
             file: 'bracket_2026.json',
             loaded: files.bracket?.loaded,
             detail: files.bracket?.loaded
-              ? `${files.bracket.teams} teams · ${files.bracket.r64_matchups} R64 matchups`
+              ? `${files.bracket.teams} teams - ${files.bracket.r64_matchups} R64 matchups`
               : 'Not loaded',
           },
           {
@@ -462,14 +526,14 @@
             file: 'bracketgpt_bracket_output_2026.json',
             loaded: files.bracket_output?.loaded,
             detail: files.bracket_output?.loaded
-              ? `${files.bracket_output.strategies} strategies · ${files.bracket_output.team_ep_rankings} teams ranked`
+              ? `${files.bracket_output.strategies} strategies - ${files.bracket_output.team_ep_rankings} teams ranked`
               : 'Not loaded',
           },
           {
             file: 'kenpom_2026.csv',
             loaded: files.kenpom_csv?.loaded,
             detail: files.kenpom_csv?.loaded
-              ? `${files.kenpom_csv.rows} rows · ${files.kenpom_csv.teams} teams`
+              ? `${files.kenpom_csv.rows} rows - ${files.kenpom_csv.teams} teams`
               : 'Not loaded',
           },
           {
@@ -477,6 +541,13 @@
             loaded: files.espn_public_csv?.loaded,
             detail: files.espn_public_csv?.loaded
               ? `${files.espn_public_csv.rows} matchup rows`
+              : 'Not loaded',
+          },
+          {
+            file: 'bracket_tree_exact_probabilities_2026.csv',
+            loaded: files.team_round_probs_csv?.loaded,
+            detail: files.team_round_probs_csv?.loaded
+              ? `${files.team_round_probs_csv.rows} rows - ${files.team_round_probs_csv.teams} teams${warningSuffix}`
               : 'Not loaded',
           },
           {
@@ -514,13 +585,7 @@
           },
         ];
 
-        $('data-status-body').innerHTML = rows.map(r => `
-          <tr style="border-bottom:1px solid #222;">
-            <td style="padding:8px;font-family:JetBrains Mono,monospace;font-size:13px;">${r.file}</td>
-            <td style="padding:8px;">${r.loaded ? '✅' : '❌'}</td>
-            <td style="padding:8px;color:#aaa;">${r.detail}</td>
-          </tr>`).join('');
-
+        renderDataStatusTable(rows);
         $('data-status-loading').style.display = 'none';
         $('data-status-table').style.display = 'table';
       } catch (e) {
@@ -528,12 +593,17 @@
       }
     }
 
-    async function uploadSingle(type, inputId) {
+    async function uploadSingle(type, inputId, opts = {}) {
+      const options = { refresh: true, quiet: false, clearInput: false, ...opts };
       const fileInput = $(inputId);
       const statusEl = $('status-' + type);
       const file = fileInput?.files?.[0];
-      if (!file) { statusEl.textContent = '❌'; return; }
-      statusEl.textContent = '⏳';
+      if (!file) {
+        setStatusBadge(statusEl, 'err');
+        if (!options.quiet) toast('Select a file before uploading.');
+        return false;
+      }
+      setStatusBadge(statusEl, 'pending');
       const formData = new FormData();
       formData.append('type', type);
       formData.append('file', file);
@@ -550,40 +620,45 @@
         } catch (e) {
           data = { success: false, error: bodyText || `HTTP ${res.status}` };
         }
-        statusEl.textContent = data.success ? '✅' : '❌';
         if (!data.success) {
-          alert('Upload failed (' + res.status + '): ' + (data.error || 'Unknown'));
-        } else if (data.type) {
-          console.log('Uploaded type:', data.type, 'savedAs:', data.savedAs);
+          setStatusBadge(statusEl, 'err');
+          if (!options.quiet) toast(`Upload failed (${res.status}): ${data.error || 'Unknown error'}`);
+          return false;
         }
-        await loadDataStatus();
-        await initUploadStatus();
+        setStatusBadge(statusEl, 'ok');
+        if (options.clearInput && fileInput) fileInput.value = '';
+        if (options.refresh) await refreshUploadViews();
+        if (!options.quiet) toast(`Uploaded ${type}`);
+        return true;
       } catch (e) {
-        statusEl.textContent = '❌';
-        alert('Upload error: ' + e.message);
+        setStatusBadge(statusEl, 'err');
+        if (!options.quiet) toast('Upload error: ' + e.message);
+        return false;
       }
     }
 
     async function uploadAll() {
       const allStatus = $('upload-all-status');
-      const types = ['bracket_ready', 'predictions', 'bracket', 'bracket_cache', 'bracket_output', 'kenpom_csv', 'espn_public_csv', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
-      let ok = 0; let fail = 0;
-      allStatus.textContent = '⏳ Uploading...';
-
-      for (const type of types) {
+      let ok = 0;
+      let fail = 0;
+      let selected = 0;
+      allStatus.textContent = '... Uploading...';
+      for (const type of uploadTypes) {
         const input = $('file-' + type);
-        if (input?.files?.length > 0) {
-          try {
-            await uploadSingle(type, 'file-' + type);
-            ok += 1;
-          } catch (e) {
-            fail += 1;
-          }
-        }
+        if (!input?.files?.length) continue;
+        selected += 1;
+        const success = await uploadSingle(type, 'file-' + type, { refresh: false, quiet: true });
+        if (success) ok += 1;
+        else fail += 1;
       }
-      allStatus.textContent = `✅ ${ok} uploaded${fail > 0 ? `, ❌ ${fail} failed` : ''}`;
-      await loadDataStatus();
-      await initUploadStatus();
+      if (selected === 0) {
+        allStatus.textContent = 'No files selected';
+        toast('Choose at least one file to upload.');
+        return;
+      }
+      await refreshUploadViews();
+      allStatus.textContent = `OK ${ok} uploaded${fail > 0 ? `, ERR ${fail} failed` : ''}`;
+      toast(fail > 0 ? `Upload complete: ${ok} ok, ${fail} failed` : `Upload complete: ${ok} uploaded`);
     }
 
     async function uploadLegacy() {
@@ -591,10 +666,10 @@
       const file = $('legacy-upload-file').files[0];
       const status = $('legacy-upload-status');
       if (!file) {
-        status.textContent = '❌ Select a file';
+        status.textContent = 'ERR Select a file';
         return;
       }
-      status.textContent = '⏳ Uploading...';
+      status.textContent = '... Uploading...';
       const formData = new FormData();
       formData.append('type', type);
       formData.append('file', file);
@@ -608,15 +683,17 @@
         let data = null;
         try { data = JSON.parse(text); } catch (e) { data = { success: false, error: text || `HTTP ${res.status}` }; }
         if (data.success) {
-          status.textContent = `✅ Saved as ${data.savedAs} (${data.size})`;
+          status.textContent = `OK Saved as ${data.savedAs} (${data.size})`;
           $('legacy-upload-file').value = '';
-          await loadDataStatus();
-          await initUploadStatus();
+          await refreshUploadViews();
+          toast(`Legacy upload saved as ${data.savedAs}`);
         } else {
-          status.textContent = `❌ ${data.error || 'Upload failed'}`;
+          status.textContent = `ERR ${data.error || 'Upload failed'}`;
+          toast(`Legacy upload failed: ${data.error || 'Upload failed'}`);
         }
       } catch (e) {
-        status.textContent = `❌ Upload error: ${e.message}`;
+        status.textContent = `ERR Upload error: ${e.message}`;
+        toast('Legacy upload error: ' + e.message);
       }
     }
 
@@ -627,20 +704,19 @@
         });
         const s = await res.json();
         const files = s.files || {};
-        $('status-bracket_ready').textContent = files.bracket_ready?.loaded ? '✅' : '❌';
-        $('status-predictions').textContent = files.predictions?.loaded ? '✅' : '❌';
-        $('status-bracket').textContent = files.bracket?.loaded ? '✅' : '❌';
-        $('status-bracket_cache').textContent = files.bracket_cache?.loaded ? '✅' : '❌';
-        $('status-bracket_output').textContent = files.bracket_output?.loaded ? '✅' : '❌';
-        $('status-kenpom_csv').textContent = files.kenpom_csv?.loaded ? '✅' : '❌';
-        $('status-espn_public_csv').textContent = files.espn_public_csv?.loaded ? '✅' : '❌';
-        $('status-team_profiles').textContent = files.team_profiles?.loaded ? '✅' : '❌';
-        $('status-seed_matchups').textContent = files.seed_matchups?.loaded ? '✅' : '❌';
-        $('status-archetype_summary').textContent = files.archetype_summary?.loaded ? '✅' : '❌';
-        $('status-archetype_history').textContent = files.archetype_history?.loaded ? '✅' : '❌';
-      } catch (e) {
-        console.error('Status check failed:', e);
-      }
+        setStatusBadge($('status-bracket_ready'), files.bracket_ready?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-predictions'), files.predictions?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-bracket'), files.bracket?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-bracket_cache'), files.bracket_cache?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-bracket_output'), files.bracket_output?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-kenpom_csv'), files.kenpom_csv?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-espn_public_csv'), files.espn_public_csv?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-team_round_probs_csv'), files.team_round_probs_csv?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-team_profiles'), files.team_profiles?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-seed_matchups'), files.seed_matchups?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-archetype_summary'), files.archetype_summary?.loaded ? 'ok' : 'err');
+        setStatusBadge($('status-archetype_history'), files.archetype_history?.loaded ? 'ok' : 'err');
+      } catch (e) {}
     }
 
     async function chpw() {
