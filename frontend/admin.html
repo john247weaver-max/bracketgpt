@@ -184,6 +184,26 @@
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-kenpom_csv" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">kenpom_2026.csv (or summary26.csv)</div>
+            <div style="font-size:12px; color:#888;">KenPom team ratings CSV used by matchup cards</div>
+          </div>
+          <input type="file" id="file-kenpom_csv" data-type="kenpom_csv" accept=".csv,text/csv" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('kenpom_csv', 'file-kenpom_csv')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
+          <span id="status-espn_public_csv" style="font-size:20px;">⏳</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600;">espn_peoples_bracket_2026.csv (or yahoo_bracket_pick_distribution.csv)</div>
+            <div style="font-size:12px; color:#888;">Public pick rates (matchup format or Yahoo team pick-distribution format)</div>
+          </div>
+          <input type="file" id="file-espn_public_csv" data-type="espn_public_csv" accept=".csv,text/csv" style="max-width:200px;" />
+          <button class="btn" onclick="uploadSingle('espn_public_csv', 'file-espn_public_csv')">Upload</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #333; border-radius:8px;">
           <span id="status-team_profiles" style="font-size:20px;">⏳</span>
           <div style="flex:1; min-width:0;">
             <div style="font-weight:600;">team_profiles_2026.json</div>
@@ -246,6 +266,8 @@
             <option value="seed_matchups">seed_matchups</option>
             <option value="archetype_summary">archetype_summary</option>
             <option value="archetype_history">archetype_history</option>
+            <option value="kenpom_csv">kenpom_csv</option>
+            <option value="espn_public_csv">espn_public_csv</option>
             <option value="base">base (old)</option>
             <option value="teams">teams (old)</option>
             <option value="upset">upset (old)</option>
@@ -255,7 +277,7 @@
         </div>
         <div class="field">
           <label>File</label>
-          <input type="file" id="legacy-upload-file" accept=".json,.txt" />
+          <input type="file" id="legacy-upload-file" accept=".json,.csv,.txt" />
         </div>
       </div>
       <button class="btn" onclick="uploadLegacy()">Upload (Compatibility)</button>
@@ -444,6 +466,20 @@
               : 'Not loaded',
           },
           {
+            file: 'kenpom_2026.csv',
+            loaded: files.kenpom_csv?.loaded,
+            detail: files.kenpom_csv?.loaded
+              ? `${files.kenpom_csv.rows} rows · ${files.kenpom_csv.teams} teams`
+              : 'Not loaded',
+          },
+          {
+            file: 'espn_peoples_bracket_2026.csv',
+            loaded: files.espn_public_csv?.loaded,
+            detail: files.espn_public_csv?.loaded
+              ? `${files.espn_public_csv.rows} matchup rows`
+              : 'Not loaded',
+          },
+          {
             file: 'team_profiles_2026.json',
             loaded: files.team_profiles?.loaded,
             detail: files.team_profiles?.loaded
@@ -530,7 +566,7 @@
 
     async function uploadAll() {
       const allStatus = $('upload-all-status');
-      const types = ['bracket_ready', 'predictions', 'bracket', 'bracket_cache', 'bracket_output', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
+      const types = ['bracket_ready', 'predictions', 'bracket', 'bracket_cache', 'bracket_output', 'kenpom_csv', 'espn_public_csv', 'team_profiles', 'seed_matchups', 'archetype_summary', 'archetype_history'];
       let ok = 0; let fail = 0;
       allStatus.textContent = '⏳ Uploading...';
 
@@ -596,6 +632,8 @@
         $('status-bracket').textContent = files.bracket?.loaded ? '✅' : '❌';
         $('status-bracket_cache').textContent = files.bracket_cache?.loaded ? '✅' : '❌';
         $('status-bracket_output').textContent = files.bracket_output?.loaded ? '✅' : '❌';
+        $('status-kenpom_csv').textContent = files.kenpom_csv?.loaded ? '✅' : '❌';
+        $('status-espn_public_csv').textContent = files.espn_public_csv?.loaded ? '✅' : '❌';
         $('status-team_profiles').textContent = files.team_profiles?.loaded ? '✅' : '❌';
         $('status-seed_matchups').textContent = files.seed_matchups?.loaded ? '✅' : '❌';
         $('status-archetype_summary').textContent = files.archetype_summary?.loaded ? '✅' : '❌';

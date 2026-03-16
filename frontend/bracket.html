@@ -2132,7 +2132,7 @@
       </div>
 
       <div class="pc-insight" id="pcInsight">
-        <div class="pc-insight-lbl">AI Read</div>
+        <div class="pc-insight-lbl">Public Perception</div>
         <div class="pc-insight-txt" id="pcInsightTxt">Loading...</div>
       </div>
 
@@ -2291,6 +2291,8 @@
     let roundAdvanceProbs = {};
     let upsetScoresData = [];
     let upsetThresholdsData = [];
+    let kenpomCsvTeams = {};
+    let publicPerceptionRows = [];
     let activeStrategy = '';
     let strategyBaselinePicks = {};
     let strategyEpByNode = {};
@@ -3381,6 +3383,64 @@
       } catch (e) {
         showError('Bracket data not loaded. Check admin panel.');
         return null;
+      }
+    }
+
+    function normalizeLookupKey(value) {
+      return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+
+    function getByTeamNameLoose(mapObj, teamName) {
+      const key = normalizeLookupKey(teamName);
+      if (!key) return null;
+      if (mapObj?.[key]) return mapObj[key];
+      const display = getDisplayName(teamName);
+      const displayKey = normalizeLookupKey(display);
+      if (displayKey && mapObj?.[displayKey]) return mapObj[displayKey];
+      return null;
+    }
+
+    async function loadMonteCarloData() {
+      try {
+        const res = await fetch('/api/bracket-output');
+        if (!res.ok) return;
+        const data = await res.json();
+        bracketOutput = data || null;
+        strategyMap = data?.strategies || {};
+        teamEpRankings = data?.team_ep_rankings || {};
+        championProbs = data?.bracket_structure?.champion_probs || {};
+        roundAdvanceProbs =
+          data?.round_advance_probs ||
+          data?.team_round_probs ||
+          data?.bracket_structure?.round_advance_probs ||
+          {};
+        teamStats = data?.team_stats || data?.team_profiles || {};
+        upsetScoresData = Array.isArray(data?.upset_scores) ? data.upset_scores : [];
+        upsetThresholdsData = Array.isArray(data?.upset_thresholds) ? data.upset_thresholds : [];
+      } catch (e) {
+        // Keep client fallback behavior if Monte Carlo payload is unavailable.
+      }
+    }
+
+    async function loadKenpomCsvData() {
+      try {
+        const res = await fetch('/api/kenpom');
+        if (!res.ok) return;
+        const data = await res.json();
+        kenpomCsvTeams = data?.teams || {};
+      } catch (e) {
+        kenpomCsvTeams = {};
+      }
+    }
+
+    async function loadPublicPerceptionData() {
+      try {
+        const res = await fetch('/api/public-perception');
+        if (!res.ok) return;
+        const data = await res.json();
+        publicPerceptionRows = Array.isArray(data?.rows) ? data.rows : [];
+      } catch (e) {
+        publicPerceptionRows = [];
       }
     }
 
@@ -5015,6 +5075,86 @@
         (nextRoundPts ? ', ' + nextRoundPts + ' pts if they advance' : '');
     }
 
+    function normalizeRoundKeyClient(round) {
+      const key = String(round || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (key === 'r64' || key === 'roundof64' || key === 'round64' || key === 'firstround') return 'R64';
+      if (key === 'r32' || key === 'roundof32' || key === 'round32' || key === 'secondround') return 'R32';
+      if (key === 's16' || key === 'sweet16' || key === 'roundof16') return 'S16';
+      if (key === 'e8' || key === 'elite8' || key === 'roundof8') return 'E8';
+      if (key === 'f4' || key === 'finalfour') return 'F4';
+      if (key === 'ncg' || key === 'championship' || key === 'titlegame') return 'NCG';
+      return String(round || '').toUpperCase();
+    }
+
+    function roundLabelForKey(round) {
+      return PICK_ROUND_LABELS[normalizeRoundKeyClient(round)] || String(round || '');
+    }
+
+    function getPublicPerceptionForMatchup(matchup, teamAName, teamBName) {
+      if (!Array.isArray(publicPerceptionRows) || !publicPerceptionRows.length) return null;
+      const targetRound = normalizeRoundKeyClient(matchup?.round);
+      const nA = normalizeName(teamAName);
+      const nB = normalizeName(teamBName);
+      const region = normalizeLookupKey(matchup?.region || '');
+      const matchNum = Number(matchup?.matchup_number || matchup?.game_number);
+      let best = null;
+      for (const row of publicPerceptionRows) {
+        const rowRound = normalizeRoundKeyClient(row?.round || row?.round_raw);
+        if (rowRound !== targetRound) continue;
+        const r1 = normalizeName(row?.team_1);
+        const r2 = normalizeName(row?.team_2);
+        if (!((r1 === nA && r2 === nB) || (r1 === nB && r2 === nA))) continue;
+        const rowRegion = normalizeLookupKey(row?.region_or_stage || '');
+        const rowNum = Number(row?.matchup_number);
+        const score =
+          (region && rowRegion && region === rowRegion ? 2 : 0) +
+          (Number.isFinite(matchNum) && Number.isFinite(rowNum) && matchNum === rowNum ? 1 : 0);
+        if (!best || score > best.score) best = { row, score };
+      }
+      if (!best) return null;
+      const row = best.row;
+      const team1Pct = Number(row?.team_1_pct);
+      const team2Pct = Number(row?.team_2_pct);
+      const directOrder = normalizeName(row?.team_1) === nA;
+      return {
+        roundLabel: roundLabelForKey(row?.round || matchup?.round),
+        teamA: {
+          name: teamAName,
+          pct: directOrder ? team1Pct : team2Pct,
+        },
+        teamB: {
+          name: teamBName,
+          pct: directOrder ? team2Pct : team1Pct,
+        },
+      };
+    }
+
+    function estimateEpLeft(teamName, roundKey, winProbThisGame) {
+      const teamLabel = getDisplayName(teamName);
+      const probs = getByTeamNameLoose(roundAdvanceProbs, teamName) || getByTeamNameLoose(roundAdvanceProbs, teamLabel) || {};
+      const champ = Number(getByTeamNameLoose(championProbs, teamName) || getByTeamNameLoose(championProbs, teamLabel) || 0);
+      const current = normalizeRoundKeyClient(roundKey);
+      const nextKeys = {
+        R64: ['R32', 'S16', 'E8', 'F4', 'NCG'],
+        R32: ['S16', 'E8', 'F4', 'NCG'],
+        S16: ['E8', 'F4', 'NCG'],
+        E8: ['F4', 'NCG'],
+        F4: ['NCG'],
+        NCG: [],
+      };
+      let ep = 0;
+      const thisWin = normalizeProbability(winProbThisGame, null);
+      if (thisWin != null) ep += thisWin * (roundPoints[current] || 0);
+      for (const key of (nextKeys[current] || [])) {
+        const p = normalizeProbability(probs?.[key], null);
+        if (p != null) ep += p * (roundPoints[key] || 0);
+      }
+      if (current !== 'NCG') ep += champ * (roundPoints.NCG || 0);
+      if (ep > 0) return ep;
+      const fallback = Number(getByTeamNameLoose(teamEpRankings, teamName) || getByTeamNameLoose(teamEpRankings, teamLabel));
+      return Number.isFinite(fallback) ? fallback : null;
+    }
+
     function badgeClass(flag) {
       const f = String(flag || 'chalk').toLowerCase().replace(/\s+/g, '_');
       const valid = ['chalk', 'upset_alert', 'upset_watch', 'competitive', 'leverage_play', 'toss_up', 'lock'];
@@ -5059,6 +5199,7 @@
         matchup_id: String(node?.id || data?.matchup_id || ''),
         region: String(data?.region || node?.region || ''),
         round: String(data?.round || node?.round || 'R64'),
+        matchup_number: Number(data?.matchup_number || data?.game_number || node?.source?.game_number || ((Number(node?.slot) || 0) + 1)),
         confidence_tier: String(
           data?.confidence_tier ||
           data?.confidence ||
@@ -5157,8 +5298,19 @@
       renderCol('B', tB, colorB);
 
       const insightLblEl = document.getElementById('pcInsight').querySelector('.pc-insight-lbl');
-      document.getElementById('pcInsightTxt').textContent = m.recommended_pick_reason || m.risk?.reason || m.historical_blurb || '-';
-      if (insightLblEl) insightLblEl.textContent = 'AI Read';
+      const insightTxtEl = document.getElementById('pcInsightTxt');
+      const perception = getPublicPerceptionForMatchup(m, tA.name, tB.name);
+      if (insightLblEl) insightLblEl.textContent = 'PUBLIC PERCEPTION';
+      if (perception) {
+        const aPct = Number(perception.teamA?.pct);
+        const bPct = Number(perception.teamB?.pct);
+        const aTxt = Number.isFinite(aPct) ? (aPct * 100).toFixed(0) + '%' : '--';
+        const bTxt = Number.isFinite(bPct) ? (bPct * 100).toFixed(0) + '%' : '--';
+        insightTxtEl.textContent =
+          `${perception.roundLabel}: ${getDisplayName(tA.name)} ${aTxt} vs ${getDisplayName(tB.name)} ${bTxt}`;
+      } else {
+        insightTxtEl.textContent = 'Public perception CSV not loaded for this matchup.';
+      }
       const matchupUpset = (upsetScoresData || []).find((u) => {
         const nA = normalizeName(tA.name);
         const nB = normalizeName(tB.name);
@@ -5178,19 +5330,19 @@
           const publicPickPct = Number(matchupUpset.public_pick_pct);
           if (Number.isFinite(publicPickPct)) {
             insightLines.push('Only ' + (publicPickPct * 100).toFixed(0) +
-              '% of pools pick them — ' + (leverage * 100).toFixed(0) + '% leverage edge.');
+              '% of pools pick them - ' + (leverage * 100).toFixed(0) + '% leverage edge.');
           } else {
             insightLines.push((leverage * 100).toFixed(0) + '% leverage edge on this upset pick.');
           }
         }
         insightLines.push('Upset value: ' + Number(matchupUpset.upset_value || 0).toFixed(2) +
-          ' — ' + String(matchupUpset.risk_label || 'Risk profile unavailable') + '.');
-        document.getElementById('pcInsightTxt').textContent = insightLines.join(' ');
+          ' - ' + String(matchupUpset.risk_label || 'Risk profile unavailable') + '.');
+        insightTxtEl.textContent = insightLines.join(' ');
         if (insightLblEl) {
           insightLblEl.textContent =
             matchupUpset.risk_tier === 'low' ? 'UPSET OPPORTUNITY' :
             matchupUpset.risk_tier === 'medium' ? 'UPSET WATCH' :
-            matchupUpset.risk_tier === 'elevated' ? 'UPSET ALERT' : 'LONG SHOT';
+            matchupUpset.risk_tier === 'elevated' ? 'UPSET ALERT' : 'PUBLIC PERCEPTION';
         }
       }
 
@@ -5272,6 +5424,10 @@
       if (winPct != null) {
         oddsSection.appendChild(makeStatLine('Win This Game', Math.round(winPct * 100) + '%', winPct >= 0.5 ? 'var(--green)' : 'var(--muted)', true));
       }
+      const epLeft = estimateEpLeft(team.name, currentPickCardMatchup?.round || 'R64', winPct);
+      if (epLeft != null) {
+        oddsSection.appendChild(makeStatLine('EP Left', Number(epLeft).toFixed(1), 'var(--gold)', true));
+      }
       const rounds = [
         { key: 'R32', label: 'Round of 32' },
         { key: 'S16', label: 'Sweet 16' },
@@ -5317,8 +5473,10 @@
       if (!grid) return;
       const s1 = teamStats[tA?.name] || teamStats[getDisplayName(tA?.name)] || {};
       const s2 = teamStats[tB?.name] || teamStats[getDisplayName(tB?.name)] || {};
-      const k1 = { ...s1, ...(tA?.kenpom || {}) };
-      const k2 = { ...s2, ...(tB?.kenpom || {}) };
+      const csv1 = getByTeamNameLoose(kenpomCsvTeams, tA?.name) || {};
+      const csv2 = getByTeamNameLoose(kenpomCsvTeams, tB?.name) || {};
+      const k1 = { ...s1, ...(tA?.kenpom || {}), ...csv1 };
+      const k2 = { ...s2, ...(tB?.kenpom || {}), ...csv2 };
       const hasData = [k1.adjoe, k1.adjde, k1.adjem, k1.tempo, k2.adjoe, k2.adjde, k2.adjem, k2.tempo]
         .some((x) => Number.isFinite(Number(x)));
       if (!hasData) {
@@ -5771,9 +5929,16 @@
         roundAdvanceProbs = {};
         upsetScoresData = [];
         upsetThresholdsData = [];
+        kenpomCsvTeams = {};
+        publicPerceptionRows = [];
         for (const key of strategyKeys) {
           if (!strategyMap[key]) strategyMap[key] = {};
         }
+        await Promise.all([
+          loadMonteCarloData(),
+          loadKenpomCsvData(),
+          loadPublicPerceptionData()
+        ]);
         window._teamDir = teamDirectory;
         window._seedHistory = seedHistory;
         window._archetypeMatrix = archetypeMatrix;

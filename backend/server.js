@@ -141,7 +141,10 @@ const DATA_FILES = {
   seed_matchups: 'seed_matchup_all_rounds.json',
   archetype_summary: 'archetype_summary_v5.json',
   archetype_history: 'archetype_history.json',
+  kenpom_csv: 'kenpom_2026.csv',
+  espn_public_csv: 'espn_peoples_bracket_2026.csv',
 };
+const CSV_UPLOAD_TYPES = new Set(['kenpom_csv', 'espn_public_csv']);
 const TEAM_MAPPING_FILE = 'team_name_mapping_2026.json';
 
 const REGION_ORDER_2026 = ['South', 'East', 'West', 'Midwest'];
@@ -272,7 +275,9 @@ function loadDataFiles() {
     try {
       if (fs.existsSync(filepath)) {
         const raw = fs.readFileSync(filepath, 'utf8');
-        dataStore[key] = JSON.parse(raw);
+        dataStore[key] = CSV_UPLOAD_TYPES.has(key)
+          ? parseUploadedCsv(key, raw).parsed
+          : JSON.parse(raw);
         const size = (Buffer.byteLength(raw) / 1024 / 1024).toFixed(1);
         console.log(`  [ok] ${filename} loaded (${size}MB)`);
         anyLoaded = true;
@@ -346,6 +351,165 @@ function parseUploadedJson(rawInput) {
     }
   }
   throw lastErr || new Error('Invalid JSON');
+}
+
+function parseCsvRows(rawInput) {
+  const raw = String(rawInput || '').replace(/^\uFEFF/, '');
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let i = 0;
+  let inQuotes = false;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === '"') {
+      if (inQuotes && raw[i + 1] === '"') {
+        cell += '"';
+        i += 2;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      i += 1;
+      continue;
+    }
+    if (!inQuotes && (ch === ',' || ch === '\n' || ch === '\r')) {
+      row.push(cell);
+      cell = '';
+      if (ch === ',') {
+        i += 1;
+        continue;
+      }
+      if (ch === '\r' && raw[i + 1] === '\n') i += 1;
+      if (row.some((v) => String(v || '').trim() !== '')) rows.push(row);
+      row = [];
+      i += 1;
+      continue;
+    }
+    cell += ch;
+    i += 1;
+  }
+  row.push(cell);
+  if (row.some((v) => String(v || '').trim() !== '')) rows.push(row);
+  if (!rows.length) return [];
+  const headers = rows[0].map((h) => String(h || '').trim());
+  return rows.slice(1).map((vals) => {
+    const out = {};
+    for (let idx = 0; idx < headers.length; idx += 1) {
+      const key = headers[idx] || `col_${idx + 1}`;
+      out[key] = String(vals[idx] ?? '').trim();
+    }
+    return out;
+  });
+}
+
+function normalizeTextKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function normalizeRoundKey(value) {
+  const key = normalizeTextKey(value).replace(/\s+/g, '');
+  if (key === 'roundof64' || key === 'r64' || key === 'firstround' || key === 'round64') return 'R64';
+  if (key === 'roundof32' || key === 'r32' || key === 'secondround' || key === 'round32') return 'R32';
+  if (key === 'sweet16' || key === 's16' || key === 'roundof16') return 'S16';
+  if (key === 'elite8' || key === 'e8' || key === 'roundof8') return 'E8';
+  if (key === 'finalfour' || key === 'f4') return 'F4';
+  if (key === 'championship' || key === 'titlegame' || key === 'ncg') return 'NCG';
+  return String(value || '').trim();
+}
+
+function parsePercentMaybe(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  if (n > 1) return Math.max(0, Math.min(1, n / 100));
+  if (n < 0) return 0;
+  return n;
+}
+
+function parseNumberMaybe(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseUploadedCsv(type, rawInput) {
+  const rows = parseCsvRows(rawInput);
+  if (!rows.length) throw new Error('CSV appears empty.');
+  if (type === 'kenpom_csv') {
+    const normalized = {};
+    let count = 0;
+    for (const row of rows) {
+      const name = row.TeamName || row.Team || row.team || row.team_name || row.School || row.school || '';
+      const key = normalizeTextKey(name);
+      if (!key) continue;
+      normalized[key] = {
+        team: String(name || '').trim(),
+        adjoe: parseNumberMaybe(row.AdjOE ?? row.adjoe ?? row.OffRating ?? row.ORtg),
+        adjoe_rank: parseNumberMaybe(row.AdjOE_Rank ?? row.AdjOERank ?? row.adjoe_rank ?? row.OffRank ?? row.ORtgRank),
+        adjde: parseNumberMaybe(row.AdjDE ?? row.adjde ?? row.DefRating ?? row.DRtg),
+        adjde_rank: parseNumberMaybe(row.AdjDE_Rank ?? row.AdjDERank ?? row.adjde_rank ?? row.DefRank ?? row.DRtgRank),
+        adjem: parseNumberMaybe(row.AdjEM ?? row.adjem ?? row.NetRtg ?? row.NetRating),
+        adjem_rank: parseNumberMaybe(row.AdjEM_Rank ?? row.AdjEMRank ?? row.adjem_rank ?? row.NetRank),
+        tempo: parseNumberMaybe(row.Tempo ?? row.tempo),
+        tempo_rank: parseNumberMaybe(row.Tempo_Rank ?? row.TempoRank ?? row.tempo_rank),
+      };
+      count += 1;
+    }
+    return { parsed: { rows, teams: normalized, count }, normalized: String(rawInput || ''), mode: 'csv' };
+  }
+  if (type === 'espn_public_csv') {
+    const hasMatchupShape = rows.some((row) => {
+      const team1 = String(row.team_1 || row.team1 || row.Team1 || '').trim();
+      const team2 = String(row.team_2 || row.team2 || row.Team2 || '').trim();
+      return !!(team1 && team2);
+    });
+    const normalizedRows = [];
+    if (hasMatchupShape) {
+      for (const row of rows) {
+        const team1 = String(row.team_1 || row.team1 || row.Team1 || '').trim();
+        const team2 = String(row.team_2 || row.team2 || row.Team2 || '').trim();
+        if (!team1 || !team2) continue;
+        normalizedRows.push({
+          round: normalizeRoundKey(row.round || row.Round || ''),
+          round_raw: String(row.round || row.Round || '').trim(),
+          region_or_stage: String(row.region_or_stage || row.region || row.stage || '').trim(),
+          matchup_number: parseNumberMaybe(row.matchup_number || row.game_number || row.game || ''),
+          team_1: team1,
+          team_1_pct: parsePercentMaybe(row.team_1_pct || row.team1_pct || row.public_1_pct),
+          team_2: team2,
+          team_2_pct: parsePercentMaybe(row.team_2_pct || row.team2_pct || row.public_2_pct),
+          source_format: 'matchup',
+        });
+      }
+    } else {
+      for (const row of rows) {
+        const team = String(row.team || row.Team || row.school || row.School || '').trim();
+        if (!team) continue;
+        const roundRaw = String(row.round_label || row.round || row.Round || '').trim();
+        normalizedRows.push({
+          round: normalizeRoundKey(roundRaw),
+          round_raw: roundRaw,
+          region_or_stage: String(row.region_or_stage || row.region || row.stage || '').trim(),
+          matchup_number: parseNumberMaybe(row.matchup_number || row.game_number || row.game || row.rank || row.Rank || ''),
+          team_1: team,
+          team_1_pct: parsePercentMaybe(row.pct_picked || row.pct || row.pick_pct || row.team_pct || row.public_pct),
+          team_2: '',
+          team_2_pct: null,
+          rank: parseNumberMaybe(row.rank || row.Rank || ''),
+          seed: parseNumberMaybe(row.seed || row.Seed || ''),
+          source_format: 'team_pick_distribution',
+        });
+      }
+    }
+    return { parsed: { rows: normalizedRows, count: normalizedRows.length }, normalized: String(rawInput || ''), mode: 'csv' };
+  }
+  throw new Error(`Unsupported CSV type: ${type}`);
+}
+
+function parseUploadedData(rawInput, type) {
+  if (CSV_UPLOAD_TYPES.has(type)) return parseUploadedCsv(type, rawInput);
+  return parseUploadedJson(rawInput);
 }
 
 function findMatchup(t1Id, t2Id) {
@@ -1170,7 +1334,8 @@ let dataReloadTimer = null;
 try {
   fs.watch(DATA_DIR, { persistent: false }, (eventType, fileName) => {
     if (!fileName || fileName.startsWith('tmp')) return;
-    if (!fileName.toLowerCase().endsWith('.json')) return;
+    const lower = fileName.toLowerCase();
+    if (!lower.endsWith('.json') && !lower.endsWith('.csv')) return;
     clearTimeout(dataReloadTimer);
     dataReloadTimer = setTimeout(() => reloadDataFromDisk(`fs:${eventType}:${fileName}`), 150);
   });
@@ -3021,6 +3186,25 @@ app.get('/api/bracket-output/champion-probs', (req, res) => {
   });
 });
 
+app.get('/api/kenpom', (req, res) => {
+  const rows = dataStore.kenpom_csv?.rows || [];
+  const teams = dataStore.kenpom_csv?.teams || {};
+  return res.json({
+    loaded: rows.length > 0,
+    count: rows.length,
+    teams,
+  });
+});
+
+app.get('/api/public-perception', (req, res) => {
+  const rows = dataStore.espn_public_csv?.rows || [];
+  return res.json({
+    loaded: rows.length > 0,
+    count: rows.length,
+    rows,
+  });
+});
+
 app.get('/api/matchup/by-teams/:t1/:t2', (req, res) => {
   const matchup = findBracketMatchupByTeams(req.params.t1, req.params.t2);
   if (!matchup) return res.status(404).json({ error: 'Matchup not found.' });
@@ -3290,6 +3474,8 @@ app.get('/api/admin/data-status', auth, (req, res) => {
     bracket_lookup: Object.keys(dataStore.predictions?.bracket_lookup || bracketReady?.bracket_lookup || {}).length > 0,
     seed_rounds: Object.keys(dataStore.seed_matchups || bracketReady?.seed_matchup_history || {}).length,
     bracket_output_strategies: Object.keys(store.bracketOutput?.strategies || {}).length,
+    kenpom_rows: Number(dataStore.kenpom_csv?.count || dataStore.kenpom_csv?.rows?.length || 0),
+    espn_public_rows: Number(dataStore.espn_public_csv?.count || dataStore.espn_public_csv?.rows?.length || 0),
   };
 
   return res.json({
@@ -3338,6 +3524,15 @@ app.get('/api/admin/data-status', auth, (req, res) => {
         strategies: Object.keys(store.bracketOutput?.strategies ?? {}).length,
         team_ep_rankings: Object.keys(store.bracketOutput?.team_ep_rankings ?? {}).length,
         champion_probs: Object.keys(store.bracketOutput?.bracket_structure?.champion_probs ?? {}).length,
+      },
+      kenpom_csv: {
+        loaded: Number(dataStore.kenpom_csv?.count || 0) > 0,
+        rows: Number(dataStore.kenpom_csv?.count || 0),
+        teams: Object.keys(dataStore.kenpom_csv?.teams || {}).length,
+      },
+      espn_public_csv: {
+        loaded: Number(dataStore.espn_public_csv?.count || 0) > 0,
+        rows: Number(dataStore.espn_public_csv?.count || 0),
       },
     },
   });
@@ -3428,6 +3623,8 @@ app.post('/admin/upload', auth, (req, res) => {
       seed_matchups: 'seed_matchup_all_rounds.json',
       archetype_summary: 'archetype_summary_v5.json',
       archetype_history: 'archetype_history.json',
+      kenpom_csv: 'kenpom_2026.csv',
+      espn_public_csv: 'espn_peoples_bracket_2026.csv',
     };
     const typeAliases = {
       base: 'predictions',
@@ -3453,13 +3650,18 @@ app.post('/admin/upload', auth, (req, res) => {
       seedMatchups: 'seed_matchups',
       archetypeSummary: 'archetype_summary',
       archetypeHistory: 'archetype_history',
+      kenpom: 'kenpom_csv',
+      kenpomcsv: 'kenpom_csv',
+      espn_public: 'espn_public_csv',
+      espnpublic: 'espn_public_csv',
+      peoples_bracket: 'espn_public_csv',
     };
     if (!req.file) return res.status(400).json({ success: false, error: 'File required' });
 
     function normalizeFileKey(v) {
       return String(v || '')
         .toLowerCase()
-        .replace(/\.json$/i, '')
+        .replace(/\.(json|csv)$/i, '')
         .replace(/[_\-\s().]+/g, '');
     }
 
@@ -3475,6 +3677,8 @@ app.post('/admin/upload', auth, (req, res) => {
       if (key.includes('seedmatchupallrounds') || key.includes('seedmatchups') || key.includes('seedhistory')) return 'seed_matchups';
       if (key.includes('archetypesummaryv5') || key.includes('archetypesummary')) return 'archetype_summary';
       if (key.includes('archetypehistory')) return 'archetype_history';
+      if (key.includes('kenpom') || key.includes('summary26')) return 'kenpom_csv';
+      if (key.includes('espnpeoplesbracket') || key.includes('peoplesbracket') || key.includes('yahoobracketpickdistribution') || key.includes('pickdistribution')) return 'espn_public_csv';
       return '';
     }
 
@@ -3486,13 +3690,13 @@ app.post('/admin/upload', auth, (req, res) => {
     if (!resolvedType) {
       return res.status(400).json({
         success: false,
-        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_ready_2026*.json, bracket_2026*.json, bracket_cache_2026*.json, bracketgpt_bracket_output_2026*.json, team_profiles_2026*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
+        error: `Invalid type "${t || 'missing'}". Allowed: ${Object.keys(uploadTypeMap).join(', ')}. You can also upload by filename like chatbot_predictions_v5*.json, bracket_ready_2026*.json, bracket_2026*.json, bracket_cache_2026*.json, bracketgpt_bracket_output_2026*.json, bracket_output_enriched_2026*.json, kenpom_2026*.csv, summary26*.csv, espn_peoples_bracket_2026*.csv, yahoo_bracket_pick_distribution*.csv, team_profiles_2026*.json, seed_matchup_all_rounds*.json, archetype_summary_v5*.json, archetype_history*.json`
       });
     }
 
     try {
       const raw = fs.readFileSync(req.file.path, 'utf8');
-      const { parsed, normalized, mode } = parseUploadedJson(raw);
+      const { parsed, normalized, mode } = parseUploadedData(raw, resolvedType);
       fs.writeFileSync(path.join(DATA_DIR, uploadTypeMap[resolvedType]), normalized);
       fs.unlinkSync(req.file.path);
       dataStore[resolvedType] = parsed;
