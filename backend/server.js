@@ -429,8 +429,16 @@ function parsePercentMaybe(value) {
 }
 
 function parseNumberMaybe(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+  if (value == null) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const direct = Number(raw.replace(/,/g, '').replace(/^#/, ''));
+  if (Number.isFinite(direct)) return direct;
+  const match = raw.match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const fallback = Number(match[0]);
+  return Number.isFinite(fallback) ? fallback : null;
 }
 
 function parseUploadedCsv(type, rawInput) {
@@ -445,6 +453,7 @@ function parseUploadedCsv(type, rawInput) {
       if (!key) continue;
       normalized[key] = {
         team: String(name || '').trim(),
+        rank: parseNumberMaybe(row.Rank ?? row.rank ?? row.Rk ?? row.rk ?? row.KenPomRank ?? row.KP_Rank),
         adjoe: parseNumberMaybe(row.AdjOE ?? row.adjoe ?? row.OffRating ?? row.ORtg),
         adjoe_rank: parseNumberMaybe(row.AdjOE_Rank ?? row.AdjOERank ?? row.adjoe_rank ?? row.OffRank ?? row.ORtgRank),
         adjde: parseNumberMaybe(row.AdjDE ?? row.adjde ?? row.DefRating ?? row.DRtg),
@@ -1776,6 +1785,15 @@ function bracketOutputRoundKeys() {
   return ['R64', 'R32', 'S16', 'E8', 'F4', 'Championship'];
 }
 
+function getChampionProbMap() {
+  if (!store.bracketOutput || typeof store.bracketOutput !== 'object') return {};
+  const nested = store.bracketOutput?.bracket_structure?.champion_probs;
+  if (nested && typeof nested === 'object') return nested;
+  const topLevel = store.bracketOutput?.champion_probs;
+  if (topLevel && typeof topLevel === 'object') return topLevel;
+  return {};
+}
+
 function getScoringMap() {
   const fallback = { R64: 10, R32: 20, S16: 40, E8: 80, F4: 160, Championship: 320 };
   const s = store.bracketOutput?.metadata?.scoring;
@@ -1821,9 +1839,10 @@ function formatExpectedPointsContext(bracketState) {
     return lines.join('\n');
   }
   const sampled = uniqueTeams.slice(0, 16);
+  const championProbs = getChampionProbMap();
   for (const team of sampled) {
     const ep = buildTeamEpBreakdown(team);
-    const champProb = Number(store.bracketOutput?.bracket_structure?.champion_probs?.[team] || 0);
+    const champProb = Number(championProbs?.[team] || 0);
     lines.push(`${team} EP breakdown: R64=${ep.R64.toFixed(2)}, R32=${ep.R32.toFixed(2)}, S16=${ep.S16.toFixed(2)}, Total=${ep.total.toFixed(2)} | Champion probability: ${(champProb * 100).toFixed(2)}%`);
   }
   return lines.join('\n');
@@ -3178,11 +3197,12 @@ app.get('/api/bracket-output/ep-rankings', (req, res) => {
 });
 
 app.get('/api/bracket-output/champion-probs', (req, res) => {
-  if (!store.bracketOutput?.bracket_structure?.champion_probs) {
+  const champion_probs = getChampionProbMap();
+  if (!Object.keys(champion_probs).length) {
     return res.status(404).json({ error: 'Champion probabilities unavailable.' });
   }
   return res.json({
-    champion_probs: store.bracketOutput.bracket_structure.champion_probs,
+    champion_probs,
   });
 });
 
@@ -3523,7 +3543,7 @@ app.get('/api/admin/data-status', auth, (req, res) => {
         loaded: !!store.bracketOutput,
         strategies: Object.keys(store.bracketOutput?.strategies ?? {}).length,
         team_ep_rankings: Object.keys(store.bracketOutput?.team_ep_rankings ?? {}).length,
-        champion_probs: Object.keys(store.bracketOutput?.bracket_structure?.champion_probs ?? {}).length,
+        champion_probs: Object.keys(getChampionProbMap()).length,
       },
       kenpom_csv: {
         loaded: Number(dataStore.kenpom_csv?.count || 0) > 0,
@@ -3737,6 +3757,10 @@ app.get('/bracket', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'bracket.html'), (err) => {
     if (err && !res.headersSent) res.status(404).send('Not found');
   });
+});
+
+app.get('/', (req, res) => {
+  return res.redirect(302, '/bracket');
 });
 
 app.use('/data', express.static(path.join(__dirname, 'data')));

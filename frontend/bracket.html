@@ -1624,21 +1624,11 @@
     letter-spacing: .08em; text-transform: uppercase;
     color: var(--muted); margin-bottom: 8px;
   }
-  .pc-mo {
+  .pc-archetype {
     display: inline-flex; align-items: center; gap: 4px;
     font-family: var(--fd); font-size: 10px; font-weight: 700;
     letter-spacing: .08em; text-transform: uppercase;
     padding: 3px 7px; border-radius: 4px; margin-bottom: 10px;
-  }
-  .pc-mo.rising {
-    background: rgba(0,168,70,.12); color: var(--green);
-    border: 1px solid rgba(0,168,70,.25);
-  }
-  .pc-mo.fading {
-    background: rgba(204,51,51,.12); color: var(--red);
-    border: 1px solid rgba(204,51,51,.25);
-  }
-  .pc-mo.steady {
     background: rgba(46,116,212,.12); color: var(--blue);
     border: 1px solid rgba(46,116,212,.25);
   }
@@ -1681,6 +1671,33 @@
   .pc-stat-value.bold {
     font-size: 15px;
     font-weight: 900;
+  }
+  .pc-summary {
+    margin: 6px 0 8px;
+    font-family: var(--fb);
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text);
+  }
+  .pc-mini-title {
+    margin: 8px 0 4px;
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .pc-bullet-list {
+    margin: 0 0 6px 16px;
+    padding: 0;
+  }
+  .pc-bullet-item {
+    margin: 0 0 4px;
+    font-family: var(--fb);
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--muted);
   }
 
   .pc-stat {
@@ -1955,36 +1972,6 @@
             Finish Round 1 picks to run full historical baseline validation.
           </div>
         </section>
-        <section class="edge-optimizer" id="edgeOptimizer" aria-live="polite">
-          <div class="edge-head">
-            <span class="edge-title">First-Place Optimizer</span>
-            <span class="edge-tier" id="edgeTierBadge">Medium 26-100</span>
-          </div>
-          <div class="edge-main">
-            <div class="edge-card">
-              <div class="edge-label">Recommended Champion</div>
-              <div class="edge-champ" id="edgeChampRecommend">Michigan</div>
-              <div class="edge-sub" id="edgeChampReason">Balancing title odds with duplication risk for your current pool.</div>
-            </div>
-            <div class="edge-card edge-stat-grid">
-              <div class="edge-stat-row">
-                <span class="edge-stat-name">First-Place Score</span>
-                <span class="edge-stat-val good" id="edgeChampScore">0.00</span>
-              </div>
-              <div class="edge-stat-row">
-                <span class="edge-stat-name">Ownership Adj Value</span>
-                <span class="edge-stat-val" id="edgeChampUtility">0.00</span>
-              </div>
-              <div class="edge-stat-row">
-                <span class="edge-stat-name">Projected Champ Own</span>
-                <span class="edge-stat-val" id="edgeChampOwn">0.0%</span>
-              </div>
-            </div>
-          </div>
-          <p class="edge-current" id="edgeCurrentPick">Build your title game pick to unlock champion-specific guidance.</p>
-          <ul class="edge-advice" id="edgeAdvice"></ul>
-          <div class="edge-table" id="edgeTable"></div>
-        </section>
         <div class="nav-inner">
           <div class="round-tabs" id="roundTabs">
             <button class="round-tab active" data-round="R64">Rd 64</button>
@@ -2117,17 +2104,14 @@
         </div>
       </div>
       <div id="pcStatsGrid" class="pc-stats-grid"></div>
-      <div class="pc-section-label">Seed Matchup History</div>
-      <div id="pcSeedHistory" class="pc-seed-history"></div>
-
       <div class="pc-breakdown">
         <div class="pc-col" id="pcColA">
           <div class="pc-col-name" id="pcColNameA"></div>
-          <div class="pc-mo" id="pcMoA"></div>
+          <div class="pc-archetype" id="pcArchetypeA"></div>
         </div>
         <div class="pc-col" id="pcColB">
           <div class="pc-col-name" id="pcColNameB"></div>
-          <div class="pc-mo" id="pcMoB"></div>
+          <div class="pc-archetype" id="pcArchetypeB"></div>
         </div>
       </div>
 
@@ -2281,6 +2265,7 @@
     const teamIndex = new Map();
     const predictionsByName = new Map();
     const teamPowerIndex = new Map();
+    const teamHumanSummaryRows = [];
     let finalFourPairings = defaultFinalFourPairings.slice();
     let mobileRound = 'R64';
     let bracketOutput = null;
@@ -2382,6 +2367,103 @@
     function normalizeName(v) {
       const cleaned = aliasKey(v);
       return aliasLookup.get(cleaned) || cleaned;
+    }
+    function summaryTokens(value) {
+      return normalizeName(value)
+        .split(' ')
+        .map((x) => x.trim())
+        .filter((x) => x && !['the', 'and', 'of', 'at', 'st', 'state', 'university', 'college', 'team'].includes(x));
+    }
+    function parseNarrativeItems(raw) {
+      const text = String(raw || '')
+        .replace(/\r/g, '\n')
+        .replace(/\n{2,}/g, '\n')
+        .trim();
+      if (!text) return [];
+      return text
+        .split(/\n|\*/g)
+        .map((s) => s.replace(/^[\s\-•]+/, '').trim())
+        .filter(Boolean);
+    }
+    function parseTeamSummaryMarkdown(raw) {
+      const out = [];
+      const input = String(raw || '');
+      const blockRx = /^###\s+\d+\.\s+(.+?)\r?\n([\s\S]*?)(?=^###\s+\d+\.\s+|(?![\s\S]))/gm;
+      let m = null;
+      while ((m = blockRx.exec(input)) !== null) {
+        const teamLabel = String(m[1] || '').trim();
+        const body = String(m[2] || '');
+        const keyPlayer = (body.match(/\*\s+\*\*Key Player:\*\*\s*(.+)/i)?.[1] || '').trim();
+        const summary = (body.match(/\*\s+\*\*Summary:\*\*\s*([\s\S]*?)(?=\n\*\s+\*\*(?:Strengths|Weaknesses):\*\*|$)/i)?.[1] || '').trim();
+        const strengthsRaw = (body.match(/\*\s+\*\*Strengths:\*\*\s*([\s\S]*?)(?=\n\*\s+\*\*Weaknesses:\*\*|$)/i)?.[1] || '').trim();
+        const weaknessesRaw = (body.match(/\*\s+\*\*Weaknesses:\*\*\s*([\s\S]*?)(?=$)/i)?.[1] || '').trim();
+        out.push({
+          teamLabel,
+          teamNorm: normalizeName(teamLabel),
+          keyPlayer,
+          summary,
+          strengths: parseNarrativeItems(strengthsRaw),
+          weaknesses: parseNarrativeItems(weaknessesRaw),
+        });
+      }
+      return out;
+    }
+    function scoreTeamSummaryMatch(teamName, row) {
+      const teamNorm = normalizeName(teamName);
+      const rowNorm = String(row?.teamNorm || '');
+      if (!teamNorm || !rowNorm) return 0;
+      if (teamNorm === rowNorm) return 100;
+      if (rowNorm.includes(teamNorm) || teamNorm.includes(rowNorm)) return 60;
+      const a = new Set(summaryTokens(teamNorm));
+      const b = new Set(summaryTokens(rowNorm));
+      let overlap = 0;
+      for (const tok of a) {
+        if (b.has(tok)) overlap += 1;
+      }
+      return overlap * 10;
+    }
+    function findTeamHumanSummary(teamName) {
+      if (!teamName) return null;
+      let best = null;
+      let bestScore = 0;
+      for (const row of teamHumanSummaryRows) {
+        const score = scoreTeamSummaryMatch(teamName, row);
+        if (score > bestScore) {
+          best = row;
+          bestScore = score;
+        }
+      }
+      return bestScore >= 20 ? best : null;
+    }
+    function enrichTeamWithHumanSummary(teamRaw, fallbackName) {
+      if (!teamRaw && !fallbackName) return null;
+      const base = teamRaw ? { ...teamRaw } : {};
+      const name = String(base?.name || fallbackName || '').trim();
+      const human = findTeamHumanSummary(name);
+      if (!human) return base;
+      const baseStrengths = Array.isArray(base?.strengths) ? base.strengths : [];
+      const baseWeaknesses = Array.isArray(base?.weaknesses) ? base.weaknesses : [];
+      const basePlayers = Array.isArray(base?.key_players) ? base.key_players : [];
+      return {
+        ...base,
+        name: base?.name || name,
+        key_players: basePlayers.length ? basePlayers : (human.keyPlayer ? [human.keyPlayer] : []),
+        summary: base?.summary || human.summary || '',
+        strengths: baseStrengths.length ? baseStrengths : human.strengths,
+        weaknesses: baseWeaknesses.length ? baseWeaknesses : human.weaknesses,
+      };
+    }
+    async function loadTeamHumanSummaries() {
+      teamHumanSummaryRows.length = 0;
+      try {
+        const res = await fetch('/team_summaries_2026.md', { cache: 'no-store' });
+        if (!res.ok) return;
+        const raw = await res.text();
+        const rows = parseTeamSummaryMarkdown(raw);
+        for (const row of rows) teamHumanSummaryRows.push(row);
+      } catch (e) {
+        // Optional data source: keep UI working when file is not present.
+      }
     }
     function normalizeRegionName(v) {
       return String(v || '').toLowerCase().replace(/[^a-z]/g, '');
@@ -2535,7 +2617,6 @@
       localStorage.setItem(POOL_SIZE_STORAGE_KEY, String(poolSize));
       refreshAllSignals();
       updateUpsetRec();
-      renderEdgeOptimizer();
     }
 
     function getUpsetRecommendation(size) {
@@ -3695,7 +3776,8 @@
 
     function getTeamProfileClient(teamName) {
       if (!teamName) return null;
-      return teamPowerIndex.get(teamName) || teamPowerIndex.get(normalizeName(teamName)) || null;
+      const team = teamPowerIndex.get(teamName) || teamPowerIndex.get(normalizeName(teamName)) || null;
+      return enrichTeamWithHumanSummary(team, teamName);
     }
 
     function confidenceTierFromProb(prob) {
@@ -4713,7 +4795,6 @@
         pill.classList.toggle('active', !!activeStrategy && key === activeStrategy);
       });
       updateBracketChecklist();
-      renderEdgeOptimizer();
       bracketState.activeStrategy = activeStrategy || 'custom';
       saveState();
     }
@@ -4912,6 +4993,8 @@
       if (node.round === 'R64' && node.source) return node.source;
       const tA = getTeamProfileClient(t1.name) || teamIndex.get(normalizeName(t1.name)) || {};
       const tB = getTeamProfileClient(t2.name) || teamIndex.get(normalizeName(t2.name)) || {};
+      const hA = findTeamHumanSummary(t1.name);
+      const hB = findTeamHumanSummary(t2.name);
       const pred = getLaterRoundCardData(t1.name, t2.name);
       const prob = estimateWinProb(t1.name, t2.name);
       const predProbT1 = predictionProbForTeam(pred, t1.name);
@@ -4941,10 +5024,11 @@
           win_probability: resolvedP1,
           archetype: t1?.archetype || pred?.[sideA + '_archetype'] || tA?.archetype || 'Unknown',
           key_players: t1?.key_players || predProfileA?.key_players || tA?.key_players || [],
+          summary: t1?.summary || predProfileA?.summary || tA?.summary || hA?.summary || '',
           historical_comp: t1?.historical_comp || pred?.[sideA + '_historical_comp'] || pred?.[sideA + '_topComp'] || tA?.historical_comp || null,
           topComp: t1?.topComp || pred?.[sideA + '_topComp'] || pred?.[sideA + '_historical_comp'] || tA?.historical_comp || null,
-          strengths: t1?.strengths || predProfileA?.strengths || tA?.strengths || [],
-          weaknesses: t1?.weaknesses || predProfileA?.weaknesses || tA?.weaknesses || [],
+          strengths: t1?.strengths || predProfileA?.strengths || tA?.strengths || hA?.strengths || [],
+          weaknesses: t1?.weaknesses || predProfileA?.weaknesses || tA?.weaknesses || hA?.weaknesses || [],
           momentum: t1?.momentum || predProfileA?.momentum || tA?.momentum || null,
           pool: t1?.pool || predProfileA?.pool || tA?.pool || {
             public_pick_pct: Number.isFinite(pickPct1) ? pickPct1 : null,
@@ -4958,10 +5042,11 @@
           win_probability: resolvedP2,
           archetype: t2?.archetype || pred?.[sideB + '_archetype'] || tB?.archetype || 'Unknown',
           key_players: t2?.key_players || predProfileB?.key_players || tB?.key_players || [],
+          summary: t2?.summary || predProfileB?.summary || tB?.summary || hB?.summary || '',
           historical_comp: t2?.historical_comp || pred?.[sideB + '_historical_comp'] || pred?.[sideB + '_topComp'] || tB?.historical_comp || null,
           topComp: t2?.topComp || pred?.[sideB + '_topComp'] || pred?.[sideB + '_historical_comp'] || tB?.historical_comp || null,
-          strengths: t2?.strengths || predProfileB?.strengths || tB?.strengths || [],
-          weaknesses: t2?.weaknesses || predProfileB?.weaknesses || tB?.weaknesses || [],
+          strengths: t2?.strengths || predProfileB?.strengths || tB?.strengths || hB?.strengths || [],
+          weaknesses: t2?.weaknesses || predProfileB?.weaknesses || tB?.weaknesses || hB?.weaknesses || [],
           momentum: t2?.momentum || predProfileB?.momentum || tB?.momentum || null,
           pool: t2?.pool || predProfileB?.pool || tB?.pool || {
             public_pick_pct: Number.isFinite(pickPct2) ? pickPct2 : null,
@@ -5231,6 +5316,8 @@
           kenpom: srcA?.kenpom || {},
           win_pct: pA,
           momentum: String(srcA?.momentum || 'steady'),
+          key_players: Array.isArray(srcA?.key_players) ? srcA.key_players : [],
+          summary: String(srcA?.summary || ''),
           strengths: Array.isArray(srcA?.strengths) ? srcA.strengths : [],
           weaknesses: Array.isArray(srcA?.weaknesses) ? srcA.weaknesses : []
         },
@@ -5243,6 +5330,8 @@
           kenpom: srcB?.kenpom || {},
           win_pct: 1 - pA,
           momentum: String(srcB?.momentum || 'steady'),
+          key_players: Array.isArray(srcB?.key_players) ? srcB.key_players : [],
+          summary: String(srcB?.summary || ''),
           strengths: Array.isArray(srcB?.strengths) ? srcB.strengths : [],
           weaknesses: Array.isArray(srcB?.weaknesses) ? srcB.weaknesses : []
         }
@@ -5292,7 +5381,6 @@
       document.getElementById('pcBarLblA').textContent = `${getDisplayName(tA.name)} ${pctA.toFixed(1)}%`;
       document.getElementById('pcBarLblB').textContent = `${getDisplayName(tB.name)} ${pctB.toFixed(1)}%`;
       renderKenPomComparison(m, tA, tB);
-      renderSeedHistory(m, tA, tB);
 
       renderCol('A', tA, colorA);
       renderCol('B', tB, colorB);
@@ -5323,8 +5411,8 @@
         const edge = Number(matchupUpset.model_edge || 0);
         const leverage = Number(matchupUpset.pool_leverage || 0);
         if (edge > 0) {
-          insightLines.push('Model gives ' + getDisplayName(matchupUpset.underdog) +
-            ' ' + (edge * 100).toFixed(0) + '% more chance than seed history suggests.');
+            insightLines.push('Model gives ' + getDisplayName(matchupUpset.underdog) +
+            ' ' + (edge * 100).toFixed(0) + '% more chance than baseline suggests.');
         }
         if (leverage > 0) {
           const publicPickPct = Number(matchupUpset.public_pick_pct);
@@ -5389,34 +5477,13 @@
     function renderCol(side, team, color) {
       const col = document.getElementById('pcCol' + side);
       const nameEl = document.getElementById('pcColName' + side);
-      const moEl = document.getElementById('pcMo' + side);
+      const archetypeEl = document.getElementById('pcArchetype' + side);
       const displayName = getDisplayName(team.name);
       nameEl.textContent = displayName;
-      const mo = (team.momentum || 'steady').toLowerCase();
-      const moMap = {
-        rising: { cls: 'rising', label: '\u2191 Rising' },
-        fading: { cls: 'fading', label: '\u2193 Fading' },
-        steady: { cls: 'steady', label: '\u2192 Steady' },
-      };
-      const moInfo = moMap[mo] || moMap.steady;
-      moEl.className = 'pc-mo ' + moInfo.cls;
-      moEl.textContent = moInfo.label;
+      const archetype = String(team.archetype || (Array.isArray(team.archetypes) ? team.archetypes[0] : '') || 'Unknown');
+      if (archetypeEl) archetypeEl.textContent = archetype;
       col.querySelectorAll('.pc-stat, .pc-stats-section').forEach((el) => el.remove());
-      const stats = teamStats[team.name] || teamStats[displayName] || {};
       const advance = roundAdvanceProbs[team.name] || roundAdvanceProbs[displayName] || {};
-      const champ = championProbs[team.name] || championProbs[displayName] || 0;
-      const ratingsSection = document.createElement('div');
-      ratingsSection.className = 'pc-stats-section';
-      ratingsSection.innerHTML = '<div class="pc-stats-title">RATINGS</div>';
-      const net = stats.net_rating;
-      if (net != null) {
-        const c = net >= 20 ? 'var(--green)' : net >= 10 ? 'var(--text)' : net >= 0 ? 'var(--muted)' : 'var(--red)';
-        ratingsSection.appendChild(makeStatLine('Net Rating', (net >= 0 ? '+' : '') + net.toFixed(1), c));
-      }
-      if (stats.adjoe != null) ratingsSection.appendChild(makeStatLine('Adj. Offense', stats.adjoe.toFixed(1), 'var(--text)'));
-      if (stats.adjde != null) ratingsSection.appendChild(makeStatLine('Adj. Defense', stats.adjde.toFixed(1), 'var(--text)'));
-      if (stats.tempo != null) ratingsSection.appendChild(makeStatLine('Tempo', stats.tempo.toFixed(1), 'var(--muted)'));
-      col.appendChild(ratingsSection);
       const oddsSection = document.createElement('div');
       oddsSection.className = 'pc-stats-section';
       oddsSection.innerHTML = '<div class="pc-stats-title">TOURNAMENT ODDS</div>';
@@ -5443,10 +5510,57 @@
           oddsSection.appendChild(makeStatLine(rd.label, pct, c));
         }
       }
-      if (champ > 0.001) {
-        oddsSection.appendChild(makeStatLine('Win Championship', (champ * 100).toFixed(1) + '%', champ >= 0.10 ? 'var(--gold)' : 'var(--muted)'));
-      }
       col.appendChild(oddsSection);
+
+      const players = Array.isArray(team?.key_players) ? team.key_players.filter(Boolean) : [];
+      const strengths = Array.isArray(team?.strengths) ? team.strengths.filter(Boolean) : [];
+      const weaknesses = Array.isArray(team?.weaknesses) ? team.weaknesses.filter(Boolean) : [];
+      const summary = String(team?.summary || '').trim();
+      if (players.length || summary || strengths.length || weaknesses.length) {
+        const snapshot = document.createElement('div');
+        snapshot.className = 'pc-stats-section';
+        snapshot.innerHTML = '<div class="pc-stats-title">TEAM SNAPSHOT</div>';
+        if (players.length) {
+          snapshot.appendChild(makeStatLine('Key Player', players[0], color, false));
+        }
+        if (summary) {
+          const p = document.createElement('p');
+          p.className = 'pc-summary';
+          p.textContent = summary;
+          snapshot.appendChild(p);
+        }
+        if (strengths.length) {
+          const st = document.createElement('div');
+          st.className = 'pc-mini-title';
+          st.textContent = 'Strengths';
+          snapshot.appendChild(st);
+          const ul = document.createElement('ul');
+          ul.className = 'pc-bullet-list';
+          for (const item of strengths.slice(0, 3)) {
+            const li = document.createElement('li');
+            li.className = 'pc-bullet-item';
+            li.textContent = item;
+            ul.appendChild(li);
+          }
+          snapshot.appendChild(ul);
+        }
+        if (weaknesses.length) {
+          const wt = document.createElement('div');
+          wt.className = 'pc-mini-title';
+          wt.textContent = 'Weaknesses';
+          snapshot.appendChild(wt);
+          const ul = document.createElement('ul');
+          ul.className = 'pc-bullet-list';
+          for (const item of weaknesses.slice(0, 3)) {
+            const li = document.createElement('li');
+            li.className = 'pc-bullet-item';
+            li.textContent = item;
+            ul.appendChild(li);
+          }
+          snapshot.appendChild(ul);
+        }
+        col.appendChild(snapshot);
+      }
     }
 
     function makeStatLine(label, value, valueColor, bold) {
@@ -5489,10 +5603,20 @@
       const deB = Number(k2.adjde);
       const emA = Number(k1.adjem);
       const emB = Number(k2.adjem);
+      const rankA = Number(k1.rank ?? k1.kenpom_rank ?? k1.kp_rank ?? k1.rk ?? k1.adjem_rank);
+      const rankB = Number(k2.rank ?? k2.kenpom_rank ?? k2.kp_rank ?? k2.rk ?? k2.adjem_rank);
+      const hasOverallRank = Number.isFinite(rankA) || Number.isFinite(rankB);
+      const rankClassA = Number.isFinite(rankA) && (!Number.isFinite(rankB) || rankA <= rankB) ? 'stat-better' : 'stat-worse';
+      const rankClassB = Number.isFinite(rankB) && (!Number.isFinite(rankA) || rankB <= rankA) ? 'stat-better' : 'stat-worse';
       grid.innerHTML =
         '<table class="pc-stats-table"><thead><tr><th></th><th>' + escHtml(tA.abbreviation || getDisplayName(tA.name)) +
         '</th><th>' + escHtml(tB.abbreviation || getDisplayName(tB.name)) +
         '</th></tr></thead><tbody>' +
+        (hasOverallRank
+          ? '<tr><td class="stat-label">KenPom Rank</td><td class="' + rankClassA + '">' +
+            (Number.isFinite(rankA) ? '#' + rankA : '-') + '</td><td class="' + rankClassB + '">' +
+            (Number.isFinite(rankB) ? '#' + rankB : '-') + '</td></tr>'
+          : '') +
         '<tr><td class="stat-label">Adj OE</td><td class="' + (oeA >= oeB ? 'stat-better' : 'stat-worse') + '">' +
         fmtNum(k1.adjoe) + ' <span class="stat-rank">' + fmtRank(k1.adjoe_rank) + '</span></td><td class="' +
         (oeB >= oeA ? 'stat-better' : 'stat-worse') + '">' + fmtNum(k2.adjoe) +
@@ -5507,26 +5631,6 @@
         ' <span class="stat-rank">' + fmtRank(k2.adjem_rank) + '</span></td></tr>' +
         '<tr><td class="stat-label">Tempo</td><td>' + fmtNum(k1.tempo) + '</td><td>' + fmtNum(k2.tempo) + '</td></tr>' +
         '</tbody></table>';
-    }
-
-    function renderSeedHistory(m, tA, tB) {
-      const el = document.getElementById('pcSeedHistory');
-      if (!el) return;
-      const sh = m?.historical_seed_matchup || {};
-      const h = Number(sh.higher_seed_wins);
-      const l = Number(sh.lower_seed_wins);
-      const upsetPct = Number(sh.upset_pct);
-      if (!Number.isFinite(h) || !Number.isFinite(l)) {
-        el.textContent = `${tA.seed}-seed vs ${tB.seed}-seed historical record unavailable`;
-        return;
-      }
-      const total = h + l;
-      const favoritePct = total > 0 ? ((h / total) * 100).toFixed(1) : '-';
-      const label = sh.label || `${tA.seed}-seeds vs ${tB.seed}-seeds`;
-      el.innerHTML = escHtml(`${label}: ${h}-${l} (${favoritePct}% favorite)`);
-      if (Number.isFinite(upsetPct) && upsetPct > 25) {
-        el.innerHTML += ' <span class="upset-zone-tag">Upset Zone</span>';
-      }
     }
 
     function setFlag(flag, confidenceTier) {
@@ -5917,6 +6021,7 @@
       clearError();
       try {
         await loadTeamNameMappingSource();
+        await loadTeamHumanSummaries();
         const data = await loadBracketData();
         if (!data || !Array.isArray(matchups) || matchups.length === 0) {
           throw new Error('Bracket data not loaded. Check admin panel.');
