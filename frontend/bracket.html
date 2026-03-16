@@ -6021,6 +6021,7 @@
       const host = document.getElementById('pcLeverage');
       if (!host) return;
       const useYahooMatrixPublic = Object.keys(exactTeamPublicRoundProbs || {}).length > 0;
+      const summaryRoundKey = 'R32';
       const rounds = ['R32', 'S16', 'E8', 'F4', 'NCG'];
       if (!rounds.length) {
         host.innerHTML = '';
@@ -6100,10 +6101,10 @@
       }
 
       function summarizeTeam(team, rows) {
-        const roundRow = rows.find((r) => r.roundKey === roundKey) || rows[0] || null;
+        const roundRow = rows.find((r) => r.roundKey === summaryRoundKey) || rows[0] || null;
         const totalLevRaw = rows.reduce((sum, r) => sum + (Number.isFinite(r.levEv) ? r.levEv : 0), 0);
         const totalLev = Number(totalLevRaw || 0);
-        const status = classifyPublicDifferential(roundRow?.edge, roundRow?.model, roundRow?.levEv, roundKey, team?.seed);
+        const status = classifyPublicDifferential(roundRow?.edge, roundRow?.model, roundRow?.levEv, summaryRoundKey, team?.seed);
         return {
           team,
           totalLev,
