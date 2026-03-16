@@ -576,6 +576,156 @@
     line-height: 1.35;
     color: var(--muted);
   }
+  .edge-optimizer {
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    background: var(--bg-surface);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+  .edge-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .edge-title {
+    font-family: var(--fd);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .10em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .edge-tier {
+    border: 1px solid var(--bg-line);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--bg-surface-2);
+  }
+  .edge-main {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .edge-card {
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    background: var(--bg-surface-2);
+    padding: 8px;
+  }
+  .edge-label {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .edge-champ {
+    font-family: var(--fd);
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: .03em;
+    color: var(--accent);
+    line-height: 1.1;
+    margin-bottom: 6px;
+  }
+  .edge-sub {
+    font-family: var(--fb);
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--muted);
+  }
+  .edge-stat-grid {
+    display: grid;
+    gap: 6px;
+  }
+  .edge-stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    padding: 5px 7px;
+  }
+  .edge-stat-name {
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .edge-stat-val {
+    font-family: var(--fd);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .edge-stat-val.good { color: var(--green); }
+  .edge-stat-val.warn { color: var(--orange); }
+  .edge-stat-val.bad { color: var(--red); }
+  .edge-current {
+    margin: 0 0 8px;
+    font-family: var(--fb);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--muted);
+  }
+  .edge-current strong { color: var(--text); }
+  .edge-advice {
+    margin: 0 0 10px;
+    padding-left: 16px;
+    display: grid;
+    gap: 3px;
+    font-family: var(--fb);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text);
+  }
+  .edge-advice li::marker { color: var(--accent); }
+  .edge-table {
+    border: 1px solid var(--bg-line);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .edge-row {
+    display: grid;
+    grid-template-columns: 1.1fr .5fr .6fr .6fr .6fr;
+    gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--bg-line);
+    align-items: center;
+    font-family: var(--fb);
+    font-size: 11px;
+  }
+  .edge-row:last-child { border-bottom: 0; }
+  .edge-row.head {
+    background: var(--bg-surface-2);
+    font-family: var(--fd);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .edge-row .r { text-align: right; font-family: var(--fd); font-weight: 700; letter-spacing: .04em; }
+  .edge-row .g { color: var(--green); }
+  .edge-row .o { color: var(--orange); }
+  .edge-row .m { color: var(--muted); }
   .strategy-control {
     flex: 1 1 auto;
     display: grid;
@@ -1520,6 +1670,8 @@
     .round-tabs { display: flex; width: 100%; }
     .pool-size-control { width: 100%; justify-content: flex-end; }
     .optimizer-checklist-grid { grid-template-columns: 1fr; }
+    .edge-main { grid-template-columns: 1fr; }
+    .edge-row { grid-template-columns: 1fr .7fr .7fr .7fr .7fr; gap: 6px; font-size: 10px; }
     .chat-quick-grid { grid-template-columns: 1fr; }
     .round-col { display: none; }
     .round-col.visible { display: block; }
@@ -1655,6 +1807,36 @@
           <div class="optimizer-check-foot" id="checklistNote">
             Finish Round 1 picks to run full historical baseline validation.
           </div>
+        </section>
+        <section class="edge-optimizer" id="edgeOptimizer" aria-live="polite">
+          <div class="edge-head">
+            <span class="edge-title">First-Place Optimizer</span>
+            <span class="edge-tier" id="edgeTierBadge">Medium 26-100</span>
+          </div>
+          <div class="edge-main">
+            <div class="edge-card">
+              <div class="edge-label">Recommended Champion</div>
+              <div class="edge-champ" id="edgeChampRecommend">Michigan</div>
+              <div class="edge-sub" id="edgeChampReason">Balancing title odds with duplication risk for your current pool.</div>
+            </div>
+            <div class="edge-card edge-stat-grid">
+              <div class="edge-stat-row">
+                <span class="edge-stat-name">First-Place Score</span>
+                <span class="edge-stat-val good" id="edgeChampScore">0.00</span>
+              </div>
+              <div class="edge-stat-row">
+                <span class="edge-stat-name">Ownership Adj Value</span>
+                <span class="edge-stat-val" id="edgeChampUtility">0.00</span>
+              </div>
+              <div class="edge-stat-row">
+                <span class="edge-stat-name">Projected Champ Own</span>
+                <span class="edge-stat-val" id="edgeChampOwn">0.0%</span>
+              </div>
+            </div>
+          </div>
+          <p class="edge-current" id="edgeCurrentPick">Build your title game pick to unlock champion-specific guidance.</p>
+          <ul class="edge-advice" id="edgeAdvice"></ul>
+          <div class="edge-table" id="edgeTable"></div>
         </section>
         <div class="nav-inner">
           <div class="round-tabs" id="roundTabs">
@@ -1816,6 +1998,64 @@
     let regions = ['South', 'East', 'West', 'Midwest'];
     const roundOrder = ['R64', 'R32', 'S16', 'E8', 'F4', 'NCG'];
     const roundPoints = { R64: 10, R32: 20, S16: 40, E8: 80, F4: 160, NCG: 320 };
+    const poolPlaybook = {
+      small: {
+        key: 'small',
+        label: 'Small 10-25',
+        min: 2,
+        max: 25,
+        weights: { ep: 0.90, uniq: 0.05, lev: 0.05, champ: 0.00, corr: 0.00 },
+        championBias: 'Duke',
+        upsetTarget: [2, 3],
+        finalFourTargetNon1: [0, 1],
+        tacticalRule: 'Eat high-probability chalk and avoid unnecessary variance.'
+      },
+      medium: {
+        key: 'medium',
+        label: 'Medium 26-100',
+        min: 26,
+        max: 100,
+        weights: { ep: 0.60, uniq: 0.15, lev: 0.15, champ: 0.10, corr: 0.00 },
+        championBias: 'Michigan',
+        upsetTarget: [3, 4],
+        finalFourTargetNon1: [1, 2],
+        tacticalRule: 'Mix one strong regional pivot with mostly efficient favorites.'
+      },
+      large: {
+        key: 'large',
+        label: 'Large 101-500',
+        min: 101,
+        max: 500,
+        weights: { ep: 0.30, uniq: 0.30, lev: 0.20, champ: 0.15, corr: 0.05 },
+        championBias: 'Arizona',
+        upsetTarget: [5, 6],
+        finalFourTargetNon1: [2, 3],
+        tacticalRule: 'Prioritize leverage by fading the most duplicated title paths.'
+      },
+      huge: {
+        key: 'huge',
+        label: 'Huge 500+',
+        min: 501,
+        max: 50000,
+        weights: { ep: 0.10, uniq: 0.40, lev: 0.20, champ: 0.20, corr: 0.10 },
+        championBias: 'Florida',
+        upsetTarget: [6, 7],
+        finalFourTargetNon1: [2, 4],
+        tacticalRule: 'Play for first only: asymmetric title path and high-variance construction.'
+      }
+    };
+    const contenderMatrix = [
+      { team: 'Duke', seed: 1, region: 'East', modelTitle: 0.2368, publicTitle: 0.59 },
+      { team: 'Michigan', seed: 1, region: 'Midwest', modelTitle: 0.2310, publicTitle: 0.22 },
+      { team: 'Arizona', seed: 1, region: 'West', modelTitle: 0.1761, publicTitle: 0.41 },
+      { team: 'Florida', seed: 4, region: 'South', modelTitle: 0.0672, publicTitle: 0.08 },
+      { team: 'Houston', seed: 2, region: 'South', modelTitle: 0.0468, publicTitle: 0.12 },
+      { team: 'UConn', seed: 2, region: 'East', modelTitle: 0.0457, publicTitle: 0.05 },
+      { team: 'Purdue', seed: 1, region: 'West', modelTitle: 0.0363, publicTitle: 0.15 },
+      { team: 'Illinois', seed: 3, region: 'South', modelTitle: 0.0309, publicTitle: 0.04 },
+      { team: 'Virginia', seed: 4, region: 'Midwest', modelTitle: 0.0228, publicTitle: 0.06 },
+      { team: 'Michigan St', seed: 3, region: 'East', modelTitle: 0.0199, publicTitle: 0.02 }
+    ];
     const r64SlotByPair = { '1v16': 0, '8v9': 1, '5v12': 2, '4v13': 3, '6v11': 4, '3v14': 5, '7v10': 6, '2v15': 7 };
     const defaultFinalFourPairings = [['South', 'East'], ['West', 'Midwest']];
     const REGION_COLORS = {
@@ -2129,6 +2369,7 @@
       localStorage.setItem(POOL_SIZE_STORAGE_KEY, String(poolSize));
       refreshAllSignals();
       updateUpsetRec();
+      renderEdgeOptimizer();
     }
 
     function getUpsetRecommendation(size) {
@@ -3755,8 +3996,168 @@
       return 'bad';
     }
 
+    function getPoolTierConfig(size) {
+      const n = clampPoolSize(size);
+      if (n <= poolPlaybook.small.max) return poolPlaybook.small;
+      if (n <= poolPlaybook.medium.max) return poolPlaybook.medium;
+      if (n <= poolPlaybook.large.max) return poolPlaybook.large;
+      return poolPlaybook.huge;
+    }
+
+    function classifyAgainstBand(value, band) {
+      if (!Array.isArray(band) || band.length < 2) return 'warn';
+      return classifyBand(value, band[0], band[1]);
+    }
+
+    function pct1(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? (n * 100).toFixed(1) + '%' : '--';
+    }
+
+    function pct2(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? (n * 100).toFixed(2) : '--';
+    }
+
+    function safeLeverageRatio(modelProb, publicProb) {
+      const m = Number(modelProb);
+      const o = Number(publicProb);
+      if (!Number.isFinite(m) || !Number.isFinite(o) || o <= 0) return 0;
+      return m / o;
+    }
+
+    function currentChampionPick() {
+      const champId = finalIds?.NCG?.[0];
+      if (!champId) return null;
+      const winner = getWinnerTeam(champId);
+      if (!winner || !winner.name) return null;
+      return winner.name;
+    }
+
+    function countFinalFourNonOneSeeds() {
+      let nonOne = 0;
+      for (const nodeId of (finalIds?.F4 || [])) {
+        const pickName = bracketState?.picks?.[nodeId];
+        if (!pickName) continue;
+        const node = nodesById.get(nodeId);
+        if (!node) continue;
+        const [t1, t2] = getMatchTeams(node);
+        const picked = normalizeName(t1?.name) === normalizeName(pickName) ? t1 :
+          (normalizeName(t2?.name) === normalizeName(pickName) ? t2 : null);
+        if (!picked) continue;
+        const seed = Number(picked.seed);
+        if (Number.isFinite(seed) && seed > 1) nonOne += 1;
+      }
+      return nonOne;
+    }
+
+    function computeContenderScore(row, tier) {
+      const model = normalizeProbability(row?.modelTitle, 0);
+      const publicPick = normalizeProbability(row?.publicTitle, 0);
+      const uniq = Math.max(0, 1 - publicPick);
+      const levRatio = safeLeverageRatio(model, publicPick);
+      const levNorm = Math.max(0, Math.min(1.5, levRatio)) / 1.5;
+      const champUtility = model * Math.max(0, 1 - publicPick);
+      const corrProxy = normalizeProbability((roundAdvanceProbs?.[row.team]?.F4 || 0), 0);
+      const w = tier.weights;
+      let score = (w.ep * model) + (w.uniq * uniq) + (w.lev * levNorm) + (w.champ * (champUtility * 3.5)) + (w.corr * corrProxy);
+      if (normalizeName(row.team) === normalizeName(tier.championBias)) score += 0.03;
+      return {
+        ...row,
+        model,
+        publicPick,
+        uniq,
+        levRatio,
+        champUtility,
+        score
+      };
+    }
+
+    function renderEdgeOptimizer() {
+      const tier = getPoolTierConfig(poolSize);
+      const tierBadge = document.getElementById('edgeTierBadge');
+      const champEl = document.getElementById('edgeChampRecommend');
+      const reasonEl = document.getElementById('edgeChampReason');
+      const scoreEl = document.getElementById('edgeChampScore');
+      const utilityEl = document.getElementById('edgeChampUtility');
+      const ownEl = document.getElementById('edgeChampOwn');
+      const currentEl = document.getElementById('edgeCurrentPick');
+      const adviceEl = document.getElementById('edgeAdvice');
+      const tableEl = document.getElementById('edgeTable');
+      if (!tierBadge || !champEl || !reasonEl || !scoreEl || !utilityEl || !ownEl || !currentEl || !adviceEl || !tableEl) return;
+
+      tierBadge.textContent = tier.label;
+      const ranked = contenderMatrix
+        .map((row) => computeContenderScore(row, tier))
+        .sort((a, b) => Number(b.score) - Number(a.score));
+      const top = ranked[0];
+      if (!top) return;
+      champEl.textContent = top.team + ' (#' + top.seed + ' ' + top.region + ')';
+      reasonEl.textContent = 'Weighted for ' + tier.label + ': title probability versus duplication risk.';
+      scoreEl.textContent = pct2(top.score);
+      scoreEl.className = 'edge-stat-val ' + (top.score >= 0.28 ? 'good' : (top.score >= 0.22 ? 'warn' : 'bad'));
+      utilityEl.textContent = pct2(top.champUtility);
+      ownEl.textContent = pct1(top.publicPick);
+
+      const userChamp = currentChampionPick();
+      if (userChamp) {
+        const userRow = ranked.find((r) => normalizeName(r.team) === normalizeName(userChamp));
+        if (userRow) {
+          const delta = top.score - userRow.score;
+          const state = delta <= 0.005 ? 'good' : (delta <= 0.03 ? 'warn' : 'bad');
+          currentEl.innerHTML = 'Current champion: <strong>' + escHtml(getDisplayName(userChamp)) + '</strong> | first-place score ' +
+            '<span class="edge-stat-val ' + state + '">' + pct2(userRow.score) + '</span>' +
+            ' (delta vs optimizer ' + (delta >= 0 ? '-' : '+') + pct2(Math.abs(delta)) + ').';
+        } else {
+          currentEl.innerHTML = 'Current champion: <strong>' + escHtml(getDisplayName(userChamp)) + '</strong>. Team not in top contender matrix, high variance profile.';
+        }
+      } else {
+        currentEl.textContent = 'Build your title game pick to unlock champion-specific guidance.';
+      }
+
+      const actualUpsets = countUserUpsets();
+      const f4NonOne = countFinalFourNonOneSeeds();
+      const advice = [
+        'Round of 64 upset target: ' + tier.upsetTarget[0] + '-' + tier.upsetTarget[1] + ' true upsets.',
+        'Final Four structure: ' + tier.finalFourTargetNon1[0] + '-' + tier.finalFourTargetNon1[1] + ' non-1 seeds.',
+        tier.tacticalRule,
+        actualUpsets < tier.upsetTarget[0]
+          ? 'You are under target on upsets (' + actualUpsets + '). Add selective leverage in 7/10 and 8/9 ranges.'
+          : (actualUpsets > tier.upsetTarget[1]
+            ? 'You are over target on upsets (' + actualUpsets + '). Trim low-probability noise.'
+            : 'Your upset volume is in range (' + actualUpsets + ').'),
+        f4NonOne < tier.finalFourTargetNon1[0]
+          ? 'Final Four is too chalk-heavy for this pool tier.'
+          : (f4NonOne > tier.finalFourTargetNon1[1]
+            ? 'Final Four may be too volatile for this pool tier.'
+            : 'Final Four diversification is aligned with pool size.')
+      ];
+      adviceEl.innerHTML = advice.map((line) => '<li>' + escHtml(line) + '</li>').join('');
+
+      const rows = ranked.slice(0, 6).map((row) => {
+        const levClass = row.levRatio >= 1 ? 'g' : (row.levRatio >= 0.7 ? 'o' : 'm');
+        return '<div class="edge-row">' +
+          '<span>' + escHtml(row.team) + ' <span class="m">#' + row.seed + '</span></span>' +
+          '<span class="r">' + pct1(row.model) + '</span>' +
+          '<span class="r">' + pct1(row.publicPick) + '</span>' +
+          '<span class="r ' + levClass + '">' + row.levRatio.toFixed(2) + 'x</span>' +
+          '<span class="r">' + pct2(row.score) + '</span>' +
+          '</div>';
+      }).join('');
+      tableEl.innerHTML =
+        '<div class="edge-row head"><span>Team</span><span class="r">Model</span><span class="r">Public</span><span class="r">Lev</span><span class="r">Score</span></div>' +
+        rows;
+    }
+
     function updateBracketChecklist() {
       const completion = computeCompletion();
+      const tier = getPoolTierConfig(poolSize);
+      const upsetBand = tier.upsetTarget;
+      const underdogBand = [Math.max(0, upsetBand[0] + 2), upsetBand[1] + 3];
+      const seed10Band = tier.key === 'small' ? [0, 1] : [1, 3];
+      const seed11Band = tier.key === 'small' ? [0, 1] : [1, 3];
+      const seed12Band = tier.key === 'small' ? [0, 1] : [1, 3];
+      const longshotBand = tier.key === 'huge' ? [1, 3] : [0, 2];
       let trueUpsets = 0;
       let underdogWins = 0;
       const seedWins = { 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0 };
@@ -3785,13 +4186,13 @@
       }
 
       const longshotTotal = seedWins[13] + seedWins[14] + seedWins[15] + seedWins[16];
-      setChecklistCell('checkTrueUpsets', `${trueUpsets} / 6-7`, classifyBand(trueUpsets, 6, 7));
-      setChecklistCell('checkUnderdogWins', `${underdogWins} / 8-9`, classifyBand(underdogWins, 8, 9));
+      setChecklistCell('checkTrueUpsets', `${trueUpsets} / ${upsetBand[0]}-${upsetBand[1]}`, classifyAgainstBand(trueUpsets, upsetBand));
+      setChecklistCell('checkUnderdogWins', `${underdogWins} / ${underdogBand[0]}-${underdogBand[1]}`, classifyAgainstBand(underdogWins, underdogBand));
       setChecklistCell('checkSeed9', `${seedWins[9]} / ~2`, classifyApprox(seedWins[9], 2));
-      setChecklistCell('checkSeed10', `${seedWins[10]} / 1-2`, classifyBand(seedWins[10], 1, 2));
-      setChecklistCell('checkSeed11', `${seedWins[11]} / ~2`, classifyApprox(seedWins[11], 2));
-      setChecklistCell('checkSeed12', `${seedWins[12]} / 1-2`, classifyBand(seedWins[12], 1, 2));
-      setChecklistCell('checkSeedLongshots', `${longshotTotal} / 0-2 total`, classifyBand(longshotTotal, 0, 2));
+      setChecklistCell('checkSeed10', `${seedWins[10]} / ${seed10Band[0]}-${seed10Band[1]}`, classifyAgainstBand(seedWins[10], seed10Band));
+      setChecklistCell('checkSeed11', `${seedWins[11]} / ${seed11Band[0]}-${seed11Band[1]}`, classifyAgainstBand(seedWins[11], seed11Band));
+      setChecklistCell('checkSeed12', `${seedWins[12]} / ${seed12Band[0]}-${seed12Band[1]}`, classifyAgainstBand(seedWins[12], seed12Band));
+      setChecklistCell('checkSeedLongshots', `${longshotTotal} / ${longshotBand[0]}-${longshotBand[1]} total`, classifyAgainstBand(longshotTotal, longshotBand));
 
       const s16Picks = completion.S16;
       const e8Picks = completion.E8;
@@ -3823,22 +4224,23 @@
       if (validR64Games < 32) {
         baselineBadge.textContent = 'IN PROGRESS';
         baselineBadge.classList.add('pending');
-        note.textContent = `Round 1 picks: ${validR64Games}/32 complete. Finish Round 1 to run pass/fail against the historical upset band.`;
+        note.textContent = `Round 1 picks: ${validR64Games}/32 complete. Finish Round 1 to validate against ${tier.label} target bands.`;
         return;
       }
 
       const baselinePass = (
-        trueUpsets >= 6 && trueUpsets <= 7 &&
-        underdogWins >= 8 && underdogWins <= 9 &&
-        seedWins[10] >= 1 && seedWins[10] <= 2 &&
-        seedWins[12] >= 1 && seedWins[12] <= 2 &&
-        longshotTotal <= 2
+        trueUpsets >= upsetBand[0] && trueUpsets <= upsetBand[1] &&
+        underdogWins >= underdogBand[0] && underdogWins <= underdogBand[1] &&
+        seedWins[10] >= seed10Band[0] && seedWins[10] <= seed10Band[1] &&
+        seedWins[11] >= seed11Band[0] && seedWins[11] <= seed11Band[1] &&
+        seedWins[12] >= seed12Band[0] && seedWins[12] <= seed12Band[1] &&
+        longshotTotal >= longshotBand[0] && longshotTotal <= longshotBand[1]
       );
       baselineBadge.textContent = baselinePass ? 'BASELINE PASS' : 'BASELINE FAIL';
       baselineBadge.classList.add(baselinePass ? 'pass' : 'warn');
       note.textContent = baselinePass
-        ? 'Round 1 allocation is within target bands. Next step is controlling deep-round chaos for your pool size.'
-        : 'Round 1 allocation is outside target bands. Tighten upset distribution before locking later rounds.';
+        ? `Round 1 allocation is within ${tier.label} target bands. Next step is controlling deep-round chaos.`
+        : `Round 1 allocation is outside ${tier.label} target bands. Tighten upset distribution before locking later rounds.`;
     }
 
     function prerequisiteRound(node) {
@@ -4012,6 +4414,7 @@
         pill.classList.toggle('active', !!activeStrategy && key === activeStrategy);
       });
       updateBracketChecklist();
+      renderEdgeOptimizer();
       bracketState.activeStrategy = activeStrategy || 'custom';
       saveState();
     }
