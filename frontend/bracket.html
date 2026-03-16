@@ -2698,15 +2698,24 @@
       }
       return overlap * 10;
     }
+    function scoreTeamSummaryTieBreaker(teamName, row) {
+      const teamTokens = summaryTokens(normalizeName(teamName));
+      const rowTokens = summaryTokens(String(row?.teamNorm || ''));
+      if (!teamTokens.length || !rowTokens.length) return Number.POSITIVE_INFINITY;
+      return Math.abs(rowTokens.length - teamTokens.length);
+    }
     function findTeamHumanSummary(teamName) {
       if (!teamName) return null;
       let best = null;
       let bestScore = 0;
+      let bestTie = Number.POSITIVE_INFINITY;
       for (const row of teamHumanSummaryRows) {
         const score = scoreTeamSummaryMatch(teamName, row);
-        if (score > bestScore) {
+        const tie = scoreTeamSummaryTieBreaker(teamName, row);
+        if (score > bestScore || (score === bestScore && tie < bestTie)) {
           best = row;
           bestScore = score;
+          bestTie = tie;
         }
       }
       return bestScore >= 20 ? best : null;
@@ -5693,11 +5702,12 @@
 
     function getPublicRoundProbability(teamName, roundKey, context = {}) {
       const sourceMode = String(context?.publicSource || '').toLowerCase();
-      const matrixOnly = sourceMode === 'yahoo_matrix';
+      const matrixPreferred = sourceMode === 'yahoo_matrix';
+      let allowSeedFallback = context?.allowSeedFallback;
+      if (matrixPreferred && allowSeedFallback == null) allowSeedFallback = false;
       const matrixRow = getByTeamNameLoose(exactTeamPublicRoundProbs, teamName) || {};
       const matrixProb = normalizeProbability(matrixRow?.[normalizeRoundKeyClient(roundKey)], null);
       if (matrixProb != null) return matrixProb;
-      if (matrixOnly) return null;
 
       const best = findBestPublicRowForTeam(teamName, roundKey, context);
       if (best && best.pct != null) return best.pct;
@@ -5722,13 +5732,29 @@
 
       const fallbackPublic = normalizeProbability(context?.fallbackPublic, null);
       if (fallbackPublic != null) return fallbackPublic;
-      if (context?.allowSeedFallback === false) return null;
+      if (allowSeedFallback === false) return null;
       const seed = Number(context?.seed);
       if (!Number.isFinite(seed)) return null;
       const seedBase = normalizeProbability(SEED_PUBLIC_EST[Math.max(1, Math.min(16, seed))], null);
       if (seedBase == null) return null;
       const decay = { R64: 1.0, R32: 0.78, S16: 0.54, E8: 0.34, F4: 0.18, NCG: 0.08 }[targetRound] || 0.08;
       return Math.max(0, Math.min(1, seedBase * decay));
+    }
+
+    function resolveDisplayFlagForMatchup(matchup) {
+      const raw = String(matchup?.display_flag || matchup?.upset_flag || '').toLowerCase().replace(/\s+/g, '_');
+      if (raw !== 'upset_alert' && raw !== 'upset_watch') return raw || 'chalk';
+      const s1 = Number(matchup?.team1?.seed);
+      const s2 = Number(matchup?.team2?.seed);
+      if (!Number.isFinite(s1) || !Number.isFinite(s2)) return raw;
+      const diff = Math.abs(s1 - s2);
+      if (diff < 2) return 'toss_up';
+      const p1 = normalizeProbability(matchup?.win_prob_t1 ?? matchup?.team1?.win_pct, null);
+      const p2 = normalizeProbability(matchup?.win_prob_t2 ?? matchup?.team2?.win_pct, p1 == null ? null : (1 - p1));
+      if (p1 == null || p2 == null) return raw;
+      const favIsA = s1 <= s2;
+      const underdogFavored = favIsA ? (p1 < 0.5) : (p2 < 0.5);
+      return underdogFavored ? raw : 'competitive';
     }
 
     function getPublicPerceptionForMatchup(matchup, teamAName, teamBName) {
@@ -6305,7 +6331,7 @@
       const roundLabel = PICK_ROUND_LABELS[m.round] || (m.round || 'R64');
       document.getElementById('pcRegion').textContent =
         (m.region || '') + ' \u00b7 ' + roundLabel + netCompare;
-      setFlag(m.display_flag || m.upset_flag, m.confidence_tier);
+      setFlag(resolveDisplayFlagForMatchup(m), m.confidence_tier);
 
       setTeam('A', tA, pctA, colorA, currentPick === 'a', !!currentPick);
       setTeam('B', tB, pctB, colorB, currentPick === 'b', !!currentPick);
