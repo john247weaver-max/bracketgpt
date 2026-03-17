@@ -2757,8 +2757,14 @@
       const teamNorm = normalizeName(teamName);
       const rowNorm = String(row?.teamNorm || '');
       if (!teamNorm || !rowNorm) return 0;
+      const teamHasStateMarker = /\b(state|st)\b/.test(teamNorm);
+      const rowHasStateMarker = /\b(state|st)\b/.test(rowNorm);
       if (teamNorm === rowNorm) return 100;
-      if (rowNorm.includes(teamNorm) || teamNorm.includes(rowNorm)) return 60;
+      if (rowNorm.includes(teamNorm) || teamNorm.includes(rowNorm)) {
+        // Avoid mapping base school names (e.g. "Michigan") to "... State" summaries.
+        if (!teamHasStateMarker && rowHasStateMarker) return 35;
+        return 60;
+      }
       const a = new Set(summaryTokens(teamNorm));
       const b = new Set(summaryTokens(rowNorm));
       let overlap = 0;
