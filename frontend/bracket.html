@@ -789,7 +789,7 @@
   }
   .strategy-pill {
     border: 0;
-    border-right: 1px solid var(--bg-line);
+    border-bottom: 1px solid var(--bg-line);
     background: transparent;
     color: var(--text-muted);
     padding: 8px;
@@ -800,7 +800,7 @@
     justify-content: space-between;
     gap: 8px;
   }
-  .strategy-pill:last-child { border-right: 0; }
+  .strategy-pill:last-child { border-bottom: 0; }
   .strategy-pill.active { background: var(--accent); color: #0d0f12; }
   .strategy-pill.open-slot {
     cursor: default;
@@ -1874,6 +1874,67 @@
   .pc-lev-muted {
     color: var(--muted) !important;
   }
+  .pc-rr-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px;
+  }
+  .pc-rr-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 8px;
+    display: grid;
+    gap: 8px;
+  }
+  .pc-rr-team {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .pc-rr-block {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    display: grid;
+    gap: 4px;
+  }
+  .pc-rr-block.reward {
+    background: rgba(0,168,70,0.10);
+    border-color: rgba(0,168,70,0.35);
+  }
+  .pc-rr-block.risk {
+    background: rgba(211,47,47,0.10);
+    border-color: rgba(211,47,47,0.35);
+  }
+  .pc-rr-title {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .10em;
+    text-transform: uppercase;
+  }
+  .pc-rr-block.reward .pc-rr-title { color: var(--green); }
+  .pc-rr-block.risk .pc-rr-title { color: var(--red); }
+  .pc-rr-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .pc-rr-metric strong {
+    font-size: 12px;
+    color: var(--text);
+    letter-spacing: .03em;
+  }
+  .pc-rr-note {
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--text-label);
+  }
 
   .pc-btns { padding: 0 16px 16px; display: flex; gap: 8px; }
   .pc-btn {
@@ -1959,17 +2020,16 @@
     .grid { grid-template-columns: 1fr; }
     .region-column { min-width: 0; max-width: none; padding-right: 20px; }
     .strategy-bar { flex-direction: column; align-items: stretch; }
-    .strategy-right { justify-content: space-between; width: 100%; }
-    .upset-rec { padding: 0; margin-left: auto; }
     .nav-inner { align-items: stretch; flex-direction: column; gap: 6px; }
     .round-tabs { display: flex; width: 100%; }
-    .pool-size-control { width: 100%; justify-content: flex-end; }
+    .pool-size-control { width: auto; justify-content: flex-end; }
     .optimizer-checklist-grid { grid-template-columns: 1fr; }
     .tophead h1 { font-size: 24px; }
     .tophead-sub { font-size: 11px; }
     .edge-main { grid-template-columns: 1fr; }
     .edge-row { grid-template-columns: 1fr .7fr .7fr .7fr .7fr; gap: 6px; font-size: 10px; }
     .chat-quick-grid { grid-template-columns: 1fr; }
+    .pc-rr-grid { grid-template-columns: 1fr; }
     .round-col { display: none; }
     .round-col.visible { display: block; }
     .mobile-tabs { display: grid; }
@@ -2021,6 +2081,17 @@
               <div class="topbar-kicker">2026 model + pool edge board</div>
               <h1>Interactive Bracket</h1>
               <div class="tophead-sub">Round model probabilities, public differentials, and leverage guardrails in one flow.</div>
+              <div class="pool-size-control" style="margin-top: 12px;">
+                <span class="pool-size-label">Pool</span>
+                <input
+                  type="number"
+                  id="poolSizeInput"
+                  class="pool-size-input"
+                  min="2" max="999" value="50"
+                  oninput="onPoolSizeChange(this.value)"
+                >
+                <span class="pool-size-unit">people</span>
+              </div>
             </div>
             <div class="actions">
               <button class="btn btn-secondary" onclick="startGuidedFlow()">Start Picking</button>
@@ -2074,54 +2145,9 @@
               <span class="strategy-ep" id="ep-lev_max">-- EP</span>
             </button>
           </div>
-          <div class="strategy-right">
-            <div class="upset-rec" id="upsetRec">
-              <div class="upset-rec-circle" id="upsetRecCircle">0</div>
-              <div class="upset-rec-text" id="upsetRecText"></div>
-            </div>
-          </div>
-        </section>
-        <section class="optimizer-checklist" id="optimizerChecklist" aria-live="polite">
-          <div class="optimizer-checklist-head">
-            <span class="optimizer-checklist-title">Bracket Checklist</span>
-            <span class="optimizer-checklist-badge pending" id="checklistBaselineBadge">IN PROGRESS</span>
-          </div>
-          <div class="optimizer-checklist-grid">
-            <div class="optimizer-check-row">
-              <span class="optimizer-check-label">R1 true upsets (ex 8/9)</span>
-              <span class="optimizer-check-value" id="checkTrueUpsets">0 / 6-7</span>
-            </div>
-            <div class="optimizer-check-row">
-              <span class="optimizer-check-label">R1 underdog wins (inc 9/8)</span>
-              <span class="optimizer-check-value" id="checkUnderdogWins">0 / 8-9</span>
-            </div>
-            <div class="optimizer-check-row">
-              <span class="optimizer-check-label">9 seed wins</span>
-              <span class="optimizer-check-value" id="checkSeed9">0 / ~2</span>
-            </div>
-            <div class="optimizer-check-row">
-              <span class="optimizer-check-label">10 seed wins</span>
-              <span class="optimizer-check-value" id="checkSeed10">0 / 1-2</span>
-            </div>
-            <div class="optimizer-check-row">
-              <span class="optimizer-check-label">11 seed wins</span>
-              <span class="optimizer-check-value" id="checkSeed11">0 / ~2</span>
-            </div>
-            <div class="optimizer-check-row">
-              <span class="optimizer-check-label">12 seed wins</span>
-              <span class="optimizer-check-value" id="checkSeed12">0 / 1-2</span>
-            </div>
-            <div class="optimizer-check-row">
-              <span class="optimizer-check-label">13/14/15/16 wins</span>
-              <span class="optimizer-check-value" id="checkSeedLongshots">0 / 0-2 total</span>
-            </div>
-            <div class="optimizer-check-row">
-              <span class="optimizer-check-label">Structure quality</span>
-              <span class="optimizer-check-value" id="checkStructureQuality">Pending</span>
-            </div>
-          </div>
-          <div class="optimizer-check-foot" id="checklistNote">
-            Finish Round 1 picks to run full historical baseline validation.
+          <div class="upset-rec">
+            <div class="upset-rec-circle" id="upsetRecCircle">0</div>
+            <div class="upset-rec-text" id="upsetRecText">Play chalk — no strong upset value at this pool size</div>
           </div>
         </section>
         <div class="nav-inner">
@@ -2131,17 +2157,6 @@
             <button class="round-tab" data-round="S16">Sweet 16</button>
             <button class="round-tab" data-round="E8">Elite 8</button>
             <button class="round-tab" data-round="F4">Final 4</button>
-          </div>
-          <div class="pool-size-control">
-            <span class="pool-size-label">Pool</span>
-            <input
-              type="number"
-              id="poolSizeInput"
-              class="pool-size-input"
-              min="2" max="999" value="50"
-              oninput="onPoolSizeChange(this.value)"
-            >
-            <span class="pool-size-unit">people</span>
           </div>
         </div>
 
@@ -2214,6 +2229,60 @@
       </div>
     </div>
   </div>
+  <button class="btn btn-secondary optimizer-toggle" onclick="toggleOptimizer()">
+    <i class="strategy-icon" data-lucide="sliders-horizontal"></i>
+    Edge Optimizer
+  </button>
+  <aside id="optimizerPanel" class="optimizer-panel" aria-live="polite">
+    <div class="opt-title"><i data-lucide="chart-no-axes-combined"></i> Edge Optimizer</div>
+    <section class="optimizer-checklist" id="optimizerChecklist">
+      <div class="optimizer-checklist-head">
+        <span class="optimizer-checklist-title">Bracket Checklist</span>
+        <span class="optimizer-checklist-badge pending" id="checklistBaselineBadge">IN PROGRESS</span>
+      </div>
+      <div class="optimizer-checklist-grid">
+        <div class="optimizer-check-row">
+          <span class="optimizer-check-label">R1 true upsets (ex 8/9)</span>
+          <span class="optimizer-check-value" id="checkTrueUpsets">0 / 6-7</span>
+        </div>
+        <div class="optimizer-check-row">
+          <span class="optimizer-check-label">R1 underdog wins (inc 9/8)</span>
+          <span class="optimizer-check-value" id="checkUnderdogWins">0 / 8-9</span>
+        </div>
+        <div class="optimizer-check-row">
+          <span class="optimizer-check-label">9 seed wins</span>
+          <span class="optimizer-check-value" id="checkSeed9">0 / ~2</span>
+        </div>
+        <div class="optimizer-check-row">
+          <span class="optimizer-check-label">10 seed wins</span>
+          <span class="optimizer-check-value" id="checkSeed10">0 / 1-2</span>
+        </div>
+        <div class="optimizer-check-row">
+          <span class="optimizer-check-label">11 seed wins</span>
+          <span class="optimizer-check-value" id="checkSeed11">0 / ~2</span>
+        </div>
+        <div class="optimizer-check-row">
+          <span class="optimizer-check-label">12 seed wins</span>
+          <span class="optimizer-check-value" id="checkSeed12">0 / 1-2</span>
+        </div>
+        <div class="optimizer-check-row">
+          <span class="optimizer-check-label">13/14/15/16 wins</span>
+          <span class="optimizer-check-value" id="checkSeedLongshots">0 / 0-2 total</span>
+        </div>
+        <div class="optimizer-check-row">
+          <span class="optimizer-check-label">Structure quality</span>
+          <span class="optimizer-check-value" id="checkStructureQuality">Pending</span>
+        </div>
+      </div>
+      <div class="optimizer-check-foot" id="checklistNote">
+        Finish Round 1 picks to run full historical baseline validation.
+      </div>
+    </section>
+    <div class="opt-title"><i data-lucide="medal"></i> Team EP Rankings</div>
+    <div id="optimizerRankings"></div>
+    <div class="opt-title"><i data-lucide="trophy"></i> Title Odds</div>
+    <div id="optimizerChamps"></div>
+  </aside>
 
   <div class="overlay" id="overlay" onclick="closeOverlay(event)">
     <div class="pick-card" id="pickCard">
@@ -2419,16 +2488,85 @@
     };
     const TEAM_MAPPING_SOURCE_PATH = '/data/team_name_mapping_2026.json';
     const LEGACY_ALIAS_CANONICAL = {
+      // florida & miami variants
+      'miami fl': 'miami',
+      'miami (fl)': 'miami',
+      'miami florida': 'miami',
+      'miami-florida': 'miami',
+      'central florida': 'ucf',
+      'florida central': 'ucf',
+      'florida intl': 'fiu',
+      'florida international': 'fiu',
+      'florida gulf coast': 'fgcu',
+      'florida atlantic': 'fau',
+
+      // common abbreviations & formal names
+      'connecticut': 'uconn',
       'ole miss': 'mississippi',
-      'uconn': 'connecticut',
-      'saint marys': 'st marys ca',
-      'mount st marys': 'mt st marys',
-      'omaha': 'ne omaha',
-      'siu edwardsville': 'siue',
-      'uncw': 'unc wilmington',
+      'southern cal': 'usc',
+      'southern california': 'usc',
+      'penn': 'pennsylvania',
+      'pitt': 'pittsburgh',
+      'brigham young': 'byu',
+      'southern methodist': 'smu',
+      'massachusetts': 'umass',
+      'virginia commonwealth': 'vcu',
+      'va commonwealth': 'vcu',
+      'texas christian': 'tcu',
+      'texas el paso': 'utep',
+      'texas san antonio': 'utsa',
+
+      // state vs st adjustments
+      'san diego st': 'san diego state',
+      'nc state': 'north carolina st',
+      'north carolina state': 'north carolina st',
+      'michigan state': 'michigan st',
       'colorado state': 'colorado st',
+      'new mexico state': 'new mexico st',
+      'utah state': 'utah st',
       'norfolk state': 'norfolk st',
-      'utah state': 'utah st'
+      'mcneese state': 'mcneese',
+      'nicholls state': 'nicholls',
+      'appalachian state': 'appalachian st',
+
+      // the cal system
+      'california': 'cal',
+      'uc berkeley': 'cal',
+      'uc santa barbara': 'ucsb',
+      'uc irvine': 'uci',
+      'uc davis': 'ucd',
+
+      // saint and mount variations
+      'saint marys': 'st marys ca',
+      'saint mary\'s': 'st marys ca',
+      'st. mary\'s': 'st marys ca',
+      'saint johns': 'st johns',
+      'st. john\'s': 'st johns',
+      'saint josephs': 'st josephs',
+      'st. joseph\'s': 'st josephs',
+      'saint louis': 'st louis',
+      'saint peters': 'st peters',
+      'mount st marys': 'mt st marys',
+      'mt. st. mary\'s': 'mt st marys',
+
+      // north carolina system
+      'unc': 'north carolina',
+      'north carolina tar heels': 'north carolina',
+      'uncw': 'unc wilmington',
+      'unc greensboro': 'uncg',
+
+      // oddities & directionals
+      'stephen f austin': 'sfa',
+      'loyola (il)': 'loyola chicago',
+      'loyola il': 'loyola chicago',
+      'omaha': 'ne omaha',
+      'nebraska omaha': 'ne omaha',
+      'siu edwardsville': 'siue',
+      'texas rio grande valley': 'utrgv',
+      'cal baptist': 'california baptist',
+      'cbu': 'california baptist',
+      'fort wayne': 'purdue fort wayne',
+      'pfw': 'purdue fort wayne'
     };
 
     let baseMatchups = [];
@@ -6769,12 +6907,17 @@
     }
 
     function updateStrategyBar() {
-      const fallback = buildOptimizerStrategies();
+      // Recompute from local matchup win probabilities (R64 + later-round XGBoost predictions)
+      // so EP pills reflect the current pool-size-driven leverage settings.
+      const recalculated = buildOptimizerStrategies();
       for (const key of strategyKeys) {
         const live = Number(strategyMap[key]?.total_ep);
-        const ep = Number.isFinite(live) ? live : safeNum(fallback[key], 0);
+        const calc = Number(recalculated[key]);
+        const ep = Number.isFinite(calc) ? calc : (Number.isFinite(live) ? live : 0);
         const el = document.getElementById('ep-' + key);
         if (el) el.textContent = ep.toFixed(1) + ' EP';
+        if (!strategyMap[key]) strategyMap[key] = {};
+        strategyMap[key].total_ep = ep;
       }
     }
 
