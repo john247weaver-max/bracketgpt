@@ -51,8 +51,6 @@
   }
   a { color: inherit; text-decoration: none; }
   button, input, select { font: inherit; }
-  .font-condensed { }
-  .font-base { }
 
   .nav {
     position: sticky;
@@ -930,6 +928,7 @@
     font-size: 16px; font-weight: 900;
     text-align: center;
     padding: 5px 6px;
+    appearance: textfield;
     -moz-appearance: textfield;
   }
   .pool-size-input::-webkit-outer-spin-button,
@@ -4806,7 +4805,6 @@
       clearDescendantPicks(matchId);
       saveState();
       // Selective DOM rendering: only update this matchup and related nodes
-      const node = nodesById.get(matchId);
       if (node) {
         const [t1, t2] = getMatchTeams(node);
         const winnerEl = document.querySelector(`[data-matchup-id="${matchId}"] .mp-team[data-team="${winnerName}"]`);
