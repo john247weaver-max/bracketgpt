@@ -4805,7 +4805,17 @@
       }
       clearDescendantPicks(matchId);
       saveState();
-      renderAll();
+      // Selective DOM rendering: only update this matchup and related nodes
+      const node = nodesById.get(matchId);
+      if (node) {
+        const [t1, t2] = getMatchTeams(node);
+        const winnerEl = document.querySelector(`[data-matchup-id="${matchId}"] .mp-team[data-team="${winnerName}"]`);
+        const loserName = t1?.name === winnerName ? t2?.name : t1?.name;
+        const loserEl = document.querySelector(`[data-matchup-id="${matchId}"] .mp-team[data-team="${loserName}"]`);
+        if (winnerEl) winnerEl.classList.add('picked');
+        if (loserEl) loserEl.classList.add('eliminated');
+      }
+      renderProgress();
       updateUpsetRec();
       const thisIdx = PICK_SEQUENCE_INDEX.get(matchId);
       if (Number.isInteger(thisIdx)) currentPickIndex = thisIdx;
@@ -7225,8 +7235,16 @@
         lines.push(node.round + ': ' + pick + ' over ' + (loser || 'TBD'));
       }
       const text = 'BracketGPT 2026 Picks\n' + lines.join('\n');
-      try { await navigator.clipboard.writeText(text); alert('Bracket copied to clipboard'); }
-      catch (e) { alert(text); }
+      // Generate blob and trigger download
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'BracketGPT_Picks_2026.txt';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
 
     async function init() {

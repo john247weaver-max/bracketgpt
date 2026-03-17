@@ -13,7 +13,10 @@ try {
 const app = express();
 app.use(cors());
 if (compression) app.use(compression());
-app.use(express.json({ limit: '50mb' }));
+// Global limit reduced to 1mb to prevent OOM
+app.use(express.json({ limit: '1mb' }));
+// Specific high-limit parser for admin routes only
+const adminJsonParser = express.json({ limit: '50mb' });
 
 const DATA_DIR = path.join(__dirname, 'data');
 const TMP_DIR = path.join(DATA_DIR, 'tmp');
@@ -90,7 +93,10 @@ const cfg = {
 
 function saveCfg() {
   try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+    // Atomic write: write to temp file first, then rename
+    const tmpFile = CONFIG_FILE + '.tmp';
+    fs.writeFileSync(tmpFile, JSON.stringify(cfg, null, 2));
+    fs.renameSync(tmpFile, CONFIG_FILE);
   } catch (e) {
     // noop
   }
@@ -2483,7 +2489,7 @@ function findCtx(query, opts = {}) {
   // Base dedupe before optimization
   const seen = new Set();
   const deduped = ctx.filter((item) => {
-    const key = JSON.stringify(item);
+    const key = ctxFingerprint(item);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -2595,13 +2601,24 @@ function buildSeedMatchupSubset(predictions) {
 }
 
 function getRelevantHistoricalContext(userMessage) {
-  const cacheKey = normalizeTeamName(userMessage || '');
+  // Extract intents and teams first for better cache key
+  const flags = classifyHistoricalQuery(userMessage);
+  const mentionedTeams = detectMentionedTeamsFromQuery(userMessage);
+  
+  // Build cache key from extracted intents and teams instead of raw message
+  const cacheKeyParts = [
+    flags.isUpsets ? 'upsets' : '',
+    flags.isFinalFour ? 'ff' : '',
+    flags.isChampion ? 'champ' : '',
+    flags.isEliteEight ? 'e8' : '',
+    flags.isCompare ? 'compare' : '',
+    ...mentionedTeams.map(t => normalizeTeamName(t))
+  ].filter(Boolean);
+  const cacheKey = cacheKeyParts.join('|');
+  
   if (cacheKey && historicalIndex.contextCache.has(cacheKey)) {
     return historicalIndex.contextCache.get(cacheKey);
   }
-
-  const flags = classifyHistoricalQuery(userMessage);
-  const mentionedTeams = detectMentionedTeamsFromQuery(userMessage);
   const seen = new Set();
   const relevantPreds = [];
   const addPred = (pred) => {
@@ -3021,7 +3038,11 @@ function flattenBracketGames(node, out = []) {
     node.team || node.team_name || node.name || node.school ||
     node.seed || node.region || node.slot || node.home_team || node.away_team
   );
-  if (looksLikeGame) out.push(node);
+  if (looksLikeGame) {
+    out.push(node);
+    // Return immediately to avoid processing nested duplicates
+    return out;
+  }
 
   for (const value of Object.values(node)) {
     if (value && (Array.isArray(value) || typeof value === 'object')) {
@@ -3365,6 +3386,7 @@ function sanitizeIncomingMessages(rawMessages) {
     const roleRaw = String(msg.role || '').toLowerCase();
     const role = (roleRaw === 'assistant' || roleRaw === 'system') ? roleRaw : 'user';
     let content = normalizeMessageContent(msg.content);
+    // Hard cap user messages to prevent OOM from malicious or accidental large inputs
     if (role === 'user' && content.length > MAX_USER_MESSAGE_CHARS) {
       content = content.slice(0, MAX_USER_MESSAGE_CHARS);
     }
@@ -4010,7 +4032,7 @@ app.get('/admin/config', auth, (req, res) => {
   res.json({ ...cfg, context: contextCfg(), dataStatus });
 });
 
-app.post('/admin/config', auth, (req, res) => {
+app.post('/admin/config', adminJsonParser, auth, (req, res) => {
   const body = req.body || {};
   for (const key of ['provider', 'apiKey', 'model', 'brandName', 'tagline', 'activeSeason']) {
     if (body[key] !== undefined) cfg[key] = body[key];

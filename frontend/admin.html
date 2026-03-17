@@ -359,9 +359,11 @@
 
     async function refreshUploadViews() {
       try {
+        // Fetch data-status exactly once
         const res = await fetch('/api/admin/data-status', { headers: { 'x-admin-password': pw } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const status = await res.json();
+        // Pass same data synchronously to both renderers
         renderDataStatusFromPayload(status);
         updateUploadBadgesFromPayload(status);
       } catch (e) {
@@ -437,9 +439,9 @@
         temperature: asFloat('tmp'),
         maxTokens: asInt('tok'),
         weights: {
-          baseWeight: asFloat('wb') / 100,
-          upsetWeight: asFloat('wu') / 100,
-          floorWeight: asFloat('wf') / 100,
+          baseWeight: (parseFloat($('wb').value) || 0) / 100,
+          upsetWeight: (parseFloat($('wu').value) || 0) / 100,
+          floorWeight: (parseFloat($('wf').value) || 0) / 100,
         },
         features: {
           showTeamProfiles: $('ftp').classList.contains('on'),
@@ -450,10 +452,10 @@
           includeHistoricalContext: $('fhc').classList.contains('on'),
         },
         context: {
-          maxItems: asInt('cxm'),
-          upsetItems: asInt('cxu'),
-          optimizerItems: asInt('cxo'),
-          titleSeedCutoff: asInt('cxt'),
+          maxItems: parseInt($('cxm').value, 10) || 0,
+          upsetItems: parseInt($('cxu').value, 10) || 0,
+          optimizerItems: parseInt($('cxo').value, 10) || 0,
+          titleSeedCutoff: parseInt($('cxt').value, 10) || 0,
           includeTeamProfiles: $('cftp').classList.contains('on'),
           includeOptimizer: $('cfop').classList.contains('on'),
           includeTitleAngles: $('cfta').classList.contains('on'),
@@ -462,7 +464,7 @@
         brandName: $('bn').value,
         tagline: $('tl').value,
         activeSeason: $('sn').value,
-        messagesPerMinute: asInt('rl'),
+        messagesPerMinute: parseInt($('rl').value, 10) || 0,
       };
       const r = await fetch('/admin/config', {
         method: 'POST',
