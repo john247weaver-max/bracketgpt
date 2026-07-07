@@ -1229,12 +1229,99 @@
   .skeleton { height: 72px; border: 1px solid var(--bg-line); border-radius: 2px; margin-bottom: 8px; background: var(--bg-surface); }
   .error {
     border: 1px solid var(--accent-hot);
-    border-radius: 2px;
+    border-radius: 8px;
     background: var(--bg-surface);
     padding: 12px;
     margin-bottom: 12px;
     font-size: 13px;
     line-height: 1.4;
+  }
+  .empty-state {
+    min-height: 420px;
+    border: 1px solid var(--bg-line);
+    border-radius: 8px;
+    background:
+      linear-gradient(145deg, rgba(26,92,181,0.08), rgba(255,107,43,0.06)),
+      var(--bg-surface);
+    padding: 28px;
+    display: grid;
+    gap: 22px;
+    align-items: center;
+  }
+  .empty-hero {
+    max-width: 780px;
+    display: grid;
+    gap: 12px;
+  }
+  .empty-kicker {
+    width: fit-content;
+    border: 1px solid rgba(26,92,181,0.26);
+    border-radius: 999px;
+    padding: 5px 10px;
+    color: var(--blue);
+    background: rgba(26,92,181,0.08);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+  .empty-hero h2 {
+    margin: 0;
+    color: var(--text);
+    font-size: clamp(34px, 5vw, 58px);
+    line-height: .95;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .empty-hero p {
+    max-width: 620px;
+    margin: 0;
+    color: var(--muted);
+    font-family: var(--fb);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .empty-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .empty-metric {
+    border: 1px solid var(--bg-line);
+    border-radius: 8px;
+    background: rgba(255,255,255,.72);
+    padding: 12px;
+  }
+  .empty-metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+  .empty-metric strong {
+    display: block;
+    margin-top: 5px;
+    color: var(--text);
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1;
+  }
+  body.no-bracket-data .strategy-bar,
+  body.no-bracket-data .nav-inner,
+  body.no-bracket-data #finals-section {
+    display: none;
+  }
+  body.no-bracket-data .actions .btn:not(.always-enabled),
+  body.no-bracket-data #analyzeBracketBtn {
+    opacity: .45;
+    pointer-events: none;
   }
 
   .optimizer-toggle { position: fixed; right: 12px; top: 64px; z-index: 140; display: inline-flex; align-items: center; gap: 8px; }
@@ -2029,6 +2116,8 @@
     .edge-row { grid-template-columns: 1fr .7fr .7fr .7fr .7fr; gap: 6px; font-size: 10px; }
     .chat-quick-grid { grid-template-columns: 1fr; }
     .pc-rr-grid { grid-template-columns: 1fr; }
+    .empty-state { padding: 20px; min-height: 360px; }
+    .empty-metrics { grid-template-columns: 1fr; }
     .round-col { display: none; }
     .round-col.visible { display: block; }
     .mobile-tabs { display: grid; }
@@ -2067,7 +2156,7 @@
     <div class="brand">BracketGPT</div>
     <div class="nav-links">
       <a href="/bracket" class="active">Bracket</a>
-      <a href="/">Chat</a>
+      <a href="/chat">Chat</a>
     </div>
   </nav>
 
@@ -2097,6 +2186,7 @@
               <button class="btn btn-primary" onclick="autoFillModelPicks()">Auto-Fill Model Picks</button>
               <button class="btn btn-secondary" onclick="exportBracket()">Export Bracket</button>
               <button class="btn btn-secondary" onclick="resetBracket()">Clear All</button>
+              <button class="btn btn-secondary always-enabled" onclick="window.location.href='/admin'">Admin</button>
             </div>
           </div>
           <div class="progress-wrap">
@@ -2146,7 +2236,7 @@
           </div>
           <div class="upset-rec">
             <div class="upset-rec-circle" id="upsetRecCircle">0</div>
-            <div class="upset-rec-text" id="upsetRecText">Play chalk — no strong upset value at this pool size</div>
+            <div class="upset-rec-text" id="upsetRecText">Play chalk - no strong upset value at this pool size</div>
           </div>
         </section>
         <div class="nav-inner">
@@ -3605,10 +3695,80 @@
     function hideLoading() { document.getElementById('loading').style.display = 'none'; }
 
     function showError(msg) {
-      document.getElementById('error').innerHTML = '<div class="error">' + msg + ' <button class="btn btn-secondary" onclick="init()">Retry</button></div>';
+      const errorEl = document.getElementById('error');
+      if (!errorEl) return;
+      errorEl.innerHTML = '';
+      const wrap = document.createElement('div');
+      wrap.className = 'error';
+      const text = document.createElement('span');
+      text.textContent = msg || 'Something went wrong.';
+      const retry = document.createElement('button');
+      retry.className = 'btn btn-secondary';
+      retry.type = 'button';
+      retry.textContent = 'Retry';
+      retry.onclick = init;
+      wrap.append(text, ' ', retry);
+      errorEl.appendChild(wrap);
     }
 
     function clearError() { document.getElementById('error').innerHTML = ''; }
+
+    function showEmptyBracketState(detail) {
+      document.body.classList.add('no-bracket-data');
+      clearError();
+      hideLoading();
+      bracketState.picks = {};
+      const regionsEl = document.getElementById('regions');
+      const finalsEl = document.getElementById('finals');
+      const statusText = detail || 'The 2026 bracket data has not been uploaded yet.';
+      const safeStatusText = String(statusText).replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[ch]));
+      if (finalsEl) finalsEl.innerHTML = '';
+      if (regionsEl) {
+        regionsEl.innerHTML = `
+          <section class="empty-state">
+            <div class="empty-hero">
+              <div class="empty-kicker">Bracket workspace ready</div>
+              <h2>Upload the field to unlock picks.</h2>
+              <p>${safeStatusText} The chat advisor is still available, and the bracket board will populate as soon as bracket_ready_2026.json is added through Admin.</p>
+              <div class="empty-actions">
+                <button class="btn btn-primary always-enabled" type="button" onclick="window.location.href='/admin'">Open Admin</button>
+                <button class="btn btn-secondary always-enabled" type="button" onclick="sendChatMessage('What bracket strategy should I use before the field is loaded?')">Ask Strategy</button>
+                <button class="btn btn-secondary always-enabled" type="button" onclick="init()">Retry Data Load</button>
+              </div>
+            </div>
+            <div class="empty-metrics">
+              <div class="empty-metric"><span>Season</span><strong>2026</strong></div>
+              <div class="empty-metric"><span>Data status</span><strong>Waiting</strong></div>
+              <div class="empty-metric"><span>Next step</span><strong>Admin upload</strong></div>
+            </div>
+          </section>`;
+      }
+      const contextMain = document.getElementById('chatContextMain');
+      if (contextMain) contextMain.textContent = 'Bracket data is not loaded yet. Ask general pool and matchup strategy.';
+      const progressText = document.getElementById('progress-text');
+      const completionText = document.getElementById('completion-text');
+      const progressBar = document.getElementById('progress-bar');
+      const completion = document.getElementById('impactCompletion');
+      const picks = document.getElementById('impactPicks');
+      const ep = document.getElementById('impactEp');
+      const upset = document.getElementById('impactUpsets');
+      const upsetNote = document.getElementById('impactUpsetNote');
+      if (progressText) progressText.innerHTML = '0 <span class="slash">/</span> 63';
+      if (completionText) completionText.textContent = '0%';
+      if (progressBar) progressBar.style.width = '0%';
+      if (completion) completion.textContent = '0%';
+      if (picks) picks.textContent = 'Waiting for bracket data';
+      if (ep) ep.textContent = '--';
+      if (upset) upset.textContent = '--';
+      if (upsetNote) upsetNote.textContent = 'Upload tournament data to enable recommendations';
+      refreshIcons();
+    }
 
     function initTopBinCache() {
       TOP_BIN_DOM.progressText = document.getElementById('progress-text');
@@ -3826,7 +3986,8 @@
       try {
         const res = await fetch('/api/bracket');
         if (!res.ok) {
-          showError('Bracket data not loaded. Check admin panel.');
+          const payload = await res.json().catch(() => ({}));
+          showEmptyBracketState(payload?.message || payload?.error || 'Bracket data is not loaded yet.');
           return null;
         }
         bracketData = await res.json();
@@ -3845,7 +4006,7 @@
         buildTeamPowerIndex();
         return bracketData;
       } catch (e) {
-        showError('Bracket data not loaded. Check admin panel.');
+        showEmptyBracketState('Bracket data could not be reached. Retry in a moment or open Admin to check uploads.');
         return null;
       }
     }
@@ -7259,8 +7420,10 @@
         await loadTeamHumanSummaries();
         const data = await loadBracketData();
         if (!data || !Array.isArray(matchups) || matchups.length === 0) {
-          throw new Error('Bracket data not loaded. Check admin panel.');
+          showEmptyBracketState('Bracket data is not loaded yet.');
+          return;
         }
+        document.body.classList.remove('no-bracket-data');
         bracketOutput = null;
         strategyMap = {};
         teamEpRankings = {};
@@ -7312,7 +7475,7 @@
         if (baseMatchups.length === 0) {
           document.getElementById('regions').innerHTML = '';
           document.getElementById('finals').innerHTML = '';
-          showError('No bracket data loaded. Upload bracket_ready_2026.json in admin.');
+          showEmptyBracketState('No matchups were found in the uploaded bracket data.');
           return;
         }
         const byRegion = {};
@@ -7354,7 +7517,7 @@
           currentPickIndex = -1;
         }
       } catch (e) {
-        showError(String(e?.message || '').trim() || "Couldn't load bracket data.");
+        showEmptyBracketState(String(e?.message || '').trim() || "Couldn't load bracket data.");
       } finally {
         hideLoading();
       }
